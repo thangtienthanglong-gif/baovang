@@ -1126,15 +1126,17 @@ async function openZaloAndPasteMessage(message, link = '') {
 
     if (success) {
       toast('Đã tự động mở Zalo và dán tin nhắn.');
-      return;
+      return true;
     }
     
     // Fallback if local server is unreachable
     toast(`Không kết nối ZaloHelper: ${fetchError1 || fetchError2 || 'Unknown'}. Đang mở thủ công...`);
     await copyMessageAndOpenZalo(message, link);
+    return false;
   } catch (error) {
     toast(`${error.message} Nội dung đã được copy sẵn; dùng Copy tin nếu cần.`);
     await copyMessageAndOpenZalo(message, link);
+    return false;
   }
 }
 
@@ -1730,7 +1732,15 @@ async function confirmAiAction(button, actionId, card) {
       for (const log of manualLogs) {
         const payload = log.responsePayload || {};
         if (payload.link) {
-          await openZaloAndPasteMessage(payload.message || log.message, payload.link);
+          const ok = await openZaloAndPasteMessage(payload.message || log.message, payload.link);
+          if (ok && log.absenceId) {
+            try {
+              await api(`/api/absences/${log.absenceId}/zalo/manual-sent`, { method: 'POST', body: '{}' });
+              log.status = 'Đã gửi';
+            } catch (err) {
+              console.error('Failed to update status:', err);
+            }
+          }
           await new Promise(r => setTimeout(r, 3000));
         }
       }
