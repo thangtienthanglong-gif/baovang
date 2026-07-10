@@ -1740,6 +1740,13 @@ async function confirmAiAction(button, actionId, card) {
             } catch (err) {
               console.error('Failed to update status:', err);
             }
+          } else if (!ok && log.absenceId) {
+            try {
+              await api(`/api/absences/${log.absenceId}/zalo/manual-error`, { method: 'POST', body: '{}' });
+              log.status = 'Lỗi gửi';
+            } catch (err) {
+              console.error('Failed to update error status:', err);
+            }
           }
           await new Promise(r => setTimeout(r, 3000));
         }
