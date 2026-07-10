@@ -198,6 +198,9 @@ async function getBranchDb(req) {
   if (!rootDb.branches[branchId]) {
     rootDb.branches[branchId] = { students: [], absences: [], callLogs: [], notificationLogs: [], settings: defaultSettings() };
   }
+  if (!rootDb.branches[branchId].students) rootDb.branches[branchId].students = [];
+  if (!rootDb.branches[branchId].absences) rootDb.branches[branchId].absences = [];
+  
   return rootDb.branches[branchId];
 }
 
@@ -1901,6 +1904,8 @@ function upsertImportedStudents(db, importedStudents) {
   let updated = 0;
   let skipped = 0;
   const details = [];
+
+  if (!db.students) db.students = [];
 
   importedStudents.forEach(student => {
     if (!student.fullName || !student.className || !student.phone1) {
