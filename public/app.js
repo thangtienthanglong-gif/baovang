@@ -1720,6 +1720,20 @@ async function confirmAiAction(button, actionId, card) {
     card.dataset.done = 'true';
     const meta = card.querySelector('span');
     if (meta) meta.textContent = 'Đã xác nhận và app đã xử lý lệnh gửi.';
+    
+    const manualLogs = (result.logs || []).filter(log => log.status === 'Chờ gửi thủ công');
+    if (manualLogs.length > 0) {
+      addChatMessage('bot', `Hệ thống đang tự động gửi ${manualLogs.length} tin qua ZaloHelper. Vui lòng không chạm chuột/bàn phím...`);
+      for (const log of manualLogs) {
+        const payload = log.responsePayload || {};
+        if (payload.link) {
+          await openZaloAndPasteMessage(payload.message || log.message, payload.link);
+          await new Promise(r => setTimeout(r, 3000));
+        }
+      }
+      addChatMessage('bot', 'Đã hoàn tất gửi tự động qua ZaloHelper.');
+    }
+
     addChatMessage('bot', `Đã thực hiện lệnh gửi Zalo.\n${bulkZaloMessage(result)}`);
     renderManualSendPanel(result.logs || []);
     renderManualSendChatCards(result.logs || []);
