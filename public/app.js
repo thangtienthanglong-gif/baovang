@@ -1083,10 +1083,36 @@ async function copyMessageAndOpenZalo(message, link = '') {
 
 async function openZaloAndPasteMessage(message, link = '') {
   try {
-    await api('/api/local-zalo/open-paste', {
-      method: 'POST',
-      body: JSON.stringify({ message, link })
-    });
+    let success = false;
+    
+    // Attempt 1: If on Vercel, try to call the local helper on localhost:3000
+    if (window.location.hostname.includes('vercel.app')) {
+      try {
+        const localResponse = await fetch('http://localhost:3000/api/local-zalo/open-paste', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message, link })
+        });
+        if (localResponse.ok) success = true;
+      } catch (e) {
+        // Local server not running, ignore
+      }
+    }
+
+    // Attempt 2: Try the same-origin server (works if running locally)
+    if (!success) {
+      const response = await fetch('/api/local-zalo/open-paste', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, link })
+      });
+      if (response.ok) success = true;
+    }
+
+    if (success) {
+      toast('Đã tự động mở Zalo và dán tin nhắn.');
+      return;
+    }
     toast('Đã mở Zalo và đưa nội dung vào khung chat. Thầy/cô kiểm tra rồi bấm gửi.');
   } catch (error) {
     toast(`${error.message} Nội dung đã được copy sẵn; dùng Copy tin nếu cần.`);

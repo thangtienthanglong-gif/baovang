@@ -2173,6 +2173,11 @@ app.post('/api/ai-actions/confirm', async (req, res, next) => {
 
 app.post('/api/local-zalo/open-paste', async (req, res, next) => {
   try {
+    // Allow Vercel frontend to call this local endpoint
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+
     if (!isLocalRequest(req)) {
       const err = new Error('Chức năng mở và tự dán Zalo chỉ cho phép dùng trên máy đang chạy app.');
       err.status = 403;
@@ -2193,6 +2198,14 @@ app.post('/api/local-zalo/open-paste', async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+// Handle CORS preflight for the local helper
+app.options('/api/local-zalo/open-paste', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.sendStatus(200);
 });
 
 app.get('/api/students', async (req, res, next) => {
