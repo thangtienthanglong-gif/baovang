@@ -32,7 +32,13 @@ const JWT_SECRET = process.env.JWT_SECRET || 'baovang_secret_key_12345';
 let serviceAccount;
 try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    let saString = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (saString.startsWith("'") && saString.endsWith("'")) {
+      saString = saString.slice(1, -1);
+    } else if (saString.startsWith('"') && saString.endsWith('"')) {
+      saString = saString.slice(1, -1);
+    }
+    serviceAccount = JSON.parse(saString);
   } else {
     const serviceAccountPath = path.join(process.cwd(), 'serviceAccountKey.json');
     if (fs.existsSync(serviceAccountPath)) {
