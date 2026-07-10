@@ -31,6 +31,15 @@ const JWT_SECRET = process.env.JWT_SECRET || 'baovang_secret_key_12345';
 
 let serviceAccount;
 try {
+  // Use Vercel fallback base64 file if env var is missing
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+    const b64Path = path.join(process.cwd(), 'sa-b64.txt');
+    if (fs.existsSync(b64Path)) {
+      const b64 = fs.readFileSync(b64Path, 'utf8');
+      process.env.FIREBASE_SERVICE_ACCOUNT = Buffer.from(b64, 'base64').toString('utf8');
+    }
+  }
+
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     let saString = process.env.FIREBASE_SERVICE_ACCOUNT;
     if (saString.startsWith("'") && saString.endsWith("'")) {
@@ -60,6 +69,13 @@ try {
 }
 
 const PORT = process.env.PORT || 3000;
+// Hardcoded fallbacks for Vercel if Env Vars are missing
+if (!process.env.FIREBASE_DATABASE_URL) {
+  process.env.FIREBASE_DATABASE_URL = 'https://thangtienthanglong-17088-default-rtdb.firebaseio.com';
+}
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = 'mat_khau_bao_mat_gi_cung_duoc_123';
+}
 const DATA_DIR = path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
