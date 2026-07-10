@@ -165,6 +165,8 @@ async function readDb() {
     for (const branchId in db.branches) {
       if (!db.branches[branchId].students) db.branches[branchId].students = [];
       if (!db.branches[branchId].absences) db.branches[branchId].absences = [];
+      if (!db.branches[branchId].callLogs) db.branches[branchId].callLogs = [];
+      if (!db.branches[branchId].notificationLogs) db.branches[branchId].notificationLogs = [];
     }
 
     return db;
@@ -200,6 +202,8 @@ async function getBranchDb(req) {
   }
   if (!rootDb.branches[branchId].students) rootDb.branches[branchId].students = [];
   if (!rootDb.branches[branchId].absences) rootDb.branches[branchId].absences = [];
+  if (!rootDb.branches[branchId].callLogs) rootDb.branches[branchId].callLogs = [];
+  if (!rootDb.branches[branchId].notificationLogs) rootDb.branches[branchId].notificationLogs = [];
   
   return rootDb.branches[branchId];
 }
