@@ -1085,6 +1085,9 @@ async function openZaloAndPasteMessage(message, link = '') {
   try {
     let success = false;
     
+    let fetchError1 = '';
+    let fetchError2 = '';
+
     // Attempt 1: Try to call the local helper on 127.0.0.1:3000
     try {
       const localResponse = await fetch('http://127.0.0.1:3000/api/local-zalo/open-paste', {
@@ -1094,7 +1097,7 @@ async function openZaloAndPasteMessage(message, link = '') {
       });
       if (localResponse.ok) success = true;
     } catch (e) {
-      // Ignore
+      fetchError1 = e.message;
     }
 
     // Attempt 1.5: Try localhost
@@ -1107,7 +1110,7 @@ async function openZaloAndPasteMessage(message, link = '') {
         });
         if (localResponse.ok) success = true;
       } catch (e) {
-        // Ignore
+        fetchError2 = e.message;
       }
     }
 
@@ -1127,7 +1130,7 @@ async function openZaloAndPasteMessage(message, link = '') {
     }
     
     // Fallback if local server is unreachable
-    toast('Không kết nối được ZaloHelper tự động, sẽ mở thủ công...');
+    toast(`Không kết nối ZaloHelper: ${fetchError1 || fetchError2 || 'Unknown'}. Đang mở thủ công...`);
     await copyMessageAndOpenZalo(message, link);
   } catch (error) {
     toast(`${error.message} Nội dung đã được copy sẵn; dùng Copy tin nếu cần.`);
