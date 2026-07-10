@@ -160,6 +160,13 @@ async function readDb() {
     }
     
     if (!db.branches) db.branches = {};
+
+    // Normalize arrays for all branches to prevent undefined errors
+    for (const branchId in db.branches) {
+      if (!db.branches[branchId].students) db.branches[branchId].students = [];
+      if (!db.branches[branchId].absences) db.branches[branchId].absences = [];
+    }
+
     return db;
   } catch (err) {
     console.error('Lỗi khi đọc dữ liệu từ Firebase:', err);
