@@ -474,9 +474,13 @@ function sendWorkbook(res, filename, sheets) {
 }
 
 function buildMessage(settings, absence, student) {
+  const dateStr = absence.date || '';
+  const dateParts = dateStr.split('-');
+  const displayDate = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : dateStr;
+
   const dict = {
     schoolName: settings.schoolName || 'Trường học',
-    date: absence.date || '',
+    date: displayDate,
     studentCode: student.code || '',
     studentName: student.fullName || '',
     className: student.className || '',
