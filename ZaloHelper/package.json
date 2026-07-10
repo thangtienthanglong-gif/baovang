@@ -1,0 +1,11 @@
+{
+  "name": "zalo-helper",
+  "version": "1.0.0",
+  "description": "Zalo Helper Tool",
+  "main": "server.js",
+  "bin": "server.js",
+  "scripts": {
+    "build": "pkg . --targets node18-win-x64 --output ZaloHelper.exe"
+  },
+  "dependencies": {}
+}
