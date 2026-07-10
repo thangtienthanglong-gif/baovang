@@ -41,7 +41,6 @@ $link = ""
 if ($env:ZALO_AUTOPASTE_LINK_B64) {
   $link = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:ZALO_AUTOPASTE_LINK_B64))
 }
-if ($link) { Start-Process $link }
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
@@ -121,7 +120,19 @@ function Invoke-AutomationElement($element) {
   return $false
 }
 
+$zaloProc = Get-Process -Name "Zalo" -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+if ($zaloProc) {
+  $handle = $zaloProc.MainWindowHandle
+  [Win32ZaloPaste]::ShowWindowAsync($handle, 9) | Out-Null
+  [Win32ZaloPaste]::SetForegroundWindow($handle) | Out-Null
+  Start-Sleep -Milliseconds 100
+  [System.Windows.Forms.SendKeys]::SendWait("{ESC}")
+  Start-Sleep -Milliseconds 100
+}
+
+if ($link) { Start-Process $link }
 Start-Sleep -Seconds 1
+
 $zaloProc = Get-Process -Name "Zalo" -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
 if (-not $zaloProc) {
   if ($msg) { [System.Windows.Forms.Clipboard]::SetText($msg) }
@@ -168,14 +179,8 @@ try {
 } catch {}
 
 if (-not $pasted) {
-  Click-WindowRatio $handle 0.5 0.92
-  Start-Sleep -Milliseconds 100
-  [Win32ZaloPaste]::keybd_event(0x11, 0, 0, [UIntPtr]::Zero)
-  [Win32ZaloPaste]::keybd_event(0x56, 0, 0, [UIntPtr]::Zero)
-  [Win32ZaloPaste]::keybd_event(0x56, 0, 2, [UIntPtr]::Zero)
-  [Win32ZaloPaste]::keybd_event(0x11, 0, 2, [UIntPtr]::Zero)
-  Start-Sleep -Milliseconds 200
-  [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+  Write-Error "Khong the tim thay o nhap tin nhan Zalo. Co the do chua ket ban, so dien thoai khong ton tai hoac Zalo phien ban moi thay doi giao dien."
+  exit 1
 }
 
 Write-Host "Success"

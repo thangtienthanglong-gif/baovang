@@ -2611,26 +2611,37 @@ app.post('/api/absences/:id/zalo/manual-sent', async (req, res, next) => {
       updatedAt: time
     };
 
-    const log = {
-      id: id('noti'),
-      time,
-      absenceId: absence.id,
-      date: absence.date,
-      studentId: student.id || '',
-      studentCode: student.code || '',
-      studentName: student.fullName || '',
-      className: student.className || '',
-      parentName: student.parentName || '',
-      phone1: student.phone1 || '',
-      zaloUserId: student.zaloUserId || '',
-      channel: 'Zalo cá nhân',
-      reason: 'personal_manual_confirmed',
-      message,
-      status: 'Đã gửi',
-      result: 'Đã gửi qua Zalo cá nhân, giáo viên đánh dấu thủ công.',
-      responsePayload: { manual: true }
-    };
-    db.notificationLogs.push(log);
+    const existingLogIndex = db.notificationLogs.findIndex(l => l.absenceId === absence.id && l.status === 'Chờ gửi thủ công');
+    
+    let log;
+    if (existingLogIndex !== -1) {
+      log = db.notificationLogs[existingLogIndex];
+      log.status = 'Đã gửi';
+      log.result = 'Đã gửi qua Zalo cá nhân, giáo viên đánh dấu thủ công.';
+      log.time = time;
+    } else {
+      log = {
+        id: id('noti'),
+        time,
+        absenceId: absence.id,
+        date: absence.date,
+        studentId: student.id || '',
+        studentCode: student.code || '',
+        studentName: student.fullName || '',
+        className: student.className || '',
+        parentName: student.parentName || '',
+        phone1: student.phone1 || '',
+        zaloUserId: student.zaloUserId || '',
+        channel: 'Zalo cá nhân',
+        reason: 'personal_manual_confirmed',
+        message,
+        status: 'Đã gửi',
+        result: 'Đã gửi qua Zalo cá nhân, giáo viên đánh dấu thủ công.',
+        responsePayload: { manual: true }
+      };
+      db.notificationLogs.push(log);
+    }
+    
     await saveBranchDb(req, db);
     res.json({ absence: enrichAbsence(db.absences[index], studentByIdMap(db.students)), log });
   } catch (error) {
@@ -2664,26 +2675,37 @@ app.post('/api/absences/:id/zalo/manual-error', async (req, res, next) => {
       updatedAt: time
     };
 
-    const log = {
-      id: id('noti'),
-      time,
-      absenceId: absence.id,
-      date: absence.date,
-      studentId: student.id || '',
-      studentCode: student.code || '',
-      studentName: student.fullName || '',
-      className: student.className || '',
-      parentName: student.parentName || '',
-      phone1: student.phone1 || '',
-      zaloUserId: student.zaloUserId || '',
-      channel: 'Zalo cá nhân',
-      reason: 'personal_manual_failed',
-      message,
-      status: 'Lỗi gửi',
-      result: 'Lỗi: Không kết nối được ZaloHelper nội bộ.',
-      responsePayload: { manual: true }
-    };
-    db.notificationLogs.push(log);
+    const existingLogIndex = db.notificationLogs.findIndex(l => l.absenceId === absence.id && l.status === 'Chờ gửi thủ công');
+    
+    let log;
+    if (existingLogIndex !== -1) {
+      log = db.notificationLogs[existingLogIndex];
+      log.status = 'Lỗi gửi';
+      log.result = 'Lỗi: Không kết nối được ZaloHelper nội bộ.';
+      log.time = time;
+    } else {
+      log = {
+        id: id('noti'),
+        time,
+        absenceId: absence.id,
+        date: absence.date,
+        studentId: student.id || '',
+        studentCode: student.code || '',
+        studentName: student.fullName || '',
+        className: student.className || '',
+        parentName: student.parentName || '',
+        phone1: student.phone1 || '',
+        zaloUserId: student.zaloUserId || '',
+        channel: 'Zalo cá nhân',
+        reason: 'personal_manual_failed',
+        message,
+        status: 'Lỗi gửi',
+        result: 'Lỗi: Không kết nối được ZaloHelper nội bộ.',
+        responsePayload: { manual: true }
+      };
+      db.notificationLogs.push(log);
+    }
+    
     await saveBranchDb(req, db);
     res.json({ absence: enrichAbsence(db.absences[index], studentByIdMap(db.students)), log });
   } catch (error) {
