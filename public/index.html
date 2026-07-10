@@ -32,8 +32,7 @@
         <button class="tab" data-tab="queueTab" type="button"><span class="nav-icon"><i class="fa-solid fa-list-check"></i></span> Hàng xử lý</button>
         <button class="tab" data-tab="importTab" type="button"><span class="nav-icon"><i class="fa-solid fa-file-excel"></i></span> Nạp Excel</button>
         <button class="tab" data-tab="zaloTab" type="button"><span class="nav-icon"><i class="fa-solid fa-comment-dots"></i></span> Zalo</button>
-        <button class="tab" data-tab="noticeTab" type="button"><span class="nav-icon"><i class="fa-solid fa-clock-rotate-left"></i></span> Lịch sử Zalo</button>
-        <button class="tab" data-tab="historyTab" type="button"><span class="nav-icon"><i class="fa-solid fa-phone-volume"></i></span> Lịch sử gọi</button>
+        <button class="tab" data-tab="historyTab" type="button"><span class="nav-icon"><i class="fa-solid fa-clock-rotate-left"></i></span> Lịch sử liên hệ</button>
         <button class="tab admin-only" data-tab="staffTab" type="button" style="display:none;"><span class="nav-icon"><i class="fa-solid fa-users"></i></span> Nhân sự</button>
       </nav>
 
@@ -389,24 +388,25 @@
       </section>
     </section>
 
-    <section id="noticeTab" class="tab-panel">
+    <section id="historyTab" class="tab-panel">
       <section class="card filters">
         <div class="field">
-          <label for="noticeDate">Ngày vắng</label>
-          <input id="noticeDate" type="date">
+          <label for="historyDate">Ngày vắng</label>
+          <input id="historyDate" type="date">
         </div>
         <div class="field grow">
-          <label for="noticeKeyword">Tìm kiếm</label>
-          <input id="noticeKeyword" type="search" placeholder="Tên, lớp, phụ huynh, UID, trạng thái">
+          <label for="historyKeyword">Tìm kiếm</label>
+          <input id="historyKeyword" type="search" placeholder="Tên, lớp, phụ huynh, SĐT, trạng thái...">
         </div>
-        <button class="btn" id="noticeFilterBtn" type="button">Lọc lịch sử Zalo</button>
+        <button class="btn" id="historyFilterBtn" type="button">Lọc lịch sử</button>
       </section>
+
       <section class="card table-card">
         <div class="section-title">
           <div>
             <h2>Lịch sử gửi Zalo</h2>
           </div>
-          <button class="btn danger" id="clearNoticeHistoryBtn" type="button">Xóa lịch sử</button>
+          <button class="btn danger" id="clearNoticeHistoryBtn" type="button">Xóa lịch sử Zalo</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -427,22 +427,6 @@
           </table>
         </div>
       </section>
-    </section>
-
-    <section id="historyTab" class="tab-panel">
-      <section class="card filters">
-        <div class="field">
-          <label for="historyDate">Ngày vắng</label>
-          <input id="historyDate" type="date">
-        </div>
-        <div class="field grow">
-          <label for="historyKeyword">Tìm kiếm</label>
-          <input id="historyKeyword" type="search" placeholder="Tên, lớp, người gọi, số điện thoại">
-        </div>
-        <button class="btn" id="historyFilterBtn" type="button">Lọc lịch sử</button>
-      </section>
-
-    
 
       <section class="card table-card">
         <div class="section-title">

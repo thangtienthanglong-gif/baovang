@@ -232,8 +232,9 @@ async function refreshCurrentView(button) {
     await loadBootstrap();
     const tab = activeTabId();
     if (tab === 'queueTab') await loadAbsences();
-    if (tab === 'historyTab') await loadHistory();
-    if (tab === 'noticeTab') await loadNotices();
+    if (tab === 'historyTab') {
+      await Promise.all([loadHistory(), loadNotices()]);
+    }
     if (tab === 'absenceTab' || tab === 'overviewTab') await loadAttendanceAbsences();
     toast('Đã tải lại dữ liệu.');
   } catch (error) {
@@ -932,8 +933,8 @@ async function loadHistory() {
 
 async function loadNotices() {
   const rows = await api('/api/notification-logs?' + queryString({
-    date: $('#noticeDate').value,
-    q: $('#noticeKeyword').value.trim()
+    date: $('#historyDate').value,
+    q: $('#historyKeyword').value.trim()
   }));
 
   const tbody = $('#noticeRows');
@@ -977,8 +978,9 @@ async function activateTab(tabId, activeShortcut = null) {
   $$('.tab-panel').forEach(panel => panel.classList.remove('active'));
   $('#' + tabId).classList.add('active');
   if (tabId === 'overviewTab' || tabId === 'absenceTab') await loadAttendanceAbsences();
-  if (tabId === 'historyTab') await loadHistory();
-  if (tabId === 'noticeTab') await loadNotices();
+  if (tabId === 'historyTab') {
+    await Promise.all([loadHistory(), loadNotices()]);
+  }
   if (tabId === 'queueTab') await loadAbsences();
 }
 
@@ -1292,8 +1294,8 @@ async function clearCallHistory() {
 
 async function clearNoticeHistory() {
   const params = {
-    date: $('#noticeDate')?.value || '',
-    q: $('#noticeKeyword')?.value.trim() || ''
+    date: $('#historyDate')?.value || '',
+    q: $('#historyKeyword')?.value.trim() || ''
   };
   const scope = params.date || params.q ? 'lịch sử Zalo đang lọc' : 'toàn bộ lịch sử Zalo';
   if (!confirm(`Xóa ${scope}?`)) return;
@@ -2065,7 +2067,9 @@ function initEvents() {
     $(selector)?.addEventListener('change', renderAiStatus);
   });
 
-  $('#historyFilterBtn').addEventListener('click', loadHistory);
+  $('#historyFilterBtn').addEventListener('click', async () => {
+    await Promise.all([loadHistory(), loadNotices()]);
+  });
   $('#clearCallHistoryBtn')?.addEventListener('click', async () => {
     try {
       await clearCallHistory();
@@ -2085,20 +2089,18 @@ function initEvents() {
       q: $('#historyKeyword')?.value.trim() || ''
     });
   });
-  $('#historyKeyword').addEventListener('keydown', event => {
-    if (event.key === 'Enter') loadHistory();
+  $('#historyKeyword').addEventListener('keydown', async event => {
+    if (event.key === 'Enter') {
+      await Promise.all([loadHistory(), loadNotices()]);
+    }
   });
 
-  $('#noticeFilterBtn').addEventListener('click', loadNotices);
   $('#clearNoticeHistoryBtn')?.addEventListener('click', async () => {
     try {
       await clearNoticeHistory();
     } catch (error) {
       toast(error.message, 'error');
     }
-  });
-  $('#noticeKeyword').addEventListener('keydown', event => {
-    if (event.key === 'Enter') loadNotices();
   });
 }
 
