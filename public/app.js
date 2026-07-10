@@ -157,6 +157,10 @@ async function api(path, options = {}) {
 async function apiForm(path, formData) {
   const response = await fetch(path, {
     method: 'POST',
+    headers: {
+      'X-Branch-Id': getActiveBranch(),
+      'Authorization': 'Bearer ' + getToken()
+    },
     body: formData
   });
   const data = await response.json().catch(() => ({}));
