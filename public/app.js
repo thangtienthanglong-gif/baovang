@@ -266,6 +266,7 @@ async function loadStudents(q = '') {
   renderStudentSelect();
   renderClassDropdown();
   renderRoster();
+  renderFilters(); // Added this!
 }
 
 function getClassScheduleInfo(className, dateString, forcedDay = 'ALL') {
