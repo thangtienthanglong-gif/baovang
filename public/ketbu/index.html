@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>App xếp lịch học bù</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-frame">
+    <aside class="taskbar">
+      <div class="taskbar-brand">
+        <div class="logo-mark">LB</div>
+        <div>
+          <strong>Lịch bù</strong>
+          <span>Webapp quản lý lớp</span>
+        </div>
+      </div>
+
+      <nav class="task-nav" aria-label="Thanh chức năng">
+        <button class="task-item is-active" type="button" data-view="planner">
+          <span class="task-index">01</span>
+          <span class="task-icon task-icon-planner" aria-hidden="true"></span>
+          <span class="task-label">Xếp lịch bù</span>
+        </button>
+        <button class="task-item" type="button" data-view="settings">
+          <span class="task-index">02</span>
+          <span class="task-icon task-icon-settings" aria-hidden="true"></span>
+          <span class="task-label">Cài đặt lớp</span>
+        </button>
+        <button class="task-item" type="button" data-view="assignments">
+          <span class="task-index">03</span>
+          <span class="task-icon task-icon-list" aria-hidden="true"></span>
+          <span class="task-label">Lịch đã xếp</span>
+        </button>
+        <a href="/" class="task-item" style="text-decoration: none; color: inherit; display: flex; align-items: center; justify-content: center; font-weight: 500;">
+          <span class="task-label" style="font-size: 14px;">‹ Trở về Báo vắng</span>
+        </a>
+      </nav>
+
+      <label class="toggle-row capacity-toggle taskbar-capacity-toggle" for="capacityCheckToggle">
+        <input id="capacityCheckToggle" type="checkbox" />
+        <span class="switch-track" aria-hidden="true"><span></span></span>
+        <strong>Kiểm tra sức chứa</strong>
+      </label>
+
+      <div class="branch-switcher" aria-label="Quản lý chi nhánh">
+        <label for="branchSelect">Chi nhánh</label>
+        <div class="branch-control-row">
+          <select id="branchSelect"></select>
+          <button id="addBranchBtn" class="branch-button" type="button" title="Thêm chi nhánh">+</button>
+          <button id="renameBranchBtn" class="branch-button" type="button">Đổi tên</button>
+          <button id="deleteBranchBtn" class="branch-button danger" type="button">Xóa</button>
+        </div>
+      </div>
+
+    </aside>
+
+    <main class="content-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">TRUNG TÂM BỒI DƯỠNG VĂN HÓA THĂNG TIẾN THĂNG LONG</p>
+          <h1 id="pageTitle">Xếp lịch học bù</h1>
+          <p id="pageSubtitle">Tìm lớp bù cùng phần học, cùng khối và còn sức chứa phòng.</p>
+        </div>
+        <div class="header-actions">
+          <img class="company-logo" src="./company-logo.png" alt="TRUNG TÂM BỒI DƯỠNG VĂN HÓA THĂNG TIẾN THĂNG LONG" />
+        </div>
+      </header>
+
+      <section id="plannerView" class="view-section is-active" data-view-panel="planner">
+        <div class="planner-stage">
+          <div class="planner-main">
+            <div class="planner-grid">
+              <article class="work-card planner-card planner-card-red">
+                <div class="card-title">
+                  <span class="icon-box icon-red">HS</span>
+                  <div>
+                    <p>1</p>
+                    <h2>Nhập mã lớp</h2>
+                  </div>
+                </div>
+
+                <label for="studentClassCode">Mã lớp học sinh</label>
+                <input id="studentClassCode" type="text" placeholder="VD: 8S35, 8S35A, 8VC2, 8AT2..." autocomplete="off" />
+
+                <label for="studentNameInput">Tên học sinh để lưu lịch sử</label>
+                <input id="studentNameInput" type="text" placeholder="VD: Lê Hoàng Phúc" autocomplete="off" />
+
+                <div id="studentInfo" class="student-profile"></div>
+              </article>
+
+              <article class="work-card planner-card planner-card-orange">
+                <div class="card-title">
+                  <span class="icon-box icon-orange">BK</span>
+                  <div>
+                    <p>2</p>
+                    <h2>Chọn buổi bị kẹt</h2>
+                  </div>
+                </div>
+
+                <label for="missedSessionSelect">Buổi học sinh bị kẹt</label>
+                <select id="missedSessionSelect"></select>
+                <div id="missedInfo" class="info-box"></div>
+              </article>
+
+              <article class="work-card planner-card planner-card-green">
+                <div class="card-title">
+                  <span class="icon-box icon-green">TG</span>
+                  <div>
+                    <p>3</p>
+                    <h2>Chọn buổi muốn bù</h2>
+                  </div>
+                </div>
+
+                <label for="preferredWeekday">Thứ muốn bù</label>
+                <select id="preferredWeekday">
+                  <option value="2">Thứ 2</option>
+                  <option value="3">Thứ 3</option>
+                  <option value="4">Thứ 4</option>
+                  <option value="5">Thứ 5</option>
+                  <option value="6">Thứ 6</option>
+                  <option value="7">Thứ 7</option>
+                  <option value="8">Chủ nhật</option>
+                </select>
+
+                <label for="preferredShift">Ca muốn bù</label>
+                <select id="preferredShift">
+                  <option value="Sáng">Sáng</option>
+                  <option value="Chiều">Chiều</option>
+                  <option value="Tối">Tối</option>
+                </select>
+
+                <button id="findBtn" class="planner-search-button" type="button">Tìm lớp bù phù hợp</button>
+              </article>
+
+            </div>
+
+            <section class="panel result-panel planner-result-panel">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Kết quả</p>
+                  <h2>Kết quả gợi ý <span id="resultCount">(0 lớp phù hợp)</span></h2>
+                </div>
+                <div id="notice" class="notice" hidden></div>
+              </div>
+
+              <div id="resultSummary" class="result-summary"></div>
+
+              <div class="table-wrap">
+                <table class="suggestion-table">
+                  <thead>
+                    <tr>
+                      <th>Lớp bù gợi ý</th>
+                      <th>Thời gian</th>
+                      <th>Phần học</th>
+                      <th>Phòng học</th>
+                      <th>Số chỗ còn lại</th>
+                      <th>Mức độ phù hợp</th>
+                      <th>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody id="suggestionsBody"></tbody>
+                </table>
+              </div>
+
+              <div class="planner-legend">
+                <span>Gợi ý được sắp xếp theo mức độ phù hợp và số chỗ còn lại.</span>
+                <div class="planner-legend-tags">
+                  <span class="badge success">Phù hợp cao</span>
+                  <span class="badge warning">Phù hợp trung bình</span>
+                  <span class="badge danger">Phù hợp thấp</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Kiểm tra</p>
+                  <h2>Lớp không thể xếp</h2>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Lớp</th>
+                      <th>Buổi</th>
+                      <th>Phần học</th>
+                      <th>Sĩ số</th>
+                      <th>Lý do</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rejectedBody"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section id="settingsView" class="view-section settings-view" data-view-panel="settings">
+        <div class="settings-hero">
+          <span class="settings-hero-icon" aria-hidden="true"></span>
+          <div>
+            <p class="eyebrow">Cài đặt</p>
+            <h2>Thêm hoặc sửa lớp</h2>
+            <p>Quản lý thông tin lớp học một cách dễ dàng và chính xác.</p>
+          </div>
+        </div>
+
+        <div class="settings-grid">
+          <article class="panel editor-panel settings-editor">
+            <div class="form-grid one-col settings-form">
+              <div class="form-field">
+                <div class="field-label-row">
+                  <span class="field-icon field-icon-code" aria-hidden="true"></span>
+                  <label for="settingClassCode">Mã lớp</label>
+                </div>
+                <input id="settingClassCode" type="text" placeholder="Ví dụ: 8S35A, 8VC2, 8AT2" />
+              </div>
+              <div class="form-field">
+                <div class="field-label-row">
+                  <span class="field-icon field-icon-calendar" aria-hidden="true"></span>
+                  <label>Phần học theo buổi</label>
+                </div>
+                <div id="settingScheduleFields" class="schedule-fields"></div>
+              </div>
+              <div class="settings-triple-grid">
+                <div class="form-field compact-field">
+                  <div class="field-label-row">
+                    <span class="field-icon field-icon-room" aria-hidden="true"></span>
+                    <label for="settingRoom">Phòng mặc định</label>
+                  </div>
+                  <input id="settingRoom" type="text" placeholder="P1B" />
+                </div>
+                <div class="form-field compact-field">
+                  <div class="field-label-row">
+                    <span class="field-icon field-icon-capacity" aria-hidden="true"></span>
+                    <label for="settingCapacity">Sức chứa mặc định</label>
+                  </div>
+                  <input id="settingCapacity" type="number" min="1" placeholder="20" />
+                </div>
+                <div class="form-field compact-field">
+                  <div class="field-label-row">
+                    <span class="field-icon field-icon-count" aria-hidden="true"></span>
+                    <label for="settingCount">Sĩ số hiện tại</label>
+                  </div>
+                  <input id="settingCount" type="number" min="0" placeholder="18" />
+                </div>
+              </div>
+            </div>
+
+            <div class="button-row editor-actions">
+              <button id="autoSaveIndicator" class="auto-save-indicator" type="button" disabled>Tự động lưu bật</button>
+              <button id="saveClassBtn" class="primary-button" type="button">Thêm lớp</button>
+              <button id="clearClassFormBtn" class="soft-button" type="button">Làm mới</button>
+              <button id="deleteClassBtn" class="danger-button" type="button">Xóa lớp</button>
+            </div>
+            <p id="classFormStatus" class="status-text"></p>
+          </article>
+
+        </div>
+
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Danh mục</p>
+              <h2>Danh sách lớp đang quản lý</h2>
+            </div>
+          </div>
+          <div id="parsedClassesBody" class="class-tree" aria-label="Cây danh mục lớp"></div>
+        </section>
+      </section>
+
+      <section id="assignmentsView" class="view-section" data-view-panel="assignments">
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Lưu trữ</p>
+              <h2>Danh sách học bù đã xác nhận</h2>
+            </div>
+            <div class="assignment-actions" aria-label="Xuất và quản lý lịch sử">
+              <label class="date-filter-field" for="exportDateFrom">
+                <span>Từ ngày</span>
+                <input id="exportDateFrom" type="date" />
+              </label>
+              <label class="date-filter-field" for="exportDateTo">
+                <span>Đến ngày</span>
+                <input id="exportDateTo" type="date" />
+              </label>
+              <button id="exportAssignmentsBtn" class="export-button" type="button">Xuất Excel</button>
+              <button id="clearAssignmentsBtn" class="history-button" type="button">Xóa lịch sử</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Học sinh</th>
+                  <th>Lớp chính</th>
+                  <th>Buổi kẹt</th>
+                  <th>Phần bù</th>
+                  <th>Lớp bù</th>
+                  <th>Buổi bù</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="assignmentsBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

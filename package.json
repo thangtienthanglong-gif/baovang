@@ -1,0 +1,43 @@
+{
+  "name": "bao-vang-hoc-sinh-standalone",
+  "version": "1.0.0",
+  "description": "App độc lập quản lý báo vắng học sinh và tự động gửi Zalo OA",
+  "main": "server.js",
+  "bin": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "build": "pkg . --targets node18-win-x64 --output dist/BaoVangApp.exe"
+  },
+  "keywords": [
+    "attendance",
+    "student",
+    "absence",
+    "school",
+    "zalo-oa",
+    "vietnamese"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "firebase-admin": "^14.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^1.4.5-lts.1",
+    "socket.io": "^4.8.3",
+    "xlsx": "^0.18.5"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "pkg": {
+    "assets": [
+      "public/**/*"
+    ]
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  }
+}

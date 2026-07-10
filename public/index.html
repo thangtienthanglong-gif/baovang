@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Báo vắng học sinh qua Zalo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="/style.css?v=20260703-coze-balanced">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+<body>
+
+  <div class="sidebar-backdrop" onclick="document.querySelector('.sidebar').classList.remove('open'); this.classList.remove('show');"></div>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="side-brand">
+        <div class="brand-mark">BV</div>
+        <div>
+          <strong>Báo vắng</strong>
+          <span>học sinh</span>
+        </div>
+        <button class="collapse-btn" type="button" aria-label="Thu gọn">‹</button>
+      </div>
+
+      <nav class="tabs side-nav" aria-label="Chức năng">
+        <button class="tab" data-tab="overviewTab" type="button"><span class="nav-icon"><i class="fa-solid fa-border-all"></i></span> Tổng quan</button>
+        <button class="tab active" data-tab="absenceTab" type="button"><span class="nav-icon"><i class="fa-solid fa-clipboard-user"></i></span> Điểm danh vắng</button>
+        <a href="/ketbu/index.html" class="tab" style="text-decoration: none; color: inherit;"><span class="nav-icon"><i class="fa-solid fa-calendar-alt"></i></span> Lịch học bù</a>
+        <button class="tab" data-tab="queueTab" type="button"><span class="nav-icon"><i class="fa-solid fa-list-check"></i></span> Hàng xử lý</button>
+        <button class="tab" data-tab="importTab" type="button"><span class="nav-icon"><i class="fa-solid fa-file-excel"></i></span> Nạp Excel</button>
+        <button class="tab" data-tab="zaloTab" type="button"><span class="nav-icon"><i class="fa-solid fa-comment-dots"></i></span> Zalo</button>
+        <button class="tab" data-tab="noticeTab" type="button"><span class="nav-icon"><i class="fa-solid fa-clock-rotate-left"></i></span> Lịch sử Zalo</button>
+        <button class="tab" data-tab="historyTab" type="button"><span class="nav-icon"><i class="fa-solid fa-phone-volume"></i></span> Lịch sử gọi</button>
+        <button class="tab admin-only" data-tab="staffTab" type="button" style="display:none;"><span class="nav-icon"><i class="fa-solid fa-users"></i></span> Nhân sự</button>
+      </nav>
+
+      <div class="side-extra">
+        <button class="side-link" data-tab="cozeTab" type="button"><span class="nav-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span> Trợ lý AI</button>
+        <button class="side-link" data-tab="guideTab" type="button"><span class="nav-icon"><i class="fa-solid fa-circle-question"></i></span> Hướng dẫn</button>
+      </div>
+
+      <div class="teacher-card">
+        <div class="teacher-avatar">GV</div>
+        <div>
+          <strong>Giáo viên</strong>
+          <span>GV Trường THCS</span>
+        </div>
+        <span class="teacher-chevron">⌄</span>
+      </div>
+    </aside>
+
+    <div class="app-main">
+      <header class="topbar">
+        <div class="title-block">
+          <button class="mobile-menu-btn" type="button" aria-label="Menu" onclick="document.querySelector('.sidebar').classList.add('open'); document.querySelector('.sidebar-backdrop').classList.add('show');">
+            <i class="fa-solid fa-bars"></i>
+          </button>
+          <h1>Báo vắng học sinh</h1>
+        </div>
+        <div class="header-actions">
+          
+          
+          <select id="branchSelector" style="padding: 6px; border-radius: 6px; border: 1px solid var(--border-color); background: white; margin-right: 8px;">
+            <option value="main">Cơ sở chính (Main)</option>
+          </select>
+          <button class="btn" id="newBranchBtn" type="button" style="margin-right: 8px; padding: 6px 12px;" title="Thêm chi nhánh mới"><i class="fa-solid fa-plus"></i></button>
+          <button class="btn danger" id="delBranchBtn" type="button" style="margin-right: 8px; padding: 6px 12px; background: #fee2e2; color: #dc2626; border-color: #fca5a5;" title="Xóa chi nhánh này"><i class="fa-solid fa-trash"></i></button>
+          <button class="btn" id="renameBranchBtn" type="button" style="margin-right: 8px; padding: 6px 12px; background: #e0e7ff; color: #4338ca; border-color: #c7d2fe;" title="Đổi tên chi nhánh"><i class="fa-solid fa-pen"></i></button>
+          <button class="btn secondary" id="refreshBtn" type="button"><span class="btn-icon"><i class="fa-solid fa-rotate-right"></i></span> Tải lại</button>
+        </div>
+      </header>
+
+      <main>
+    <section id="overviewTab" class="tab-panel">
+      <section class="overview-header">
+        <div>
+          <h2>Tổng quan</h2>
+          <p>Theo dõi nhanh số học sinh vắng, trạng thái gọi điện và trạng thái Zalo.</p>
+        </div>
+      </section>
+      <section class="summary-grid" id="summaryGrid"></section>
+      <section class="charts-layout">
+        <div class="chart-card">
+          <h3>Tỷ lệ vắng học</h3>
+          <canvas id="absencePieChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Thống kê vắng theo lớp</h3>
+          <canvas id="classBarChart"></canvas>
+        </div>
+      </section>
+    </section>
+
+    <section id="absenceTab" class="tab-panel active">
+      <section class="attendance-layout">
+        <aside class="class-panel">
+          <div class="class-panel-header">
+            <div class="panel-heading">
+              <div>
+                <h2>Danh sách lớp</h2>
+                <span id="classCount" class="muted">0 lớp</span>
+              </div>
+            </div>
+            <div class="field class-dropdown-field" style="margin-bottom: 12px;">
+              <label for="dayDropdown">Chọn thứ</label>
+              <select id="dayDropdown">
+                <option value="ALL">Theo ngày hiện tại</option>
+                <option value="2">Thứ 2</option>
+                <option value="3">Thứ 3</option>
+                <option value="4">Thứ 4</option>
+                <option value="5">Thứ 5</option>
+                <option value="6">Thứ 6</option>
+                <option value="7">Thứ 7</option>
+                <option value="8">Chủ nhật</option>
+              </select>
+            </div>
+            <div class="field class-dropdown-field" style="margin-bottom: 12px;">
+              <label for="sessionDropdown">Chọn buổi</label>
+              <select id="sessionDropdown">
+                <option value="ALL">Tất cả các buổi</option>
+                <option value="Sáng">Buổi Sáng</option>
+                <option value="Chiều">Buổi Chiều</option>
+                <option value="Tối">Buổi Tối</option>
+              </select>
+            </div>
+            <div class="field class-dropdown-field">
+              <label for="classDropdown">Chọn lớp</label>
+              <select id="classDropdown"></select>
+            </div>
+          </div>
+          <div id="classDropdownMeta" class="class-dropdown-meta"></div>
+        </aside>
+
+        <section class="roster-panel">
+          <section class="card roster-card">
+            <div class="section-title inline-title">
+              <div>
+                <h2 id="rosterTitle">Danh sách học sinh</h2>
+                <p id="rosterMeta">Chọn lớp ở cây bên trái để thao tác nhanh.</p>
+              </div>
+              <button class="btn ghost export-btn" type="button">Xuất danh sách</button>
+            </div>
+            <div id="studentRoster" class="student-roster"></div>
+          </section>
+
+        </section>
+      </section>
+    </section>
+
+    <section id="queueTab" class="tab-panel">
+      <section class="card queue-card">
+        <div class="section-title inline-title">
+          <div>
+            <h2>Hàng xử lý báo vắng</h2>
+            <p>Theo dõi trạng thái gửi Zalo theo danh sách báo vắng trong ngày.</p>
+          </div>
+          <div class="section-actions">
+            <button class="btn ghost" id="exportLateQueueBtn" type="button">Xuất HS đi trễ</button>
+            <button class="btn danger" id="exportFailedZaloQueueBtn" type="button">Xuất DS lỗi Zalo</button>
+            <button class="btn blue" id="bulkSendTuitionBtn" type="button">Nhắc trễ học phí</button>
+            <button class="btn blue" id="bulkSendZaloBtn" type="button">Gửi Zalo hàng loạt</button>
+          </div>
+        </div>
+        <section class="queue-filters">
+          <div class="field">
+            <label for="filterDate">Ngày</label>
+            <input id="filterDate" type="date">
+          </div>
+          <div class="field">
+            <label for="filterClass">Lớp</label>
+            <select id="filterClass"></select>
+          </div>
+          <div class="field">
+            <label for="filterAbsenceStatus">Trạng thái vắng</label>
+            <select id="filterAbsenceStatus"></select>
+          </div>
+          <div class="field">
+            <label for="filterNoticeStatus">Zalo</label>
+            <select id="filterNoticeStatus"></select>
+          </div>
+          <div class="field grow">
+            <label for="filterKeyword">Tìm kiếm</label>
+            <input id="filterKeyword" type="search" placeholder="Tên, mã HS, phụ huynh, số điện thoại">
+          </div>
+          <button class="btn" id="applyFilterBtn" type="button">Lọc</button>
+        </section>
+        <section id="manualSendPanel" class="manual-send-panel" hidden></section>
+        <div id="absenceRows" class="absence-list"></div>
+      </section>
+    </section>
+
+    <section id="importTab" class="tab-panel">
+      <section class="import-layout">
+        <section class="card import-card">
+          <div class="section-title">
+            <div>
+              <h2>Nạp danh bạ học sinh từ Excel</h2>
+              <p>File có lớp, họ tên học sinh và số điện thoại phụ huynh.</p>
+            </div>
+          </div>
+          <form id="importForm" class="form-grid">
+            <div class="field span-4">
+              <label for="contactsFile">File danh bạ .xlsx</label>
+              <input id="contactsFile" name="contacts" type="file" accept=".xlsx,.xls" multiple required>
+            </div>
+            <div class="actions span-4">
+              <button class="btn" type="submit">Nạp và tách lớp</button>
+              <button class="btn ghost" type="button" id="clearContactsBtn" style="margin-left: 8px;">Xóa file</button>
+            </div>
+          </form>
+        </section>
+        <section class="card import-result-card">
+          <div class="section-title">
+            <div>
+              <h2>Kết quả nhận diện</h2>
+              <p>Sau khi nạp, quay về cây lớp để kiểm tra danh sách.</p>
+            </div>
+          </div>
+          <pre id="importResult" class="result-box"></pre>
+        </section>
+      </section>
+    </section>
+
+    <section id="zaloTab" class="tab-panel">
+      <section class="card">
+        <div class="section-title">
+          <div>
+            <h2>Cấu hình Zalo</h2>
+            <p>Đặt chế độ gửi qua Zalo cá nhân hoặc Zalo OA, thời gian chờ và mẫu tin nhắn.</p>
+          </div>
+        </div>
+        <form id="settingsForm" class="form-grid">
+          <div class="field span-2">
+            <label for="schoolName">Tên trường</label>
+            <input id="schoolName" required>
+          </div>
+          <div class="field">
+            <label for="zaloMode">Chế độ gửi</label>
+            <select id="zaloMode">
+              <option value="dry-run">Chạy thử - chỉ ghi log</option>
+              <option value="personal-test">Zalo cá nhân - chạy thử 3-5 HS</option>
+              <option value="personal-real">Zalo cá nhân - gửi thật thủ công 3-5 HS</option>
+              <option value="oa">Gửi thật qua Zalo OA</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="zaloDelayMinutes">Chờ gửi Zalo (giây/phút)</label>
+            <input id="zaloDelayMinutes" type="number" min="0" max="1440" step="1">
+            <span class="muted" style="font-size: 12px; margin-top: 4px; line-height: 1.4;">Cá nhân: nên đặt 2-3s<br>OA: tính theo phút</span>
+          </div>
+          <div class="field check-field oa-setting">
+            <label>&nbsp;</label>
+            <label class="checkbox-line"><input id="zaloEnabled" type="checkbox"> Bật gửi thật OA</label>
+          </div>
+          <div id="zaloModeNote" class="mode-note span-4"></div>
+          <div class="field span-2 oa-setting">
+            <label for="zaloEndpoint">Endpoint OA</label>
+            <input id="zaloEndpoint" placeholder="https://openapi.zalo.me/v3.0/oa/message/cs">
+          </div>
+          <div class="field span-2 oa-setting">
+            <label for="zaloAccessToken">OA access token</label>
+            <input id="zaloAccessToken" type="password" placeholder="Để trống nếu không muốn thay token hiện tại">
+          </div>
+          <div class="field personal-setting">
+            <label for="personalZaloName">Tên Zalo cá nhân</label>
+            <input id="personalZaloName" placeholder="Ví dụ: GV Trường THCS">
+          </div>
+          <div class="field personal-setting">
+            <label for="personalZaloPhone">SĐT Zalo cá nhân</label>
+            <input id="personalZaloPhone" placeholder="Ví dụ: 0901234567">
+          </div>
+
+          <div class="field personal-setting">
+            <label for="zaloCycleSize">Chu kì gửi (Số HS)</label>
+            <input id="zaloCycleSize" type="number" min="1" max="500" step="1" value="20">
+          </div>
+          <div class="field personal-setting">
+            <label for="zaloCycleDelayMinutes">Nghỉ giữa chu kì (phút)</label>
+            <input id="zaloCycleDelayMinutes" type="number" min="0" max="60" step="0.5" value="1">
+          </div>
+          <div class="field span-4">
+            <label for="messageTemplate">Mẫu báo vắng/trễ</label>
+            <textarea id="messageTemplate" rows="3"></textarea>
+            <span class="muted">Biến: {schoolName}, {date}, {studentCode}, {studentName}, {className}, {session}, {absenceStatus}, {reason}, {parentName}, {phone}</span>
+          </div>
+          <div class="field span-4">
+            <label for="tuitionTemplate">Mẫu nhắc học phí</label>
+            <textarea id="tuitionTemplate" rows="3"></textarea>
+            <span class="muted">Biến: {schoolName}, {date}, {studentName}, {className}, {tuitionDebt}</span>
+          </div>
+          <div class="field span-4">
+            <label>Mẫu thông báo định kì/khóa mới</label>
+            <div id="periodicPasteArea" tabindex="0" style="border: 2px dashed #cbd5e1; border-radius: 6px; padding: 16px; text-align: center; cursor: text; min-height: 80px; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+              <span class="muted">Bấm vào đây và nhấn Ctrl+V để dán ảnh thông báo</span>
+              <img id="periodicImagePreview" style="max-height: 150px; display: none; margin-top: 8px; border-radius: 4px;">
+            </div>
+            <button class="btn ghost" type="button" id="clearPeriodicImageBtn" style="display: none; margin-top: 4px;">Xóa ảnh</button>
+            <input type="hidden" id="periodicImageBase64">
+            <textarea id="periodicTemplate" rows="3" placeholder="Hoặc nhập văn bản thông báo chung vào đây (nếu không dùng ảnh)..." style="margin-top: 8px;"></textarea>
+            <span class="muted">Biến: {schoolName}, {date}, {studentName}, {className}</span>
+          </div>
+          <div class="field span-4">
+            <label>Xem trước tin nhắn (Live Preview)</label>
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+              <select id="previewTypeSelect" style="max-width: 200px;">
+                <option value="absence">Mẫu báo vắng/trễ</option>
+                <option value="tuition">Mẫu nhắc học phí</option>
+                <option value="periodic">Mẫu định kì/khóa mới</option>
+              </select>
+            </div>
+            <div id="messagePreview" class="preview-box"></div>
+          </div>
+          <div class="actions span-4">
+            <button class="btn" type="submit">Lưu cấu hình</button>
+          </div>
+        </form>
+      </section>
+    </section>
+
+    <section id="cozeTab" class="tab-panel">
+      <section class="card coze-card">
+        <form id="cozeSettingsForm" class="coze-settings-form">
+          <div class="coze-title-row">
+            <h2>Trợ lý AI</h2>
+            <p>Chọn nguồn AI cho chatbox. API key chỉ được gọi qua server của app.</p>
+          </div>
+
+          <div class="coze-quickstart">
+            <a class="btn ghost" href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">OpenAI key</a>
+            <a class="btn ghost" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Gemini key</a>
+            <a class="btn ghost" href="https://www.coze.com/" target="_blank" rel="noopener">Mở Coze</a>
+            <button class="btn blue" id="copyCozePromptBtn" type="button">Copy prompt bot</button>
+            <button class="btn success" id="testAiBtn" type="button">Kiểm tra AI</button>
+            <span>Chọn Trợ lý nội bộ nếu không dùng key ngoài. Chọn ChatGPT, Gemini hoặc Coze để chatbox gọi AI qua server.</span>
+          </div>
+
+          <div class="coze-control-grid">
+            <div class="field">
+              <label for="aiProvider">Nguồn chatbox</label>
+              <select id="aiProvider">
+                <option value="internal">Trợ lý nội bộ</option>
+                <option value="openai">ChatGPT / OpenAI</option>
+                <option value="gemini">Gemini</option>
+                <option value="coze">Coze AI</option>
+              </select>
+            </div>
+            <div class="field ai-provider ai-provider-openai">
+              <label for="openaiModel">OpenAI model</label>
+              <input id="openaiModel" placeholder="gpt-5.5">
+            </div>
+            <div class="field coze-token-field ai-provider ai-provider-openai">
+              <label for="openaiApiKey">OpenAI API key</label>
+              <input id="openaiApiKey" type="password" placeholder="Để trống nếu không muốn thay key hiện tại">
+            </div>
+            <div class="field ai-provider ai-provider-gemini">
+              <label for="geminiModel">Gemini model</label>
+              <input id="geminiModel" placeholder="gemini-3.5-flash">
+            </div>
+            <div class="field coze-token-field ai-provider ai-provider-gemini">
+              <label for="geminiApiKey">Gemini API key</label>
+              <input id="geminiApiKey" type="password" placeholder="Để trống nếu không muốn thay key hiện tại">
+            </div>
+            <div class="field ai-provider ai-provider-coze">
+              <label for="cozeBotId">Coze Bot ID</label>
+              <input id="cozeBotId" placeholder="Nhập bot_id">
+            </div>
+            <div class="field ai-provider ai-provider-coze">
+              <label for="cozeUserId">User ID</label>
+              <input id="cozeUserId" placeholder="bao-vang-teacher">
+            </div>
+            <div class="field ai-provider ai-provider-coze">
+              <label for="cozeBaseUrl">Coze API</label>
+              <input id="cozeBaseUrl" placeholder="https://api.coze.com">
+            </div>
+            <div class="field coze-token-field ai-provider ai-provider-coze">
+              <label for="cozeAccessToken">Coze access token</label>
+              <input id="cozeAccessToken" type="password" placeholder="Để trống nếu không muốn thay token hiện tại">
+            </div>
+            <div id="aiModeNote" class="mode-note coze-status-note"></div>
+          </div>
+
+          <div class="actions coze-actions">
+            <button class="btn" type="submit">Lưu trợ lý AI</button>
+          </div>
+        </form>
+      </section>
+    </section>
+
+    <section id="noticeTab" class="tab-panel">
+      <section class="card filters">
+        <div class="field">
+          <label for="noticeDate">Ngày vắng</label>
+          <input id="noticeDate" type="date">
+        </div>
+        <div class="field grow">
+          <label for="noticeKeyword">Tìm kiếm</label>
+          <input id="noticeKeyword" type="search" placeholder="Tên, lớp, phụ huynh, UID, trạng thái">
+        </div>
+        <button class="btn" id="noticeFilterBtn" type="button">Lọc lịch sử Zalo</button>
+      </section>
+      <section class="card table-card">
+        <div class="section-title">
+          <div>
+            <h2>Lịch sử gửi Zalo</h2>
+          </div>
+          <button class="btn danger" id="clearNoticeHistoryBtn" type="button">Xóa lịch sử</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Thời gian</th>
+                <th>Ngày vắng</th>
+                <th>Học sinh</th>
+                <th>Lớp</th>
+                <th>Phụ huynh</th>
+                <th>UID/SĐT</th>
+                <th>Trạng thái</th>
+                <th>Kết quả</th>
+                <th>Nội dung</th>
+              </tr>
+            </thead>
+            <tbody id="noticeRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <section id="historyTab" class="tab-panel">
+      <section class="card filters">
+        <div class="field">
+          <label for="historyDate">Ngày vắng</label>
+          <input id="historyDate" type="date">
+        </div>
+        <div class="field grow">
+          <label for="historyKeyword">Tìm kiếm</label>
+          <input id="historyKeyword" type="search" placeholder="Tên, lớp, người gọi, số điện thoại">
+        </div>
+        <button class="btn" id="historyFilterBtn" type="button">Lọc lịch sử</button>
+      </section>
+
+    
+
+      <section class="card table-card">
+        <div class="section-title">
+          <div>
+            <h2>Lịch sử cuộc gọi</h2>
+          </div>
+          <div class="section-actions">
+            <button class="btn ghost" id="exportLateHistoryBtn" type="button">Xuất Excel HS đi trễ</button>
+            <button class="btn danger" id="exportFailedZaloHistoryBtn" type="button">Xuất Excel lỗi Zalo</button>
+            <button class="btn danger" id="clearCallHistoryBtn" type="button">Xóa lịch sử</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Thời gian</th>
+                <th>Ngày vắng</th>
+                <th>Học sinh</th>
+                <th>Lớp</th>
+                <th>SĐT gọi</th>
+                <th>Trạng thái</th>
+                <th>Kết quả</th>
+                <th>Người gọi</th>
+                <th>Ghi chú</th>
+              </tr>
+            </thead>
+            <tbody id="historyRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+    <section id="staffTab" class="tab-panel">
+      <div class="panel-heading">
+        <h2>👥 Quản lý Nhân sự</h2>
+        <p>Quản lý tài khoản đăng nhập của giáo viên và phân quyền chi nhánh.</p>
+      </div>
+      <div style="display: flex; gap: 20px;">
+        <div class="card" style="flex: 1;">
+          <h3>Tạo tài khoản mới</h3>
+          <form id="createStaffForm">
+            <div class="form-group" style="margin-bottom: 10px;">
+              <label>Tên đăng nhập</label>
+              <input type="text" id="staffUsername" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+            </div>
+            <div class="form-group" style="margin-bottom: 10px;">
+              <label>Mật khẩu</label>
+              <input type="password" id="staffPassword" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+            </div>
+            <div class="form-group" style="margin-bottom: 15px;">
+              <label>Quyền quản lý (Chi nhánh)</label>
+              <select id="staffBranch" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                <option value="all">Tất cả chi nhánh (Quản trị viên)</option>
+              </select>
+            </div>
+            <button type="submit" class="btn primary" style="width: 100%;">Tạo tài khoản</button>
+          </form>
+        </div>
+        <div class="card" style="flex: 2;">
+          <h3>Danh sách nhân sự</h3>
+          <div id="staffList" style="margin-top: 10px;"></div>
+        </div>
+      </div>
+    </section>
+    <section id="guideTab" class="tab-panel">
+      <section class="card">
+        <div class="section-title">
+          <div>
+            <h2>Hướng dẫn sử dụng cho Giáo viên Văn phòng</h2>
+            <p>Các bước thao tác điểm danh và gửi thông báo vắng học qua Zalo.</p>
+          </div>
+        </div>
+        <div class="guide-content" style="line-height: 1.6; padding: 0 16px 16px;">
+          <h3 style="margin-top: 16px;">1. Điểm danh học sinh vắng</h3>
+          <ul style="margin-left: 20px; margin-bottom: 16px;">
+            <li>Vào tab <strong>Điểm danh vắng</strong> trên thanh menu bên trái.</li>
+            <li>Sử dụng bộ lọc (Chọn thứ, Chọn buổi, Chọn lớp) để tìm danh sách lớp cần điểm danh.</li>
+            <li>Tại hàng của học sinh vắng mặt, bấm chọn trạng thái tương ứng (VD: <em>Vắng phép, Không phép, Đi trễ...</em>).</li>
+            <li>Nhập lý do cụ thể (nếu có) vào ô <strong>Lý do vắng</strong>.</li>
+          </ul>
+
+          <h3>2. Gửi thông báo báo vắng qua Zalo</h3>
+          <ul style="margin-left: 20px; margin-bottom: 16px;">
+            <li>Sau khi bạn chọn trạng thái vắng, hệ thống sẽ <strong>tự động</strong> đưa học sinh vào hàng đợi và gửi tin nhắn Zalo đến phụ huynh sau vài phút (tùy theo cài đặt độ trễ trong Cấu hình Zalo).</li>
+            <li>Để kiểm tra xem tin nhắn đã được gửi chưa, bạn hãy chuyển sang tab <strong>Hàng xử lý</strong>.</li>
+            <li>Tại tab <strong>Hàng xử lý</strong>, bạn sẽ thấy danh sách các học sinh vắng trong ngày và trạng thái gửi Zalo ở cột cuối cùng.</li>
+            <li>Nếu tin nhắn chưa gửi được hoặc báo lỗi, bạn có thể bấm nút <strong>Gửi Zalo</strong> ở từng dòng để gửi lại thủ công.</li>
+            <li>Bạn cũng có thể bấm nút <strong>Gửi Zalo hàng loạt</strong> ở góc phải trên cùng để gửi lại cho tất cả những bạn chưa được gửi.</li>
+          </ul>
+
+          <h3>3. Sử dụng Trợ lý AI để gửi báo vắng</h3>
+          <ul style="margin-left: 20px; margin-bottom: 16px;">
+            <li>Bấm vào biểu tượng <strong>Trợ lý chat</strong> ở góc dưới bên phải màn hình.</li>
+            <li>Gõ lệnh: <em>"Gửi báo vắng hôm nay"</em> hoặc chọn từ các gợi ý có sẵn.</li>
+            <li>Trợ lý sẽ tổng hợp danh sách học sinh vắng chưa được thông báo. Nhấn <strong>Xác nhận</strong> trên thẻ hành động để hệ thống tiến hành gửi Zalo hàng loạt.</li>
+          </ul>
+
+          <h3>4. Gửi nhắc học phí trễ</h3>
+          <ul style="margin-left: 20px; margin-bottom: 16px;">
+            <li>Chuyển sang tab <strong>Zalo</strong>, chuẩn bị nội dung tại ô <strong>Mẫu nhắc học phí</strong> và lưu cấu hình.</li>
+            <li>Tại tab <strong>Điểm danh vắng</strong>, bạn đánh dấu trạng thái vắng của học sinh là <strong>Học phí</strong> hoặc <strong>Trễ học phí</strong>.</li>
+            <li>Để gửi đi, mở Trợ lý chat và gõ lệnh: <em>"Gửi nhắc trễ học phí"</em> hoặc dùng nút <strong>Nhắc trễ học phí</strong> bên tab Hàng xử lý.</li>
+          </ul>
+
+          <h3>5. Gửi thông báo chung / Khóa mới</h3>
+          <ul style="margin-left: 20px; margin-bottom: 16px;">
+            <li>Vào tab <strong>Zalo</strong>, chuẩn bị nội dung và ảnh đính kèm (nếu có) tại <strong>Mẫu thông báo định kì/khóa mới</strong>.</li>
+            <li>Để gửi cho tất cả hoặc một lớp cụ thể, cách nhanh nhất là dùng Trợ lý chat. Gõ lệnh: <em>"Gửi thông báo khóa mới cho tất cả học sinh"</em> hoặc <em>"Gửi thông báo chung cho lớp..."</em>.</li>
+            <li>Nhấn <strong>Xác nhận</strong> khi AI hiển thị thẻ yêu cầu để hệ thống bắt đầu gửi tin.</li>
+          </ul>
+        </div>
+      </section>
+    </section>
+  </main>
+    </div>
+  </div>
+
+  <section id="chatbox" class="chatbox" data-open="false" aria-label="Trợ lý chat">
+    <button id="chatboxToggle" class="chatbox-toggle" type="button" aria-label="Mở trợ lý chat" aria-expanded="false">
+      <span><i class="fa-solid fa-comment-dots"></i></span>
+    </button>
+    <div class="chatbox-panel" role="dialog" aria-modal="false" aria-labelledby="chatboxTitle">
+      <header class="chatbox-header">
+        <div>
+          <h2 id="chatboxTitle">Trợ lý báo vắng</h2>
+          <span id="chatboxStatus">Đang trực</span>
+        </div>
+        <button id="chatboxClose" class="chatbox-close" type="button" aria-label="Đóng chatbox">×</button>
+      </header>
+      <div id="chatboxMessages" class="chatbox-messages" role="log" aria-live="polite"></div>
+      <div class="chatbox-suggestions" aria-label="Câu hỏi gợi ý">
+        <button type="button" data-chat-prompt="Học sinh vắng hôm nay">Học sinh vắng hôm nay</button>
+        <button type="button" data-chat-prompt="Gửi báo vắng hôm nay">Gửi báo vắng</button>
+        <button type="button" data-chat-prompt="Gửi nhắc trễ học phí">Gửi nhắc học phí</button>
+      </div>
+      <form id="chatboxForm" class="chatbox-form">
+        <input id="chatboxInput" type="text" autocomplete="off" placeholder="Nhập câu hỏi..." aria-label="Nhập câu hỏi cho trợ lý">
+        <button type="submit" aria-label="Gửi tin nhắn">Gửi</button>
+      </form>
+    </div>
+  </section>
+
+  <div id="toastContainer" class="toast-container" role="status"></div>
+  <script src="/app.js?v=20260710-4"></script>
+ <script src="/socket.io/socket.io.js"></script>
+
+
+</body>
+</html>
+

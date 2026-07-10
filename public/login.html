@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Đăng nhập - Báo vắng học sinh</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f3f4f6; }
+    .login-container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); width: 100%; max-width: 400px; }
+    .login-container h1 { font-size: 1.5rem; text-align: center; margin-bottom: 1.5rem; color: #1e3a8a; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
+    .form-group input { width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; }
+    .btn-login { width: 100%; padding: 0.75rem; background: #2563eb; color: white; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; }
+    .btn-login:hover { background: #1d4ed8; }
+    #errorMsg { color: #dc2626; text-align: center; margin-bottom: 1rem; font-size: 0.875rem; }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <h1>Hệ thống Quản lý</h1>
+    <div id="errorMsg"></div>
+    <form id="loginForm">
+      <div class="form-group">
+        <label>Tên đăng nhập</label>
+        <input type="text" id="username" required>
+      </div>
+      <div class="form-group">
+        <label>Mật khẩu</label>
+        <input type="password" id="password" required>
+      </div>
+      <button type="submit" class="btn-login">Đăng nhập</button>
+    </form>
+  </div>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const user = document.getElementById('username').value;
+      const pass = document.getElementById('password').value;
+      const err = document.getElementById('errorMsg');
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: user, password: pass })
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        if (data.user.branchId !== 'all') {
+          localStorage.setItem('activeBranch', data.user.branchId);
+        }
+        window.location.href = '/';
+      } catch (e) {
+        err.textContent = e.message;
+      }
+    });
+  </script>
+</body>
+</html>
