@@ -1085,18 +1085,16 @@ async function openZaloAndPasteMessage(message, link = '') {
   try {
     let success = false;
     
-    // Attempt 1: If on Vercel, try to call the local helper on localhost:3000
-    if (window.location.hostname.includes('vercel.app')) {
-      try {
-        const localResponse = await fetch('http://localhost:3000/api/local-zalo/open-paste', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message, link })
-        });
-        if (localResponse.ok) success = true;
-      } catch (e) {
-        // Local server not running, ignore
-      }
+    // Attempt 1: Try to call the local helper on 127.0.0.1:3000
+    try {
+      const localResponse = await fetch('http://127.0.0.1:3000/api/local-zalo/open-paste', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, link })
+      });
+      if (localResponse.ok) success = true;
+    } catch (e) {
+      // Local server not running, ignore
     }
 
     // Attempt 2: Try the same-origin server (works if running locally)
