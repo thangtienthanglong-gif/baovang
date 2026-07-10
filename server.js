@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
-const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { initializeApp, cert, getApps } = require('firebase-admin/app');
@@ -14,8 +13,16 @@ const multer = require('multer');
 const XLSX = require('xlsx');
 
 const app = express();
+
+// Mock req.io for Vercel Serverless (Disable real-time sync)
+app.use((req, res, next) => {
+  req.io = {
+    emit: () => {}
+  };
+  next();
+});
+
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
 const JWT_SECRET = process.env.JWT_SECRET || 'baovang_secret_key_12345';
 
 // Serve login.html for root if not authenticated
@@ -2905,9 +2912,15 @@ app.use((error, req, res, next) => {
   res.status(status).json({ error: error.message || 'Lỗi hệ thống.' });
 });
 
-server.listen(PORT, () => {
-  console.log(`App đang chạy tại http://localhost:${PORT}`);
-});
+
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`App đang chạy tại http://localhost:${PORT}`);
+  });
+} else {
+  module.exports = app;
+}
+
 
 setInterval(() => {
   processDueNotices().catch(error => {

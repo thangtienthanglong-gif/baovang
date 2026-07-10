@@ -2173,8 +2173,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Socket.io integration
   if (typeof io !== 'undefined') {
-    const socket = io();
-    socket.on('data_updated', (data) => {
+        socket.on('data_updated', (data) => {
       const active = getActiveBranch();
       if (data.branchId === active || data.branchId === 'all') {
         showToast('🔄 Dữ liệu vừa được làm mới...', 'success');
