@@ -2736,10 +2736,10 @@ setTimeout(ensureAdminUser, 2000);
 
 app.get('/api/debug', (req, res) => {
   res.json({
-    hasEnvVar: !!process.env.FIREBASE_SERVICE_ACCOUNT,
-    envVarLength: process.env.FIREBASE_SERVICE_ACCOUNT ? process.env.FIREBASE_SERVICE_ACCOUNT.length : 0,
-    envVarPrefix: process.env.FIREBASE_SERVICE_ACCOUNT ? process.env.FIREBASE_SERVICE_ACCOUNT.substring(0, 20) : null,
-    envVarSuffix: process.env.FIREBASE_SERVICE_ACCOUNT ? process.env.FIREBASE_SERVICE_ACCOUNT.slice(-20) : null,
+    hasServiceAccount: !!process.env.FIREBASE_SERVICE_ACCOUNT,
+    hasDatabaseUrl: !!process.env.FIREBASE_DATABASE_URL,
+    hasJwt: !!process.env.JWT_SECRET,
+    databaseUrl: process.env.FIREBASE_DATABASE_URL,
     firebaseAppsLength: getApps().length
   });
 });
