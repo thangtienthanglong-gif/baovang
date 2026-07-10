@@ -1094,7 +1094,21 @@ async function openZaloAndPasteMessage(message, link = '') {
       });
       if (localResponse.ok) success = true;
     } catch (e) {
-      // Local server not running, ignore
+      // Ignore
+    }
+
+    // Attempt 1.5: Try localhost
+    if (!success) {
+      try {
+        const localResponse = await fetch('http://localhost:3000/api/local-zalo/open-paste', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message, link })
+        });
+        if (localResponse.ok) success = true;
+      } catch (e) {
+        // Ignore
+      }
     }
 
     // Attempt 2: Try the same-origin server (works if running locally)
@@ -1111,12 +1125,13 @@ async function openZaloAndPasteMessage(message, link = '') {
       toast('Đã tự động mở Zalo và dán tin nhắn.');
       return;
     }
-    toast('Đã mở Zalo và đưa nội dung vào khung chat. Thầy/cô kiểm tra rồi bấm gửi.');
+    
+    // Fallback if local server is unreachable
+    toast('Không kết nối được ZaloHelper tự động, sẽ mở thủ công...');
+    await copyMessageAndOpenZalo(message, link);
   } catch (error) {
     toast(`${error.message} Nội dung đã được copy sẵn; dùng Copy tin nếu cần.`);
-    try {
-      await navigator.clipboard.writeText(message || '');
-    } catch (_) {}
+    await copyMessageAndOpenZalo(message, link);
   }
 }
 

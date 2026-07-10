@@ -210,7 +210,8 @@ const server = http.createServer(async (req, res) => {
   // CORS configuration
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Access-Control-Request-Private-Network');
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(200);
@@ -246,10 +247,29 @@ const server = http.createServer(async (req, res) => {
 });
 
 const PORT = 3000;
+server.on('error', (e) => {
+  if (e.code === 'EADDRINUSE') {
+    console.log('');
+    console.log(' LỖI: Cổng 3000 đã bị sử dụng!');
+    console.log(' Có thể bạn đang chạy npm start hoặc một cửa sổ ZaloHelper khác chưa tắt.');
+    console.log(' Hãy tắt chúng trước khi chạy file này.');
+  } else {
+    console.log(' LỖI:', e.message);
+  }
+  console.log('\n Bấm Enter để thoát...');
+  process.stdin.once('data', () => process.exit(1));
+});
+
 server.listen(PORT, () => {
   console.log('----------------------------------------------------');
   console.log(` Zalo Helper is running on http://127.0.0.1:${PORT}`);
   console.log(` Keep this window open while using the web app.`);
-  console.log(` You can now use "Tự động gửi" on the website.`);
+  console.log(` You can now use auto-paste on the website.`);
   console.log('----------------------------------------------------');
+});
+
+process.on('uncaughtException', (err) => {
+  console.log('LỖI KHÔNG XÁC ĐỊNH:', err.message);
+  console.log('\n Bấm Enter để thoát...');
+  process.stdin.once('data', () => process.exit(1));
 });
