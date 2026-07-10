@@ -207,7 +207,6 @@ async function saveBranchDb(req, branchDb) {
   if (!rootDb.branches) rootDb.branches = {};
   rootDb.branches[branchId] = branchDb;
   await writeDb(rootDb);
-  io.emit('data_updated', { branchId }); // Emit realtime event
 }
 
 function defaultSettings() {
