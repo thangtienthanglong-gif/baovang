@@ -957,11 +957,11 @@ async function loadNotices() {
         <div>${escapeHtml(row.zaloUserId || 'Chưa có UID')}</div>
         <div class="muted">${escapeHtml(row.phone1 || '')}</div>
       </td>
+      <td><span class="badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span></td>
       <td>
-        <span class="badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span>
-        ${row.status === 'Đã gửi' || row.status === 'Lỗi gửi' ? `<button class="btn-small" style="display:block; margin-top: 5px; font-size: 11px; padding: 4px 8px; background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; border-radius: 4px; cursor: pointer;" onclick="markUnfriended('${row.id}')">👉 Bấm vào đây nếu Zalo báo Người lạ</button>` : ''}
+        ${escapeHtml(row.result)}
+        ${row.status === 'Đã gửi' || row.status === 'Lỗi gửi' ? `<div style="margin-top: 4px;"><a href="javascript:void(0)" onclick="markUnfriended('${row.id}')" style="color: #6c757d; font-size: 11px; text-decoration: underline;">Báo lỗi Chưa kết bạn Zalo</a></div>` : ''}
       </td>
-      <td>${escapeHtml(row.result)}</td>
       <td class="message-cell">${escapeHtml(row.message)}</td>
     </tr>
   `).join('');
