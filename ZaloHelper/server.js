@@ -121,87 +121,35 @@ function Invoke-AutomationElement($element) {
 }
 
 $zaloProc = Get-Process -Name "Zalo" -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
-if ($zaloProc) {
-  $handle = $zaloProc.MainWindowHandle
-  [Win32ZaloPaste]::ShowWindowAsync($handle, 9) | Out-Null
-  [Win32ZaloPaste]::SetForegroundWindow($handle) | Out-Null
-  Start-Sleep -Milliseconds 100
-  [System.Windows.Forms.SendKeys]::SendWait("{ESC}")
-  Start-Sleep -Milliseconds 100
-}
-
-if ($link) { Start-Process $link }
-Start-Sleep -Seconds 1
-
-$zaloProc = Get-Process -Name "Zalo" -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
 if (-not $zaloProc) {
-  if ($msg) { [System.Windows.Forms.Clipboard]::SetText($msg) }
-  Write-Host "Zalo not running"
-  exit 0
+  Write-Error "Zalo not running"
+  exit 1
 }
 
 $handle = $zaloProc.MainWindowHandle
-Activate-Window $handle
 
-if ($msg) { [System.Windows.Forms.Clipboard]::SetText($msg) }
-Start-Sleep -Milliseconds 150
+# Ensure Zalo is activated before opening the link
+[Win32ZaloPaste]::ShowWindowAsync($handle, 9) | Out-Null
+[Win32ZaloPaste]::SetForegroundWindow($handle) | Out-Null
+Start-Sleep -Milliseconds 100
+[System.Windows.Forms.SendKeys]::SendWait("{ESC}")
+Start-Sleep -Milliseconds 100
 
-$winId = [Win32ZaloPaste]::GetForegroundWindow()
-if ($winId -ne $handle) {
-  Activate-Window $handle
-  $winId = [Win32ZaloPaste]::GetForegroundWindow()
-}
-if ($winId -ne $handle) {
-  Write-Host "Could not focus Zalo"
-  exit 0
-}
+# Open the chat link
+if ($link) { Start-Process $link }
+Start-Sleep -Milliseconds 1500
 
-$pasted = $false
-try {
-  $auto = [System.Windows.Automation.AutomationElement]::FromHandle($handle)
-  $strangerCond1 = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, "Kết bạn")
-  $isStranger = $auto.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $strangerCond1)
-  if (-not $isStranger) {
-    $strangerCond2 = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, "Add friend")
-    $isStranger = $auto.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $strangerCond2)
-  }
-  if (-not $isStranger) {
-    $strangerCond3 = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, "Thu hồi yêu cầu")
-    $isStranger = $auto.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $strangerCond3)
-  }
-  if (-not $isStranger) {
-    $strangerCond4 = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, "Cancel request")
-    $isStranger = $auto.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $strangerCond4)
-  }
-  
-  if ($isStranger) {
-    Write-Error "Nguoi nhan la nguoi la (chua ket ban). Chan gui tin nhan."
-    exit 1
-  }
+# Activate again just in case Start-Process lost focus
+[Win32ZaloPaste]::SetForegroundWindow($handle) | Out-Null
+Start-Sleep -Milliseconds 200
 
-  $inputCond = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Document)
-  $inputBox = $auto.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $inputCond)
-  if (-not $inputBox) {
-    $inputCond = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit)
-    $inputBox = $auto.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $inputCond)
-  }
-  if ($inputBox) {
-    $inputBox.SetFocus()
-    Start-Sleep -Milliseconds 100
-    [Win32ZaloPaste]::keybd_event(0x11, 0, 0, [UIntPtr]::Zero)
-    [Win32ZaloPaste]::keybd_event(0x56, 0, 0, [UIntPtr]::Zero)
-    [Win32ZaloPaste]::keybd_event(0x56, 0, 2, [UIntPtr]::Zero)
-    [Win32ZaloPaste]::keybd_event(0x11, 0, 2, [UIntPtr]::Zero)
-    Start-Sleep -Milliseconds 200
-    [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
-    $pasted = $true
-  }
-} catch {}
-
-if (-not $pasted) {
-  Write-Error "Khong the tim thay o nhap tin nhan Zalo. Co the do chua ket ban, so dien thoai khong ton tai hoac Zalo phien ban moi thay doi giao dien."
-  exit 1
-}
+# Paste and Enter
+[Win32ZaloPaste]::keybd_event(0x11, 0, 0, [UIntPtr]::Zero) # Ctrl down
+[Win32ZaloPaste]::keybd_event(0x56, 0, 0, [UIntPtr]::Zero) # V down
+[Win32ZaloPaste]::keybd_event(0x56, 0, 2, [UIntPtr]::Zero) # V up
+[Win32ZaloPaste]::keybd_event(0x11, 0, 2, [UIntPtr]::Zero) # Ctrl up
+Start-Sleep -Milliseconds 200
+[System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
 
 Write-Host "Success"
 `;
