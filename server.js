@@ -2799,6 +2799,31 @@ app.get('/api/call-logs', async (req, res, next) => {
   }
 });
 
+app.get('/api/call-logs/export', async (req, res, next) => {
+  try {
+    const db = await getBranchDb(req);
+    const rows = filterCallLogs(db, req.query).map((row, index) => ({
+      'STT': index + 1,
+      'Ngày vắng': row.date,
+      'Thời gian ghi nhận': row.time ? new Date(row.time).toLocaleString('vi-VN') : '',
+      'Học sinh': row.studentName || '',
+      'Mã HS': row.studentCode || '',
+      'Lớp': row.className || '',
+      'Phụ huynh': row.parentName || '',
+      'SĐT gọi': row.phoneCalled || '',
+      'Trạng thái cuộc gọi': row.callStatus || '',
+      'Kết quả gọi điện': row.callResult || '',
+      'Ghi chú': row.note || ''
+    }));
+    const suffix = req.query.date ? cleanText(req.query.date) : 'tat-ca';
+    sendWorkbook(res, `danh-sach-can-goi-${suffix}.xlsx`, [
+      { name: 'DS Cần Gọi', data: rows }
+    ]);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.delete('/api/call-logs', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);

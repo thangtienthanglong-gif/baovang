@@ -1328,6 +1328,10 @@ function exportFailedZalo(params = {}) {
   downloadUrl('/api/absences/export-failed-zalo', params);
 }
 
+function exportCallList(params = {}) {
+  downloadUrl('/api/call-logs/export', params);
+}
+
 async function clearCallHistory() {
   const params = {
     date: $('#historyDate')?.value || '',
@@ -2141,6 +2145,12 @@ function initEvents() {
   });
   $('#exportFailedZaloHistoryBtn')?.addEventListener('click', () => {
     exportFailedZalo({
+      date: $('#historyDate')?.value || '',
+      q: $('#historyKeyword')?.value.trim() || ''
+    });
+  });
+  $('#exportCallListBtn')?.addEventListener('click', () => {
+    exportCallList({
       date: $('#historyDate')?.value || '',
       q: $('#historyKeyword')?.value.trim() || ''
     });
