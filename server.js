@@ -2817,7 +2817,7 @@ app.get('/api/call-logs/export', async (req, res, next) => {
     }));
     const suffix = req.query.date ? cleanText(req.query.date) : 'tat-ca';
     sendWorkbook(res, `danh-sach-can-goi-${suffix}.xlsx`, [
-      { name: 'DS Cần Gọi', data: rows }
+      { name: 'DS Cần Gọi', rows }
     ]);
   } catch (error) {
     next(error);
