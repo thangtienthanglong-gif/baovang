@@ -957,11 +957,20 @@ async function loadNotices() {
         <div>${escapeHtml(row.zaloUserId || 'Chưa có UID')}</div>
         <div class="muted">${escapeHtml(row.phone1 || '')}</div>
       </td>
-      <td><span class="badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span></td>
+      <td>
+        <span class="badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span>
+        ${row.status === 'Đã gửi' || row.status === 'Lỗi gửi' ? `<button class="btn-small btn-danger" style="display:block; margin-top: 5px; font-size: 11px; padding: 2px 5px;" onclick="markUnfriended('${row.id}')">⚠️ Người lạ</button>` : ''}
+      </td>
       <td>${escapeHtml(row.result)}</td>
       <td class="message-cell">${escapeHtml(row.message)}</td>
     </tr>
   `).join('');
+}
+
+async function markUnfriended(id) {
+  if (!confirm('Bạn có chắc chắn muốn báo "Người lạ (Chưa kết bạn Zalo)" cho lượt gửi này và đưa vào danh sách Cần gọi điện không?')) return;
+  await api(`/api/notification-logs/${id}/mark-unfriended`, { method: 'POST' });
+  await Promise.all([loadNotices(), loadCallHistory()]);
 }
 
 async function activateTab(tabId, activeShortcut = null) {

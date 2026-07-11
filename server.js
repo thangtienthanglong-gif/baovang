@@ -2821,6 +2821,52 @@ app.get('/api/notification-logs', async (req, res, next) => {
   }
 });
 
+app.post('/api/notification-logs/:id/mark-unfriended', async (req, res, next) => {
+  try {
+    const db = await getBranchDb(req);
+    const logIndex = (db.notificationLogs || []).findIndex(l => l.id === req.params.id);
+    if (logIndex === -1) return res.status(404).json({ error: 'Log not found' });
+    
+    const log = db.notificationLogs[logIndex];
+    log.status = 'Chưa kết bạn - Cần gọi';
+    log.result = 'Đánh dấu thủ công: Người lạ';
+
+    // Automatically add a call log for this student
+    if (!db.callLogs) db.callLogs = [];
+    const now = nowISO();
+    
+    // Check if there is an absence linked
+    let absence = db.absences.find(a => a.studentId === log.studentId && a.date === log.date);
+    
+    db.callLogs.push({
+      id: id('log'),
+      time: now,
+      absenceId: absence ? absence.id : '',
+      date: log.date,
+      studentId: log.studentId,
+      studentCode: log.studentCode,
+      studentName: log.studentName,
+      className: log.className,
+      parentName: log.parentName,
+      phoneCalled: log.phone1,
+      callStatus: 'Cần gọi điện',
+      callResult: '',
+      caller: '',
+      note: 'Hệ thống tự thêm do Zalo báo người lạ chưa kết bạn'
+    });
+
+    // Mark the student as unfriended (optional, for future filtering)
+    const student = db.students.find(s => s.id === log.studentId);
+    if (student) {
+      student.zaloFriended = false;
+    }
+
+    await saveBranchDb(req, db);
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
 app.delete('/api/notification-logs', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
