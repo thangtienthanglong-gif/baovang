@@ -159,6 +159,26 @@ if ($winId -ne $handle) {
 $pasted = $false
 try {
   $auto = [System.Windows.Automation.AutomationElement]::FromHandle($handle)
+  $strangerCond1 = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, "Kết bạn")
+  $isStranger = $auto.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $strangerCond1)
+  if (-not $isStranger) {
+    $strangerCond2 = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, "Add friend")
+    $isStranger = $auto.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $strangerCond2)
+  }
+  if (-not $isStranger) {
+    $strangerCond3 = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, "Thu hồi yêu cầu")
+    $isStranger = $auto.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $strangerCond3)
+  }
+  if (-not $isStranger) {
+    $strangerCond4 = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, "Cancel request")
+    $isStranger = $auto.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $strangerCond4)
+  }
+  
+  if ($isStranger) {
+    Write-Error "Nguoi nhan la nguoi la (chua ket ban). Chan gui tin nhan."
+    exit 1
+  }
+
   $inputCond = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Document)
   $inputBox = $auto.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $inputCond)
   if (-not $inputBox) {
