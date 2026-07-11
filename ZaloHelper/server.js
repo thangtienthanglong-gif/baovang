@@ -148,12 +148,12 @@ Start-Sleep -Milliseconds 200
   if (isStranger) {
     throw new Error('OCR_STRANGER_DETECTED');
   }
-
   // 3. Paste message
   const pasteScript = PS_BOILERPLATE + `
 $msg = ""
 if ($env:ZALO_AUTOPASTE_MESSAGE_B64) {
   $msg = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:ZALO_AUTOPASTE_MESSAGE_B64))
+  [System.Windows.Forms.Clipboard]::SetText($msg)
 }
 if ($env:ZALO_AUTOPASTE_IMAGE_B64) {
   try {

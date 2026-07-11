@@ -10,5 +10,15 @@
   "dependencies": {
     "screenshot-desktop": "^1.15.4",
     "tesseract.js": "^7.0.0"
+  },
+  "pkg": {
+    "assets": [
+      "node_modules/tesseract.js/src/worker-script/node/**/*",
+      "node_modules/tesseract.js-core/**/*",
+      "vie.traineddata"
+    ],
+    "scripts": [
+      "node_modules/tesseract.js/src/worker-script/node/index.js"
+    ]
   }
 }

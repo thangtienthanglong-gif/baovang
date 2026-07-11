@@ -932,10 +932,12 @@ async function loadHistory() {
 }
 
 async function loadNotices() {
-  const rows = await api('/api/notification-logs?' + queryString({
+  let rows = await api('/api/notification-logs?' + queryString({
     date: $('#historyDate').value,
     q: $('#historyKeyword').value.trim()
   }));
+  
+  rows = rows.filter(row => row.status !== 'Chưa kết bạn - Cần gọi');
 
   const tbody = $('#noticeRows');
   if (!rows.length) {
