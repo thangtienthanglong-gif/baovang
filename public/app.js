@@ -959,7 +959,7 @@ async function loadNotices() {
       </td>
       <td>
         <span class="badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span>
-        ${row.status === 'Đã gửi' || row.status === 'Lỗi gửi' ? `<button class="btn-small btn-danger" style="display:block; margin-top: 5px; font-size: 11px; padding: 2px 5px;" onclick="markUnfriended('${row.id}')">Đánh dấu: Chưa kết bạn</button>` : ''}
+        ${row.status === 'Đã gửi' || row.status === 'Lỗi gửi' ? `<button class="btn-small" style="display:block; margin-top: 5px; font-size: 11px; padding: 4px 8px; background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; border-radius: 4px; cursor: pointer;" onclick="markUnfriended('${row.id}')">👉 Bấm vào đây nếu Zalo báo Người lạ</button>` : ''}
       </td>
       <td>${escapeHtml(row.result)}</td>
       <td class="message-cell">${escapeHtml(row.message)}</td>
