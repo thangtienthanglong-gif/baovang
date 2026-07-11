@@ -205,6 +205,18 @@ async function getBranchDb(req) {
   if (!rootDb.branches[branchId].callLogs) rootDb.branches[branchId].callLogs = [];
   if (!rootDb.branches[branchId].notificationLogs) rootDb.branches[branchId].notificationLogs = [];
   
+  // Auto-fix existing absences stuck in "Chờ gửi thủ công" but have a call log
+  if (rootDb.branches[branchId].callLogs && rootDb.branches[branchId].absences) {
+    rootDb.branches[branchId].callLogs.forEach(log => {
+      if (log.absenceId) {
+        const absence = rootDb.branches[branchId].absences.find(a => a.id === log.absenceId);
+        if (absence && absence.noticeStatus === 'Chờ gửi thủ công') {
+          absence.noticeStatus = 'Chưa kết bạn - Cần gọi';
+        }
+      }
+    });
+  }
+
   return rootDb.branches[branchId];
 }
 
@@ -2880,6 +2892,9 @@ app.post('/api/notification-logs/:id/mark-unfriended', async (req, res, next) =>
     
     // Check if there is an absence linked
     let absence = db.absences.find(a => a.studentId === log.studentId && a.date === log.date);
+    if (absence) {
+      absence.noticeStatus = 'Chưa kết bạn - Cần gọi';
+    }
     
     db.callLogs.push({
       id: id('log'),
