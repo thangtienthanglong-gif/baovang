@@ -1104,6 +1104,18 @@ async function openZaloAndPasteMessage(message, link = '') {
     let fetchError1 = '';
     let fetchError2 = '';
 
+    const handleResponse = async (res) => {
+      if (res.ok) {
+        success = true;
+        return true;
+      }
+      const text = await res.text();
+      if (text.includes('OCR_STRANGER_DETECTED')) {
+        throw new Error('OCR_STRANGER_DETECTED');
+      }
+      return false;
+    };
+
     // Attempt 1: Try to call the local helper on 127.0.0.1:3000
     try {
       const localResponse = await fetch('http://127.0.0.1:3000/api/local-zalo/open-paste', {
@@ -1111,8 +1123,9 @@ async function openZaloAndPasteMessage(message, link = '') {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message, link })
       });
-      if (localResponse.ok) success = true;
+      await handleResponse(localResponse);
     } catch (e) {
+      if (e.message === 'OCR_STRANGER_DETECTED') throw e;
       fetchError1 = e.message;
     }
 
@@ -1124,8 +1137,9 @@ async function openZaloAndPasteMessage(message, link = '') {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message, link })
         });
-        if (localResponse.ok) success = true;
+        await handleResponse(localResponse);
       } catch (e) {
+        if (e.message === 'OCR_STRANGER_DETECTED') throw e;
         fetchError2 = e.message;
       }
     }
@@ -1137,7 +1151,7 @@ async function openZaloAndPasteMessage(message, link = '') {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message, link })
       });
-      if (response.ok) success = true;
+      await handleResponse(response);
     }
 
     if (success) {
@@ -1150,6 +1164,10 @@ async function openZaloAndPasteMessage(message, link = '') {
     await copyMessageAndOpenZalo(message, link);
     return false;
   } catch (error) {
+    if (error.message === 'OCR_STRANGER_DETECTED') {
+      toast('Phát hiện Zalo báo Người lạ! Đã ngừng dán tin nhắn để bảo đảm an toàn.', 'error');
+      return 'STRANGER';
+    }
     toast(`${error.message} Nội dung đã được copy sẵn; dùng Copy tin nếu cần.`);
     await copyMessageAndOpenZalo(message, link);
     return false;
@@ -1749,7 +1767,15 @@ async function confirmAiAction(button, actionId, card) {
         const payload = log.responsePayload || {};
         if (payload.link) {
           const ok = await openZaloAndPasteMessage(payload.message || log.message, payload.link);
-          if (ok && log.absenceId) {
+          if (ok === 'STRANGER') {
+            try {
+              await api(`/api/notification-logs/${log.id}/mark-unfriended`, { method: 'POST' });
+              log.status = 'Chưa kết bạn - Cần gọi';
+              await Promise.all([loadNotices(), loadCallHistory()]);
+            } catch (err) {
+              console.error('Failed to mark unfriended:', err);
+            }
+          } else if (ok && log.absenceId) {
             try {
               await api(`/api/absences/${log.absenceId}/zalo/manual-sent`, { method: 'POST', body: '{}' });
               log.status = 'Đã gửi';

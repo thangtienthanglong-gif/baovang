@@ -148,6 +148,15 @@ Start-Sleep -Milliseconds 1500
 [Win32ZaloPaste]::SetForegroundWindow($handle) | Out-Null
 Start-Sleep -Milliseconds 200
 
+# OCR check for stranger
+Write-Host "Running OCR to check for stranger..."
+$checkScript = "$env:ZALO_HELPER_DIR\check_stranger.js"
+$ocrOutput = & node $checkScript 2>&1
+if ($LASTEXITCODE -eq 1) {
+  Write-Error "OCR_STRANGER_DETECTED"
+  exit 1
+}
+
 # Paste and Enter
 [Win32ZaloPaste]::keybd_event(0x11, 0, 0, [UIntPtr]::Zero) # Ctrl down
 [Win32ZaloPaste]::keybd_event(0x56, 0, 0, [UIntPtr]::Zero) # V down
@@ -162,7 +171,7 @@ Write-Host "Success"
     const scriptPath = path.join(require('os').tmpdir(), 'zalo-paste-' + Date.now() + '.ps1');
     fs.writeFileSync(scriptPath, script, 'utf8');
 
-    const env = { ...process.env };
+    const env = { ...process.env, ZALO_HELPER_DIR: __dirname };
     if (message) {
       env.ZALO_AUTOPASTE_MESSAGE_B64 = Buffer.from(message).toString('base64');
     }
