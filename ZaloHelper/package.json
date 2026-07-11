@@ -8,7 +8,6 @@
     "build": "pkg . --targets node18-win-x64 --output ZaloHelper.exe"
   },
   "dependencies": {
-    "jimp": "^1.6.1",
     "screenshot-desktop": "^1.15.4",
     "tesseract.js": "^7.0.0"
   }

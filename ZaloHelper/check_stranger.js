@@ -1,18 +1,15 @@
 const screenshot = require('screenshot-desktop');
-const { Jimp } = require('jimp');
 const Tesseract = require('tesseract.js');
 
 async function checkStranger() {
   try {
     const imgBuffer = await screenshot();
     
-    // Read with Jimp and crop the top 500 pixels to avoid scanning chat history
-    const image = await Jimp.read(imgBuffer);
-    image.crop({ x: 0, y: 0, w: image.bitmap.width, h: Math.min(500, image.bitmap.height) });
-    const croppedBuffer = await image.getBuffer('image/png');
-    
-    // Run OCR on the cropped top area
-    const { data: { text } } = await Tesseract.recognize(croppedBuffer, 'vie');
+    // Run OCR on the top area (height: 500)
+    // Tesseract natively supports rectangle cropping without Jimp
+    const { data: { text } } = await Tesseract.recognize(imgBuffer, 'vie', {
+      rectangle: { top: 0, left: 0, width: 1920, height: 600 }
+    });
     const upperText = text.toUpperCase();
     
     // Strict multi-word matching to prevent false positives from chat history
@@ -21,15 +18,16 @@ async function checkStranger() {
     const hasNoMutualGroup = upperText.includes('KHÔNG CÓ') && upperText.includes('NHÓM CHUNG');
     
     if (hasStrangerBadge || hasAddFriendBtn || hasNoMutualGroup) {
-      console.log('STRANGER');
-      process.exit(1);
+      console.log('check_stranger: STRANGER DETECTED');
+      return true;
     } else {
-      console.log('FRIEND');
-      process.exit(0);
+      console.log('check_stranger: FRIEND DETECTED');
+      return false;
     }
   } catch (err) {
-    console.error(err);
-    process.exit(2);
+    console.error('OCR Error:', err);
+    return false; // On error, assume friend to prevent blocking
   }
 }
-checkStranger();
+
+module.exports = { checkStranger };

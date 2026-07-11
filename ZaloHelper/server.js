@@ -3,44 +3,29 @@ const fs = require('fs');
 const path = require('path');
 const { execFile } = require('child_process');
 const crypto = require('crypto');
+const { checkStranger } = require('./check_stranger');
 
 function id(prefix = '') {
   return prefix + '_' + Date.now() + Math.random().toString(36).substring(2, 6);
 }
-
-// Copy the runWindowsZaloPaste function here
-function runWindowsZaloPaste(message, link, imageBase64 = null) {
+function runPowershell(script, envVars = {}) {
   return new Promise((resolve, reject) => {
-    if (process.platform !== 'win32') {
-      return reject(new Error('Chỉ hỗ trợ trên Windows.'));
-    }
+    const scriptPath = path.join(require('os').tmpdir(), 'zalo-ps-' + Date.now() + '-' + Math.random().toString(36).substring(2) + '.ps1');
+    fs.writeFileSync(scriptPath, script, 'utf8');
+    const env = { ...process.env, ...envVars };
+    execFile('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath], { env }, (error, stdout, stderr) => {
+      try { fs.unlinkSync(scriptPath); } catch (e) {}
+      if (error) {
+        reject(new Error(stderr || stdout || error.message));
+      } else {
+        resolve(stdout);
+      }
+    });
+  });
+}
 
-    const script = `
+const PS_BOILERPLATE = `
 $ErrorActionPreference = 'Stop'
-$msg = ""
-if ($env:ZALO_AUTOPASTE_MESSAGE_B64) {
-  $msg = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:ZALO_AUTOPASTE_MESSAGE_B64))
-}
-if ($env:ZALO_AUTOPASTE_IMAGE_B64) {
-  try {
-    Add-Type -AssemblyName System.Windows.Forms
-    Add-Type -AssemblyName System.Drawing
-    $base64Image = $env:ZALO_AUTOPASTE_IMAGE_B64
-    if ($base64Image -match "^data:image/.*?;base64,(.*)$") {
-      $base64Image = $matches[1]
-    }
-    $bytes = [Convert]::FromBase64String($base64Image)
-    $ms = New-Object System.IO.MemoryStream($bytes, 0, $bytes.Length)
-    $img = [System.Drawing.Image]::FromStream($ms)
-    [System.Windows.Forms.Clipboard]::SetImage($img)
-  } catch {
-    $msg = "Lỗi copy ảnh: " + $_.Exception.Message
-  }
-}
-$link = ""
-if ($env:ZALO_AUTOPASTE_LINK_B64) {
-  $link = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:ZALO_AUTOPASTE_LINK_B64))
-}
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
@@ -127,7 +112,19 @@ if (-not $zaloProc) {
 }
 
 $handle = $zaloProc.MainWindowHandle
+`;
 
+async function runWindowsZaloPaste(message, link, imageBase64 = null) {
+  if (process.platform !== 'win32') {
+    throw new Error('Chỉ hỗ trợ trên Windows.');
+  }
+  
+  if (!link) {
+    throw new Error('Link is empty, aborting to prevent pasting into wrong chat.');
+  }
+
+  // 1. Open Zalo chat
+  const openScript = PS_BOILERPLATE + `
 # Ensure Zalo is activated before opening the link
 [Win32ZaloPaste]::ShowWindowAsync($handle, 9) | Out-Null
 [Win32ZaloPaste]::SetForegroundWindow($handle) | Out-Null
@@ -135,29 +132,47 @@ Start-Sleep -Milliseconds 100
 [System.Windows.Forms.SendKeys]::SendWait("{ESC}")
 Start-Sleep -Milliseconds 100
 
-# Open the chat link
-if (-not $link) {
-  Write-Error "Link is empty, aborting to prevent pasting into wrong chat."
-  exit 1
-}
-
-Start-Process $link
+Start-Process "${link}"
 Start-Sleep -Milliseconds 1500
 
 # Activate again just in case Start-Process lost focus
 [Win32ZaloPaste]::SetForegroundWindow($handle) | Out-Null
 Start-Sleep -Milliseconds 200
+`;
+  
+  await runPowershell(openScript);
 
-# OCR check for stranger
-Write-Host "Running OCR to check for stranger..."
-$checkScript = "$env:ZALO_HELPER_DIR\check_stranger.js"
-$ocrOutput = & node $checkScript 2>&1
-if ($LASTEXITCODE -eq 1) {
-  Write-Error "OCR_STRANGER_DETECTED"
-  exit 1
+  // 2. OCR check for stranger in Node.js
+  console.log("Running OCR to check for stranger...");
+  const isStranger = await checkStranger();
+  if (isStranger) {
+    throw new Error('OCR_STRANGER_DETECTED');
+  }
+
+  // 3. Paste message
+  const pasteScript = PS_BOILERPLATE + `
+$msg = ""
+if ($env:ZALO_AUTOPASTE_MESSAGE_B64) {
+  $msg = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:ZALO_AUTOPASTE_MESSAGE_B64))
+}
+if ($env:ZALO_AUTOPASTE_IMAGE_B64) {
+  try {
+    $base64Image = $env:ZALO_AUTOPASTE_IMAGE_B64
+    if ($base64Image -match "^data:image/.*?;base64,(.*)$") {
+      $base64Image = $matches[1]
+    }
+    $bytes = [Convert]::FromBase64String($base64Image)
+    $ms = New-Object System.IO.MemoryStream($bytes, 0, $bytes.Length)
+    $img = [System.Drawing.Image]::FromStream($ms)
+    [System.Windows.Forms.Clipboard]::SetImage($img)
+  } catch {
+    Write-Host "Lỗi copy ảnh: $($_.Exception.Message)"
+  }
 }
 
-# Paste and Enter
+[Win32ZaloPaste]::SetForegroundWindow($handle) | Out-Null
+Start-Sleep -Milliseconds 100
+
 [Win32ZaloPaste]::keybd_event(0x11, 0, 0, [UIntPtr]::Zero) # Ctrl down
 [Win32ZaloPaste]::keybd_event(0x56, 0, 0, [UIntPtr]::Zero) # V down
 [Win32ZaloPaste]::keybd_event(0x56, 0, 2, [UIntPtr]::Zero) # V up
@@ -168,29 +183,11 @@ Start-Sleep -Milliseconds 200
 Write-Host "Success"
 `;
 
-    const scriptPath = path.join(require('os').tmpdir(), 'zalo-paste-' + Date.now() + '.ps1');
-    fs.writeFileSync(scriptPath, script, 'utf8');
+  let envVars = {};
+  if (message) envVars.ZALO_AUTOPASTE_MESSAGE_B64 = Buffer.from(message).toString('base64');
+  if (imageBase64) envVars.ZALO_AUTOPASTE_IMAGE_B64 = imageBase64;
 
-    const env = { ...process.env, ZALO_HELPER_DIR: __dirname };
-    if (message) {
-      env.ZALO_AUTOPASTE_MESSAGE_B64 = Buffer.from(message).toString('base64');
-    }
-    if (link) {
-      env.ZALO_AUTOPASTE_LINK_B64 = Buffer.from(link).toString('base64');
-    }
-    if (imageBase64) {
-      env.ZALO_AUTOPASTE_IMAGE_B64 = imageBase64;
-    }
-
-    execFile('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath], { env }, (error, stdout, stderr) => {
-      try { fs.unlinkSync(scriptPath); } catch (e) {}
-      if (error) {
-        reject(new Error(stderr || stdout || error.message));
-      } else {
-        resolve(stdout);
-      }
-    });
-  });
+  await runPowershell(pasteScript, envVars);
 }
 
 const server = http.createServer(async (req, res) => {
