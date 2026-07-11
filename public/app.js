@@ -959,7 +959,7 @@ async function loadNotices() {
       </td>
       <td>
         <span class="badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span>
-        ${row.status === 'Đã gửi' || row.status === 'Lỗi gửi' ? `<button class="btn-small btn-danger" style="display:block; margin-top: 5px; font-size: 11px; padding: 2px 5px;" onclick="markUnfriended('${row.id}')">⚠️ Người lạ</button>` : ''}
+        ${row.status === 'Đã gửi' || row.status === 'Lỗi gửi' ? `<button class="btn-small btn-danger" style="display:block; margin-top: 5px; font-size: 11px; padding: 2px 5px;" onclick="markUnfriended('${row.id}')">Đánh dấu: Chưa kết bạn</button>` : ''}
       </td>
       <td>${escapeHtml(row.result)}</td>
       <td class="message-cell">${escapeHtml(row.message)}</td>
@@ -1093,6 +1093,11 @@ async function copyMessageAndOpenZalo(message, link = '') {
 }
 
 async function openZaloAndPasteMessage(message, link = '') {
+  if (!link || link.trim() === '') {
+    toast('Học sinh này chưa có số điện thoại, không thể mở Zalo.', 'error');
+    return false;
+  }
+  
   try {
     let success = false;
     

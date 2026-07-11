@@ -136,7 +136,12 @@ Start-Sleep -Milliseconds 100
 Start-Sleep -Milliseconds 100
 
 # Open the chat link
-if ($link) { Start-Process $link }
+if (-not $link) {
+  Write-Error "Link is empty, aborting to prevent pasting into wrong chat."
+  exit 1
+}
+
+Start-Process $link
 Start-Sleep -Milliseconds 1500
 
 # Activate again just in case Start-Process lost focus
