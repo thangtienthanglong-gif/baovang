@@ -924,11 +924,30 @@ async function loadHistory() {
       <td>${escapeHtml(row.className)}</td>
       <td>${escapeHtml(row.phoneCalled)}</td>
       <td><span class="badge ${statusClass(row.callStatus)}">${escapeHtml(row.callStatus)}</span></td>
-      <td>${escapeHtml(row.callResult)}</td>
+      <td>
+        <select class="form-control" onchange="updateCallResult('${row.id}', this.value)" style="width: 150px;">
+          <option value="" ${!row.callResult ? 'selected' : ''}>-- Chọn --</option>
+          <option value="Đã gọi" ${row.callResult === 'Đã gọi' ? 'selected' : ''}>Đã gọi</option>
+          <option value="Không bắt máy" ${row.callResult === 'Không bắt máy' ? 'selected' : ''}>Không bắt máy</option>
+          <option value="Không liên lạc được" ${row.callResult === 'Không liên lạc được' ? 'selected' : ''}>Không liên lạc được</option>
+        </select>
+      </td>
       <td>${escapeHtml(row.caller)}</td>
       <td>${escapeHtml(row.note)}</td>
     </tr>
   `).join('');
+}
+
+async function updateCallResult(id, result) {
+  try {
+    await api(`/api/call-logs/${id}/result`, {
+      method: 'POST',
+      body: JSON.stringify({ result })
+    });
+    await loadHistory();
+  } catch (error) {
+    console.error('Failed to update call result:', error);
+  }
 }
 
 async function loadNotices() {
@@ -960,11 +979,6 @@ async function loadNotices() {
         <div class="muted">${escapeHtml(row.phone1 || '')}</div>
       </td>
       <td><span class="badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span></td>
-      <td>
-        ${escapeHtml(row.result)}
-        ${row.status === 'Đã gửi' || row.status === 'Lỗi gửi' ? `<div style="margin-top: 4px;"><a href="javascript:void(0)" onclick="markUnfriended('${row.id}')" style="color: #6c757d; font-size: 11px; text-decoration: underline;">Báo lỗi Chưa kết bạn Zalo</a></div>` : ''}
-      </td>
-      <td class="message-cell">${escapeHtml(row.message)}</td>
     </tr>
   `).join('');
 }

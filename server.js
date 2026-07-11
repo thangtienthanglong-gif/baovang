@@ -2812,6 +2812,24 @@ app.delete('/api/call-logs', async (req, res, next) => {
   }
 });
 
+app.post('/api/call-logs/:id/result', async (req, res, next) => {
+  try {
+    const db = await getBranchDb(req);
+    const log = (db.callLogs || []).find(l => l.id === req.params.id);
+    if (!log) return res.status(404).json({ error: 'Call log not found' });
+    log.callResult = req.body.result;
+    if (req.body.result === 'Đã gọi') {
+      log.callStatus = 'Đã gọi';
+    } else {
+      log.callStatus = 'Lỗi gọi';
+    }
+    await saveBranchDb(req, db);
+    res.json(log);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get('/api/notification-logs', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
