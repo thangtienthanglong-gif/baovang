@@ -873,7 +873,7 @@ function renderAbsences() {
   const displayAbsences = state.absences.filter(row => {
     if (currentNoticeFilter !== 'ALL') return true; // Show whatever they filtered for
     // In ALL mode, hide processed items
-    if (row.noticeStatus === 'Đã gửi' || row.noticeStatus === 'Chưa kết bạn - Cần gọi' || row.noticeStatus === 'Không gửi') {
+    if (['Đã gửi', 'Chưa kết bạn - Cần gọi', 'Không gửi', 'Lỗi gửi', 'Chờ gửi thủ công'].includes(row.noticeStatus)) {
       return false;
     }
     return true;
