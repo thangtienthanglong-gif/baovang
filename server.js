@@ -86,7 +86,7 @@ const DEFAULT_AI_PROVIDER = 'internal';
 const DEFAULT_OPENAI_MODEL = 'gpt-5.5';
 const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
 const DEFAULT_GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
-const ABSENCE_STATUSES = ['Vắng', 'Có phép', 'Đi trễ', 'Về sớm', 'Nghỉ học', 'Lịch sử học sinh nghỉ học', 'Học phí', 'Trễ học phí'];
+const ABSENCE_STATUSES = ['Vắng', 'Có phép', 'Đi trễ', 'Về sớm', 'Cả ngày', 'Nghỉ học', 'Học phí', 'Trễ học phí'];
 const pendingAiActions = new Map();
 
 app.use(express.json({ limit: '5mb' }));
@@ -921,7 +921,7 @@ function detectAbsenceStatusFromActionMessage(message, fallbackStatus = 'ALL') {
   if (/\bdi tre\b/.test(text)) return 'Đi trễ';
   if (/\bve som\b/.test(text)) return 'Về sớm';
   if (/\bco phep\b/.test(text)) return 'Có phép';
-  if (/\blich su\b/.test(text)) return 'Lịch sử học sinh nghỉ học';
+  if (/\bca ngay\b/.test(text)) return 'Cả ngày';
   if (/\bnghi hoc|nghi\b/.test(text)) return 'Nghỉ học';
   if (/\bvang\b/.test(text)) return 'Vắng';
   return fallbackStatus || 'ALL';

@@ -826,8 +826,8 @@ function renderRosterStudent(student) {
     ['Có phép', 'Có phép'],
     ['Đi trễ', 'Đi trễ'],
     ['Về sớm', 'Về sớm'],
+    ['Cả ngày', 'Cả ngày'],
     ['Nghỉ học', 'Nghỉ học'],
-    ['Lịch sử học sinh nghỉ học', 'Lịch sử học sinh nghỉ học'],
     ['Học phí', 'Trễ học phí']
   ];
   if (!statusOptions.some(([value]) => value === currentStatus)) {
