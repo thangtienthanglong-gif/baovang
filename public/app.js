@@ -233,7 +233,7 @@ async function refreshCurrentView(button) {
     const tab = activeTabId();
     if (tab === 'queueTab') await loadAbsences();
     if (tab === 'historyTab') {
-      await Promise.all([loadHistory(), loadNotices()]);
+      await Promise.all([loadHistory(), loadNotices(), loadQuitStudents()]);
     }
     if (tab === 'absenceTab' || tab === 'overviewTab') await loadAttendanceAbsences();
     toast('Đã tải lại dữ liệu.');
@@ -965,6 +965,36 @@ async function updateCallResult(id, result) {
   }
 }
 
+async function loadQuitStudents() {
+  const rows = await api('/api/quit-students?' + queryString({
+    q: $('#historyKeyword').value.trim()
+  }));
+
+  const tbody = $('#quitRows');
+  if (!tbody) return;
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">Không có học sinh nào nghỉ học.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(row => `
+    <tr>
+      <td>${escapeHtml(row.quitDate || '')}</td>
+      <td>
+        <div class="person-main">${escapeHtml(row.fullName)}</div>
+        <div class="muted">${escapeHtml(row.code)}</div>
+      </td>
+      <td>${escapeHtml(row.className)}</td>
+      <td>${escapeHtml(row.parentName)}</td>
+      <td>
+        <div>${escapeHtml(row.phone1 || '')}</div>
+      </td>
+      <td>${escapeHtml(row.quitReason || '')}</td>
+    </tr>
+  `).join('');
+}
+
 async function loadNotices() {
   let rows = await api('/api/notification-logs?' + queryString({
     date: $('#historyDate').value,
@@ -1033,7 +1063,7 @@ async function activateTab(tabId, activeShortcut = null) {
   $('#' + tabId).classList.add('active');
   if (tabId === 'overviewTab' || tabId === 'absenceTab') await loadAttendanceAbsences();
   if (tabId === 'historyTab') {
-    await Promise.all([loadHistory(), loadNotices()]);
+    await Promise.all([loadHistory(), loadNotices(), loadQuitStudents()]);
   }
   if (tabId === 'queueTab') await loadAbsences();
 }
@@ -2230,7 +2260,7 @@ function initEvents() {
   });
 
   $('#historyFilterBtn').addEventListener('click', async () => {
-    await Promise.all([loadHistory(), loadNotices()]);
+    await Promise.all([loadHistory(), loadNotices(), loadQuitStudents()]);
   });
   $('#clearCallHistoryBtn')?.addEventListener('click', async () => {
     try {

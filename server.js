@@ -2237,6 +2237,37 @@ app.options('/api/local-zalo/open-paste', (req, res) => {
   res.sendStatus(200);
 });
 
+app.get('/api/quit-students', async (req, res, next) => {
+  try {
+    const db = await getBranchDb(req);
+    const absences = db.absences || [];
+    const q = normalizeSearchText(req.query.q || '');
+    
+    let quitStudents = (db.students || []).filter(s => s.status === 'Nghỉ học');
+    
+    if (q) {
+      quitStudents = quitStudents.filter(student => {
+        const text = normalizeSearchText(`${student.code} ${student.fullName} ${student.className} ${student.parentName} ${student.phone1} ${student.phone2}`);
+        return text.includes(q);
+      });
+    }
+
+    const enrichedRows = quitStudents.map(student => {
+      const quitAbsences = absences.filter(a => a.studentId === student.id && a.absenceStatus === 'Nghỉ học');
+      const lastQuit = quitAbsences.sort((a, b) => b.date.localeCompare(a.date))[0];
+      return {
+        ...student,
+        quitDate: lastQuit ? lastQuit.date : '',
+        quitReason: lastQuit ? lastQuit.reason : ''
+      };
+    });
+
+    res.json(enrichedRows.sort((a, b) => b.quitDate.localeCompare(a.quitDate)));
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get('/api/students', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
