@@ -12,12 +12,12 @@ async function checkStranger() {
     const worker = await Tesseract.createWorker('vie', 1, {
       workerPath,
       corePath,
+      langPath: process.cwd(),
       logger: m => console.log(m)
     });
     
-    const { data: { text } } = await worker.recognize(imgBuffer, {
-      rectangle: { top: 0, left: 0, width: 1920, height: 600 }
-    });
+    // Do not use fixed rectangle because different monitors have different resolutions
+    const { data: { text } } = await worker.recognize(imgBuffer);
     await worker.terminate();
     
     const upperText = text.toUpperCase();
@@ -36,7 +36,9 @@ async function checkStranger() {
     }
   } catch (err) {
     console.error('OCR Error:', err);
-    return false; // On error, assume friend to prevent blocking
+    require('fs').writeFileSync('ocr_error.log', String(err));
+    // If there is an error, block sending to prevent sending to strangers
+    return true; 
   }
 }
 

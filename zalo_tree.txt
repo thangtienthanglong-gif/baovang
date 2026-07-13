@@ -1,0 +1,3 @@
+﻿- Name: 'Zalo', Type: ControlType.Window, Id: ''
+  - Name: 'Chrome Legacy Window', Type: ControlType.Pane, Id: '757622656'
+  - Name: '', Type: ControlType.Pane, Id: ''
