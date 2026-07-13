@@ -994,12 +994,19 @@ async function loadNotices() {
         <div class="muted">${escapeHtml(row.phone1 || '')}</div>
       </td>
       <td>
-        <span class="badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span>
-        ${row.status === 'Chờ gửi thủ công' && row.message ? `
-          <button class="btn ghost btn-sm copy-log-msg-btn" type="button" style="margin-top: 4px; display: block; font-size: 11px; padding: 2px 4px;" data-msg="${escapeHtml(row.message)}">
-            Copy tin nhắn
-          </button>
-        ` : ''}
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span class="badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span>
+          ${row.status === 'Chờ gửi thủ công' && row.message ? `
+            <button class="btn ghost btn-sm copy-log-msg-btn" type="button" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;" data-msg="${escapeHtml(row.message)}">
+              Copy tin nhắn
+            </button>
+          ` : ''}
+          ${row.status === 'Lỗi gửi' && row.absenceId ? `
+            <button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${row.absenceId}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">
+              Gửi lại
+            </button>
+          ` : ''}
+        </div>
       </td>
     </tr>
   `).join('');
@@ -2052,17 +2059,36 @@ function initEvents() {
   });
 
   $('#noticeRows')?.addEventListener('click', async event => {
-    const btn = event.target.closest('.copy-log-msg-btn');
-    if (!btn) return;
-    const msg = btn.dataset.msg;
-    if (msg) {
+    const copyBtn = event.target.closest('.copy-log-msg-btn');
+    if (copyBtn) {
+      const msg = copyBtn.dataset.msg;
+      if (msg) {
+        try {
+          await navigator.clipboard.writeText(msg);
+          toast('Đã copy nội dung tin nhắn.');
+        } catch (err) {
+          console.error(err);
+          toast('Lỗi khi copy: ' + err.message);
+        }
+      }
+      return;
+    }
+
+    const retryBtn = event.target.closest('.retry-zalo-btn');
+    if (retryBtn) {
+      const id = retryBtn.dataset.id;
+      retryBtn.disabled = true;
+      retryBtn.textContent = '...';
       try {
-        await navigator.clipboard.writeText(msg);
-        toast('Đã copy nội dung tin nhắn.');
+        await api(`/api/absences/${id}/zalo`, { method: 'POST', body: '{}' });
+        toast('Đã đưa vào tiến trình gửi Zalo.');
       } catch (err) {
         console.error(err);
-        toast('Lỗi khi copy: ' + err.message);
+        toast('Lỗi khi gửi lại Zalo: ' + err.message);
       }
+      await loadNotices();
+      await loadAbsences();
+      return;
     }
   });
   $('#filterClass').addEventListener('change', loadAbsences);
