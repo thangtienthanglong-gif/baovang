@@ -1002,7 +1002,7 @@ async function loadNotices() {
             </button>
           ` : ''}
           ${row.status === 'Lỗi gửi' && row.absenceId ? `
-            <button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${row.absenceId}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">
+            <button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${row.absenceId}" data-logid="${row.id}" data-msg="${escapeHtml(row.message || '')}" data-link="${escapeHtml(row.responsePayload?.link || '')}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">
               Gửi lại
             </button>
           ` : ''}
@@ -2077,17 +2077,40 @@ function initEvents() {
     const retryBtn = event.target.closest('.retry-zalo-btn');
     if (retryBtn) {
       const id = retryBtn.dataset.id;
+      const logId = retryBtn.dataset.logid;
+      const msg = retryBtn.dataset.msg;
+      const link = retryBtn.dataset.link;
+
       retryBtn.disabled = true;
       retryBtn.textContent = '...';
-      try {
-        await api(`/api/absences/${id}/zalo`, { method: 'POST', body: '{}' });
-        toast('Đã đưa vào tiến trình gửi Zalo.');
-      } catch (err) {
-        console.error(err);
-        toast('Lỗi khi gửi lại Zalo: ' + err.message);
+
+      if (msg) {
+        try {
+          const ok = await openZaloAndPasteMessage(msg, link);
+          if (ok === 'STRANGER') {
+            await api(`/api/notification-logs/${logId}/mark-unfriended`, { method: 'POST' });
+            toast('Đã đánh dấu: Chưa kết bạn.');
+          } else if (ok) {
+            await api(`/api/absences/${id}/zalo/manual-sent`, { method: 'POST', body: '{}' });
+            toast('Đã đánh dấu gửi thành công qua Zalo cá nhân.');
+          }
+        } catch (err) {
+          console.error(err);
+          toast('Lỗi khi thao tác Zalo: ' + err.message);
+        }
+        await loadNotices();
+        await loadAbsences();
+      } else {
+        try {
+          await api(`/api/absences/${id}/zalo`, { method: 'POST', body: '{}' });
+          toast('Đã đưa vào tiến trình gửi Zalo.');
+        } catch (err) {
+          console.error(err);
+          toast('Lỗi khi gửi lại Zalo: ' + err.message);
+        }
+        await loadNotices();
+        await loadAbsences();
       }
-      await loadNotices();
-      await loadAbsences();
       return;
     }
   });
