@@ -901,7 +901,10 @@ function renderAbsences() {
 
       <div class="stack notice-cell">
         <label>Zalo</label>
-        <span class="badge ${statusClass(row.noticeStatus)}">${escapeHtml(row.noticeStatus || 'Chưa gửi')}</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="badge ${statusClass(row.noticeStatus)}">${escapeHtml(row.noticeStatus || 'Chưa gửi')}</span>
+          ${['Lỗi gửi', 'Chưa gửi'].includes(row.noticeStatus || 'Chưa gửi') ? `<button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${row.id}" style="padding: 2px 8px; font-size: 12px;">Gửi thủ công</button>` : ''}
+        </div>
       </div>
 
       <div class="stack notice-time-cell">
@@ -2023,6 +2026,22 @@ function initEvents() {
       if (!$('#manualSendPanel .manual-send-card')) $('#manualSendPanel').hidden = true;
       await loadAbsences();
     }
+  });
+
+  $('#absenceRows')?.addEventListener('click', async event => {
+    const btn = event.target.closest('.retry-zalo-btn');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    btn.disabled = true;
+    btn.textContent = 'Đang xử lý...';
+    try {
+      await api(`/api/absences/${id}/zalo`, { method: 'POST', body: '{}' });
+      toast('Đã đưa vào tiến trình gửi Zalo.');
+    } catch (err) {
+      console.error(err);
+      toast('Lỗi khi gửi lại Zalo: ' + err.message);
+    }
+    await loadAbsences();
   });
   $('#filterClass').addEventListener('change', loadAbsences);
   $('#filterAbsenceStatus')?.addEventListener('change', loadAbsences);
