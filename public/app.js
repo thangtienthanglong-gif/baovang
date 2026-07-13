@@ -993,7 +993,14 @@ async function loadNotices() {
         <div>${escapeHtml(row.zaloUserId || 'Chưa có UID')}</div>
         <div class="muted">${escapeHtml(row.phone1 || '')}</div>
       </td>
-      <td><span class="badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span></td>
+      <td>
+        <span class="badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span>
+        ${row.status === 'Chờ gửi thủ công' && row.message ? `
+          <button class="btn ghost btn-sm copy-log-msg-btn" type="button" style="margin-top: 4px; display: block; font-size: 11px; padding: 2px 4px;" data-msg="${escapeHtml(row.message)}">
+            Copy tin nhắn
+          </button>
+        ` : ''}
+      </td>
     </tr>
   `).join('');
 }
@@ -2042,6 +2049,21 @@ function initEvents() {
       toast('Lỗi khi gửi lại Zalo: ' + err.message);
     }
     await loadAbsences();
+  });
+
+  $('#noticeRows')?.addEventListener('click', async event => {
+    const btn = event.target.closest('.copy-log-msg-btn');
+    if (!btn) return;
+    const msg = btn.dataset.msg;
+    if (msg) {
+      try {
+        await navigator.clipboard.writeText(msg);
+        toast('Đã copy nội dung tin nhắn.');
+      } catch (err) {
+        console.error(err);
+        toast('Lỗi khi copy: ' + err.message);
+      }
+    }
   });
   $('#filterClass').addEventListener('change', loadAbsences);
   $('#filterAbsenceStatus')?.addEventListener('change', loadAbsences);
