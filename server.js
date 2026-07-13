@@ -1324,7 +1324,7 @@ function selectSpecialZaloCandidates(db, filters, checkField) {
   const allCandidates = fakeAbsences.filter(row => !alreadySentIds.has(row.studentId));
   
   const settings = db.settings || defaultSettings();
-  const isPersonalMode = ['personal-test', 'personal-real'].includes(settings.zaloMode);
+  const isPersonalMode = ['personal-test'].includes(settings.zaloMode);
   const testLimit = isPersonalMode ? personalTestLimitFromSettings(settings) : 0;
   const candidates = testLimit > 0 ? allCandidates.slice(0, testLimit) : allCandidates;
   
