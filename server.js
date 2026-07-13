@@ -1284,8 +1284,21 @@ function selectSpecialZaloCandidates(db, filters, checkField) {
     }
     return true;
   });
+
+  let processedStudents = allStudents;
+  if (filters.absenceStatus === 'Định kì') {
+    const seenPhones = new Set();
+    processedStudents = allStudents.filter(s => {
+      let phone = (s.phone1 || s.phone2 || '').replace(/[\s\.\-\+]/g, '');
+      if (!phone && s.zaloUserId) phone = s.zaloUserId;
+      if (!phone) return true;
+      if (seenPhones.has(phone)) return false;
+      seenPhones.add(phone);
+      return true;
+    });
+  }
   
-  const fakeAbsences = allStudents.map(s => ({
+  const fakeAbsences = processedStudents.map(s => ({
     id: `fake-${checkField}-${s.id}`,
     studentId: s.id,
     date: filters.date || todayISO(),
