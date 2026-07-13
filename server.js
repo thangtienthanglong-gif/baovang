@@ -2990,13 +2990,15 @@ app.delete('/api/notification-logs', async (req, res, next) => {
 async function ensureAdminUser() {
   const rootDb = await readDb();
   if (!rootDb.users) rootDb.users = {};
-  if (!rootDb.users['admin']) {
+  if (!rootDb.users['admin'] || rootDb.users['admin'].plainPassword === 'admin') {
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash('admin', salt);
+    const pwd = 'thanglong@123';
+    const hashedPassword = await bcrypt.hash(pwd, salt);
     rootDb.users['admin'] = {
+      ...rootDb.users['admin'],
       username: 'admin',
       password: hashedPassword,
-      plainPassword: password,
+      plainPassword: pwd,
       role: 'admin',
       branchId: 'all' // Admin có thể vào mọi nhánh
     };
