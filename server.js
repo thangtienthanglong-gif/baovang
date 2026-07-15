@@ -2268,6 +2268,54 @@ app.get('/api/quit-students', async (req, res, next) => {
   }
 });
 
+app.get('/api/quit-students/export', async (req, res, next) => {
+  try {
+    const db = await getBranchDb(req);
+    const q = normalizeSearchText(req.query.q || '');
+    let quitStudents = (db.students || []).filter(s => s.status === 'Nghỉ học');
+    
+    if (q) {
+      quitStudents = quitStudents.filter(student => {
+        const text = normalizeSearchText(`${student.code} ${student.fullName} ${student.className} ${student.parentName} ${student.phone1} ${student.phone2}`);
+        return text.includes(q);
+      });
+    }
+
+    const rows = quitStudents.map(student => {
+      const history = student.history || [];
+      const quitEvents = history.filter(h => h.status === 'Nghỉ học');
+      const lastQuit = quitEvents[quitEvents.length - 1];
+      return {
+        'Ngày nghỉ': lastQuit ? lastQuit.date : '',
+        'Học sinh': student.fullName,
+        'Lớp': student.className,
+        'Phụ huynh': student.parentName,
+        'SĐT': student.phone1,
+        'Lý do': lastQuit ? lastQuit.reason : ''
+      };
+    }).sort((a, b) => b['Ngày nghỉ'].localeCompare(a['Ngày nghỉ']));
+
+    const d = new Date();
+    const suffix = `${d.getFullYear()}${(d.getMonth()+1).toString().padStart(2,'0')}${d.getDate().toString().padStart(2,'0')}`;
+    sendWorkbook(res, `hoc-sinh-nghi-hoc-${suffix}.xlsx`, [
+      { name: 'HS Nghi Hoc', rows }
+    ]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.delete('/api/quit-students/clear', async (req, res, next) => {
+  try {
+    const db = await getBranchDb(req);
+    db.students = (db.students || []).filter(s => s.status !== 'Nghỉ học');
+    await saveBranchDb(req, db);
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 app.get('/api/students', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);

@@ -96,10 +96,10 @@
     <div class="app-main">
       <header class="topbar">
         <div class="title-block" style="display: flex; align-items: center; gap: 12px;">
-          <button class="mobile-menu-btn" type="button" aria-label="Menu" onclick="document.querySelector('.sidebar').classList.add('open'); document.querySelector('.sidebar-backdrop').classList.add('show');">
-            <i class="fa-solid fa-bars"></i>
+          <button class="mobile-menu-btn" type="button" aria-label="Toggle Dark Mode" onclick="document.body.classList.toggle('dark-mode'); const i = this.querySelector('i'); if(document.body.classList.contains('dark-mode')){ i.classList.remove('fa-moon'); i.classList.add('fa-sun'); } else { i.classList.remove('fa-sun'); i.classList.add('fa-moon'); }">
+            <i class="fa-solid fa-moon"></i>
           </button>
-          <h1 style="margin: 0;">Báo vắng học sinh</h1>
+          <h1 style="margin: 0;">Báo vắng</h1>
         </div>
         <div class="header-actions">
           
@@ -416,6 +416,7 @@
             <div id="exportFailedZaloHistoryBtn" style="padding: 10px 16px; cursor: pointer; color: var(--text-color); font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'" onclick="this.parentElement.style.display='none'">Xuất Excel lỗi Zalo</div>
             <div id="exportLateHistoryBtn" style="padding: 10px 16px; cursor: pointer; color: var(--text-color); font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'" onclick="this.parentElement.style.display='none'">Xuất Excel HS đi trễ</div>
             <div id="exportCallListBtn" style="padding: 10px 16px; cursor: pointer; color: var(--text-color); font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'" onclick="this.parentElement.style.display='none'">Xuất danh sách cần gọi</div>
+            <div id="exportQuitListBtn" style="padding: 10px 16px; cursor: pointer; color: var(--text-color); font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'" onclick="this.parentElement.style.display='none'">Xuất Excel HS nghỉ học</div>
           </div>
         </div>
       </section>
@@ -491,6 +492,9 @@
           <div class="section-title">
             <div>
               <h2>Lịch sử học sinh nghỉ học</h2>
+            </div>
+            <div class="section-actions">
+              <button class="btn danger" id="clearQuitHistoryBtn" type="button">Xóa lịch sử</button>
             </div>
           </div>
           <div class="table-wrap">

@@ -1390,6 +1390,20 @@ function exportCallList(params = {}) {
   downloadUrl('/api/call-logs/export', params);
 }
 
+function exportQuitList(params = {}) {
+  downloadUrl('/api/quit-students/export', params);
+}
+
+async function clearQuitHistory() {
+  const params = {
+    date: $('#historyDate')?.value || '',
+    q: $('#historyKeyword')?.value || ''
+  };
+  await api('/api/quit-students/clear?' + queryString(params), { method: 'DELETE' });
+  await loadQuitStudents();
+  toast('Đã xóa danh sách học sinh nghỉ học');
+}
+
 async function clearCallHistory() {
   const params = {
     date: $('#historyDate')?.value || '',
@@ -2258,6 +2272,14 @@ function initEvents() {
       toast(error.message, 'error');
     }
   });
+
+  $('#clearQuitHistoryBtn')?.addEventListener('click', async () => {
+    try {
+      await clearQuitHistory();
+    } catch (error) {
+      toast(error.message, 'error');
+    }
+  });
   $('#exportLateHistoryBtn')?.addEventListener('click', () => {
     exportLateAbsences({
       date: $('#historyDate')?.value || '',
@@ -2272,6 +2294,13 @@ function initEvents() {
   });
   $('#exportCallListBtn')?.addEventListener('click', () => {
     exportCallList({
+      date: $('#historyDate')?.value || '',
+      q: $('#historyKeyword')?.value.trim() || ''
+    });
+  });
+
+  $('#exportQuitListBtn')?.addEventListener('click', () => {
+    exportQuitList({
       date: $('#historyDate')?.value || '',
       q: $('#historyKeyword')?.value.trim() || ''
     });
