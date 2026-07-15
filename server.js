@@ -2482,7 +2482,10 @@ app.get('/api/absences/export-excused', async (req, res, next) => {
       'Lý do': row.initialReason,
       'Ghi chú Zalo': row.noticeStatus
     }));
-    exportExcel(res, rows, 'LichSu_HocSinh_CoPhep');
+    const suffix = req.query.date ? cleanText(req.query.date) : 'tat-ca';
+    sendWorkbook(res, `hoc-sinh-co-phep-${suffix}.xlsx`, [
+      { name: 'Hoc sinh co phep', rows }
+    ]);
   } catch (e) {
     next(e);
   }
