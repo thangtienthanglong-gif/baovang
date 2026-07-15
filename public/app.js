@@ -1897,7 +1897,7 @@ async function testAiAssistant(button) {
     toast(message);
     return;
   }
-  const token = normalizeAccessTokenInput($('#cozeAccessToken').value);
+  const token = $('#cozeAccessToken') ? normalizeAccessTokenInput($('#cozeAccessToken').value) : '';
   if (provider === 'coze' && token && !token.startsWith('pat_')) {
     const message = 'Token Coze phải là Personal Access Token bắt đầu bằng pat_. Không dùng App ID, Client Secret hoặc chữ Bearer.';
     if (note) note.textContent = message;
