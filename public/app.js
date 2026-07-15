@@ -378,15 +378,15 @@ function renderSettings() {
 
   $('#zaloCycleSize').value = Number(settings.zaloCycleSize ?? 20);
   $('#zaloCycleDelayMinutes').value = Number(settings.zaloCycleDelayMinutes ?? 1);
-  $('#aiProvider').value = settings.aiProvider || (settings.cozeEnabled ? 'coze' : 'internal');
-  $('#openaiModel').value = settings.openaiModel || 'gpt-5.5';
-  $('#openaiApiKey').placeholder = settings.hasOpenAiApiKey ? 'Đã có key, nhập key mới nếu muốn thay' : 'Chưa có key';
-  $('#geminiModel').value = settings.geminiModel || 'gemini-3.5-flash';
-  $('#geminiApiKey').placeholder = settings.hasGeminiApiKey ? 'Đã có key, nhập key mới nếu muốn thay' : 'Chưa có key';
-  $('#cozeBaseUrl').value = settings.cozeBaseUrl || 'https://api.coze.com';
-  $('#cozeBotId').value = settings.cozeBotId || '';
-  $('#cozeUserId').value = settings.cozeUserId || 'bao-vang-teacher';
-  $('#cozeAccessToken').placeholder = settings.hasCozeAccessToken ? 'Đã có token, nhập token mới nếu muốn thay' : 'Chưa có token';
+  if ($('#aiProvider')) $('#aiProvider').value = settings.aiProvider || 'gemini';
+  if ($('#openaiModel')) $('#openaiModel').value = settings.openaiModel || 'gpt-5.5';
+  if ($('#openaiApiKey')) $('#openaiApiKey').placeholder = settings.hasOpenAiApiKey ? 'Đã có key, nhập key mới nếu muốn thay' : 'Chưa có key';
+  if ($('#geminiModel')) $('#geminiModel').value = settings.geminiModel || 'gemini-3.5-flash';
+  if ($('#geminiApiKey')) $('#geminiApiKey').placeholder = settings.hasGeminiApiKey ? 'Đã có key, nhập key mới nếu muốn thay' : 'Chưa có key';
+  if ($('#cozeBaseUrl')) $('#cozeBaseUrl').value = settings.cozeBaseUrl || 'https://api.coze.com';
+  if ($('#cozeBotId')) $('#cozeBotId').value = settings.cozeBotId || '';
+  if ($('#cozeUserId')) $('#cozeUserId').value = settings.cozeUserId || 'bao-vang-teacher';
+  if ($('#cozeAccessToken')) $('#cozeAccessToken').placeholder = settings.hasCozeAccessToken ? 'Đã có token, nhập token mới nếu muốn thay' : 'Chưa có token';
   $('#messageTemplate').value = settings.messageTemplate || '';
   if ($('#tuitionTemplate')) $('#tuitionTemplate').value = settings.tuitionTemplate || '';
   if ($('#periodicTemplate')) $('#periodicTemplate').value = settings.periodicTemplate || '';
@@ -1766,15 +1766,15 @@ function buildSettingsPayload() {
     zaloCycleSize: $('#zaloCycleSize').value,
     zaloCycleDelayMinutes: $('#zaloCycleDelayMinutes').value,
     aiProvider: selectedAiProvider(),
-    openaiModel: $('#openaiModel').value,
-    openaiApiKey: normalizeAccessTokenInput($('#openaiApiKey').value),
-    geminiModel: $('#geminiModel').value,
-    geminiApiKey: normalizeAccessTokenInput($('#geminiApiKey').value),
+    openaiModel: $('#openaiModel') ? $('#openaiModel').value : '',
+    openaiApiKey: $('#openaiApiKey') ? normalizeAccessTokenInput($('#openaiApiKey').value) : '',
+    geminiModel: $('#geminiModel') ? $('#geminiModel').value : '',
+    geminiApiKey: $('#geminiApiKey') ? normalizeAccessTokenInput($('#geminiApiKey').value) : '',
     cozeEnabled: selectedAiProvider() === 'coze',
-    cozeBaseUrl: $('#cozeBaseUrl').value,
-    cozeBotId: $('#cozeBotId').value,
-    cozeAccessToken: normalizeAccessTokenInput($('#cozeAccessToken').value),
-    cozeUserId: $('#cozeUserId').value,
+    cozeBaseUrl: $('#cozeBaseUrl') ? $('#cozeBaseUrl').value : '',
+    cozeBotId: $('#cozeBotId') ? $('#cozeBotId').value : '',
+    cozeAccessToken: $('#cozeAccessToken') ? normalizeAccessTokenInput($('#cozeAccessToken').value) : '',
+    cozeUserId: $('#cozeUserId') ? $('#cozeUserId').value : '',
     messageTemplate: $('#messageTemplate').value,
     tuitionTemplate: $('#tuitionTemplate')?.value || '',
     periodicTemplate: $('#periodicTemplate')?.value || '',
@@ -1788,10 +1788,10 @@ async function saveSettingsFromUi() {
     body: JSON.stringify(buildSettingsPayload())
   });
   state.settings = settings;
-  $('#zaloAccessToken').value = '';
-  $('#openaiApiKey').value = '';
-  $('#geminiApiKey').value = '';
-  $('#cozeAccessToken').value = '';
+  if ($('#zaloAccessToken')) $('#zaloAccessToken').value = '';
+  if ($('#openaiApiKey')) $('#openaiApiKey').value = '';
+  if ($('#geminiApiKey')) $('#geminiApiKey').value = '';
+  if ($('#cozeAccessToken')) $('#cozeAccessToken').value = '';
   renderSettings();
   toast('Đã lưu cấu hình.');
   return settings;
@@ -1917,14 +1917,14 @@ async function testAiAssistant(button) {
       body: JSON.stringify({
         message: `Hãy trả lời ngắn gọn: ${label} đã kết nối thành công với app báo vắng.`,
         aiProvider: provider,
-        openaiModel: $('#openaiModel').value,
-        openaiApiKey: normalizeAccessTokenInput($('#openaiApiKey').value),
-        geminiModel: $('#geminiModel').value,
-        geminiApiKey: normalizeAccessTokenInput($('#geminiApiKey').value),
-        cozeBaseUrl: $('#cozeBaseUrl').value,
-        cozeBotId: $('#cozeBotId').value,
+        openaiModel: $('#openaiModel') ? $('#openaiModel').value : '',
+        openaiApiKey: $('#openaiApiKey') ? normalizeAccessTokenInput($('#openaiApiKey').value) : '',
+        geminiModel: $('#geminiModel') ? $('#geminiModel').value : '',
+        geminiApiKey: $('#geminiApiKey') ? normalizeAccessTokenInput($('#geminiApiKey').value) : '',
+        cozeBaseUrl: $('#cozeBaseUrl') ? $('#cozeBaseUrl').value : '',
+        cozeBotId: $('#cozeBotId') ? $('#cozeBotId').value : '',
         cozeAccessToken: token,
-        cozeUserId: $('#cozeUserId').value
+        cozeUserId: $('#cozeUserId') ? $('#cozeUserId').value : ''
       })
     });
     if (note) note.textContent = `Kết nối ${label} thành công: ${result.answer || 'AI đã phản hồi.'}`;
