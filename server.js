@@ -2465,6 +2465,29 @@ app.get('/api/absences', async (req, res, next) => {
   }
 });
 
+app.get('/api/absences/export-excused', async (req, res, next) => {
+  try {
+    const db = await getBranchDb(req);
+    const absences = filterAbsences(db, { ...req.query, absenceStatus: 'Có phép' });
+    const rows = absences.map((row, index) => ({
+      STT: index + 1,
+      'Ngày': row.date,
+      'Buổi': row.session,
+      'Lớp': row.className,
+      'Mã HS': row.studentCode,
+      'Họ tên học sinh': row.studentName,
+      'Phụ huynh': row.parentName,
+      'SĐT phụ huynh': row.phone1 || row.phone2,
+      'Trạng thái': normalizeAbsenceStatus(row.absenceStatus),
+      'Lý do': row.initialReason,
+      'Ghi chú Zalo': row.noticeStatus
+    }));
+    exportExcel(res, rows, 'LichSu_HocSinh_CoPhep');
+  } catch (e) {
+    next(e);
+  }
+});
+
 app.get('/api/absences/export-late', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);

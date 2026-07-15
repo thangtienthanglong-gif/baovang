@@ -1382,6 +1382,10 @@ function exportLateAbsences(params = {}) {
   downloadUrl('/api/absences/export-late', params);
 }
 
+function exportExcusedAbsences(params = {}) {
+  downloadUrl('/api/absences/export-excused', params);
+}
+
 function exportFailedZalo(params = {}) {
   downloadUrl('/api/absences/export-failed-zalo', params);
 }
@@ -2282,6 +2286,13 @@ function initEvents() {
   });
   $('#exportLateHistoryBtn')?.addEventListener('click', () => {
     exportLateAbsences({
+      date: $('#historyDate')?.value || '',
+      q: $('#historyKeyword')?.value.trim() || ''
+    });
+  });
+
+  $('#exportExcusedHistoryBtn')?.addEventListener('click', () => {
+    exportExcusedAbsences({
       date: $('#historyDate')?.value || '',
       q: $('#historyKeyword')?.value.trim() || ''
     });
