@@ -1831,31 +1831,34 @@ code {
 
 /* Inner Tabs for History */
 .inner-tabs {
-  display: flex;
-  gap: 8px;
+  display: inline-flex;
+  gap: 4px;
   overflow-x: auto;
-  border-bottom: 1px solid #e2e8f0;
-  padding-bottom: 8px;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 12px;
+  margin-bottom: 20px;
 }
 .inner-tab {
-  padding: 8px 16px;
-  border-radius: 99px;
-  border: 1px solid #e2e8f0;
-  background: white;
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
   color: #64748b;
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
+  box-shadow: none;
 }
-.inner-tab:hover {
-  background: #f8fafc;
+.inner-tab:hover:not(.active) {
+  background: #e2e8f0;
   color: #334155;
 }
 .inner-tab.active {
-  background: #eff6ff;
-  color: #2563eb;
-  border-color: #bfdbfe;
+  background: white;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
 }
 
