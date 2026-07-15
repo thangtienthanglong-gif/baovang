@@ -96,7 +96,7 @@
     <div class="app-main">
       <header class="topbar">
         <div class="title-block" style="display: flex; align-items: center; gap: 12px;">
-          <button class="mobile-menu-btn" type="button" aria-label="Toggle Dark Mode" onclick="document.body.classList.toggle('dark-mode'); const i = this.querySelector('i'); if(document.body.classList.contains('dark-mode')){ i.classList.remove('fa-moon'); i.classList.add('fa-sun'); } else { i.classList.remove('fa-sun'); i.classList.add('fa-moon'); }">
+          <button class="mobile-menu-btn" type="button" aria-label="Toggle Dark Mode" onclick="toggleDarkMode()">
             <i class="fa-solid fa-moon"></i>
           </button>
           <h1 style="margin: 0;">Báo vắng</h1>
@@ -561,7 +561,6 @@
             <li>Vào tab <strong>Điểm danh</strong> trên thanh menu.</li>
             <li>Sử dụng bộ lọc 3 cột (Chọn thứ &rarr; Chọn buổi &rarr; Chọn lớp) để mở danh sách lớp học nhanh chóng.</li>
             <li>Tại hàng của học sinh, bấm chọn trạng thái tương ứng (VD: <em>Vắng phép, Không phép, Đi trễ...</em>).</li>
-            <li>Nhập lý do cụ thể vào ô <strong>Lý do vắng</strong> nếu cần.</li>
           </ul>
 
           <h3>2. Gửi thông báo báo vắng qua Zalo</h3>
@@ -620,12 +619,33 @@
   <script>
     document.addEventListener('click', function(e) {
       if (!e.target.closest('.dropdown-wrapper')) {
-        document.querySelectorAll('.dropdown-menu').forEach(function(m) {
-          m.style.display = 'none';
-        });
+        document.querySelectorAll('.dropdown-menu').forEach(x => x.style.display = 'none');
       }
     });
+
+    // Dark Mode Logic
+    function toggleDarkMode() {
+      const isDark = document.body.classList.toggle('dark-mode');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      updateDarkModeIcon(isDark);
+    }
+    
+    function updateDarkModeIcon(isDark) {
+      const icon = document.querySelector('.mobile-menu-btn i');
+      if (isDark) {
+        icon.classList.remove('fa-moon');
+        icon.classList.add('fa-sun');
+      } else {
+        icon.classList.remove('fa-sun');
+        icon.classList.add('fa-moon');
+      }
+    }
+
+    // Load saved theme
+    if (localStorage.getItem('theme') === 'dark') {
+      document.body.classList.add('dark-mode');
+      updateDarkModeIcon(true);
+    }
   </script>
 </body>
 </html>
-
