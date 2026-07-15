@@ -2292,6 +2292,21 @@ function initEvents() {
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
+  const dayDropdown = document.getElementById('dayDropdown');
+  if (dayDropdown) {
+    const dDay = new Date().getDay();
+    dayDropdown.value = dDay === 0 ? "8" : (dDay + 1).toString();
+  }
+  const sessionDropdown = document.getElementById('sessionDropdown');
+  if (sessionDropdown) {
+    const h = new Date().getHours();
+    const m = new Date().getMinutes();
+    const time = h + m / 60;
+    if (time < 12) sessionDropdown.value = "Sáng";
+    else if (time < 16.5) sessionDropdown.value = "Chiều";
+    else sessionDropdown.value = "Tối";
+  }
+
   initEvents();
   initChatbox();
   try {
