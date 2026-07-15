@@ -256,6 +256,21 @@ textarea {
   font-size: 22px;
 }
 
+.mobile-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 20px;
+  cursor: pointer;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
 .notify-btn {
   position: relative;
   width: 58px;
@@ -1872,6 +1887,50 @@ body.dark-mode {
   --text: #f8fafc;
   --muted: #94a3b8;
   --line: #334155;
+}
+
+body.dark-mode, body.dark-mode .app-main {
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+body.dark-mode .card,
+body.dark-mode .stat-card,
+body.dark-mode .sub-panel,
+body.dark-mode .dropdown-menu,
+body.dark-mode table td,
+body.dark-mode .student-card,
+body.dark-mode .person-icon,
+body.dark-mode .mobile-menu-btn {
+  background-color: var(--surface) !important;
+  color: var(--text) !important;
+  border-color: var(--line) !important;
+}
+
+body.dark-mode .topbar {
+  background-color: var(--surface) !important;
+  border-bottom-color: var(--line) !important;
+}
+
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode table th,
+body.dark-mode .inner-tab {
+  background-color: var(--surface-soft) !important;
+  color: var(--text) !important;
+  border-color: var(--line) !important;
+}
+
+body.dark-mode .inner-tab.active {
+  background-color: var(--surface) !important;
+  color: var(--text) !important;
+}
+
+body.dark-mode .badge.waiting,
+body.dark-mode .badge.called,
+body.dark-mode .badge.no-answer {
+  background-color: var(--surface-soft) !important;
+  border-color: var(--line) !important;
 }
 
 
