@@ -491,8 +491,7 @@ function aiProviderLabel(provider) {
 }
 
 function selectedAiProvider() {
-  const settings = state.settings || {};
-  return $('#aiProvider')?.value || settings.aiProvider || (settings.cozeEnabled ? 'coze' : 'internal');
+  return 'gemini';
 }
 
 function renderAiStatus() {
