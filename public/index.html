@@ -10,6 +10,50 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <link rel="stylesheet" href="/style.css?v=20260715-2">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* Inner Tabs for History - INLINED TO PREVENT CACHE */
+    .inner-tabs {
+      display: inline-flex;
+      gap: 4px;
+      overflow-x: auto;
+      background: #f1f5f9;
+      padding: 4px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+    .inner-tabs::-webkit-scrollbar {
+      height: 4px;
+    }
+    .inner-tabs::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    .inner-tab {
+      appearance: none;
+      -webkit-appearance: none;
+      padding: 8px 20px;
+      border-radius: 8px;
+      border: none;
+      background: transparent;
+      color: #64748b;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      box-shadow: none;
+      outline: none;
+    }
+    .inner-tab:hover:not(.active) {
+      background: #e2e8f0;
+      color: #334155;
+    }
+    .inner-tab.active {
+      background: white !important;
+      color: #0f172a !important;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06) !important;
+    }
+  </style>
   </head>
 <body>
 
