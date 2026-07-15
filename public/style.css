@@ -136,12 +136,14 @@ textarea {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: all 0.2s ease;
+  transition: all 0.2s;
 }
 
 .tab:hover,
 .side-link:hover {
   background: rgba(249, 115, 22, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
 }
 
 .tab.active,
@@ -1881,17 +1883,33 @@ code {
 }
 
 body.dark-mode {
-  --bg: #0f172a;
-  --surface: #1e293b;
-  --surface-soft: #334155;
-  --text: #f8fafc;
-  --muted: #94a3b8;
-  --line: #334155;
+  --bg: #121212;
+  --surface: #1e1e1e;
+  --surface-soft: #2d2d2d;
+  --text: #ffffff;
+  --muted: #a0a0a0;
+  --line: #333333;
 }
 
 body.dark-mode, body.dark-mode .app-main {
   background-color: var(--bg);
   color: var(--text);
+}
+
+body.dark-mode .sidebar {
+  background: var(--surface) !important;
+  border-right: 1px solid var(--line);
+}
+
+body.dark-mode .tab,
+body.dark-mode .side-link {
+  color: var(--muted);
+}
+body.dark-mode .tab.active,
+body.dark-mode .side-link.active {
+  background: rgba(249, 115, 22, 0.15) !important;
+  border-color: transparent !important;
+  color: #f97316 !important;
 }
 
 body.dark-mode .card,
