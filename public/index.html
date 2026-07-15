@@ -281,9 +281,7 @@
           <div class="field">
             <label for="zaloMode">Chế độ gửi</label>
             <select id="zaloMode">
-              <option value="dry-run">Chạy thử - chỉ ghi log</option>
-              <option value="personal-test">Zalo cá nhân - chạy thử 3-5 HS</option>
-              <option value="personal-real">Zalo cá nhân - gửi thật thủ công 3-5 HS</option>
+              <option value="personal-real">Zalo cá nhân - gửi thật thủ công</option>
               <option value="oa">Gửi thật qua Zalo OA</option>
             </select>
           </div>
@@ -370,31 +368,18 @@
           </div>
 
           <div class="coze-quickstart">
-            <a class="btn ghost" href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">OpenAI key</a>
-            <a class="btn ghost" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Gemini key</a>
-            <a class="btn ghost" href="https://www.coze.com/" target="_blank" rel="noopener">Mở Coze</a>
-            <button class="btn blue" id="copyCozePromptBtn" type="button">Copy prompt bot</button>
+            <a class="btn ghost" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Lấy Gemini key</a>
+            <button class="btn blue" id="copyCozePromptBtn" type="button" style="display: none;">Copy prompt bot</button>
             <button class="btn success" id="testAiBtn" type="button">Kiểm tra AI</button>
-            <span>Chọn Trợ lý nội bộ nếu không dùng key ngoài. Chọn ChatGPT, Gemini hoặc Coze để chatbox gọi AI qua server.</span>
+            <span>Nhập API Key của Gemini để kích hoạt trợ lý AI thông minh.</span>
           </div>
 
           <div class="coze-control-grid">
-            <div class="field">
+            <div class="field" style="display: none;">
               <label for="aiProvider">Nguồn chatbox</label>
               <select id="aiProvider">
-                <option value="internal">Trợ lý nội bộ</option>
-                <option value="openai">ChatGPT / OpenAI</option>
-                <option value="gemini">Gemini</option>
-                <option value="coze">Coze AI</option>
+                <option value="gemini" selected>Gemini</option>
               </select>
-            </div>
-            <div class="field ai-provider ai-provider-openai">
-              <label for="openaiModel">OpenAI model</label>
-              <input id="openaiModel" placeholder="gpt-5.5">
-            </div>
-            <div class="field coze-token-field ai-provider ai-provider-openai">
-              <label for="openaiApiKey">OpenAI API key</label>
-              <input id="openaiApiKey" type="password" placeholder="Để trống nếu không muốn thay key hiện tại">
             </div>
             <div class="field ai-provider ai-provider-gemini">
               <label for="geminiModel">Gemini model</label>
@@ -403,22 +388,6 @@
             <div class="field coze-token-field ai-provider ai-provider-gemini">
               <label for="geminiApiKey">Gemini API key</label>
               <input id="geminiApiKey" type="password" placeholder="Để trống nếu không muốn thay key hiện tại">
-            </div>
-            <div class="field ai-provider ai-provider-coze">
-              <label for="cozeBotId">Coze Bot ID</label>
-              <input id="cozeBotId" placeholder="Nhập bot_id">
-            </div>
-            <div class="field ai-provider ai-provider-coze">
-              <label for="cozeUserId">User ID</label>
-              <input id="cozeUserId" placeholder="bao-vang-teacher">
-            </div>
-            <div class="field ai-provider ai-provider-coze">
-              <label for="cozeBaseUrl">Coze API</label>
-              <input id="cozeBaseUrl" placeholder="https://api.coze.com">
-            </div>
-            <div class="field coze-token-field ai-provider ai-provider-coze">
-              <label for="cozeAccessToken">Coze access token</label>
-              <input id="cozeAccessToken" type="password" placeholder="Để trống nếu không muốn thay token hiện tại">
             </div>
             <div id="aiModeNote" class="mode-note coze-status-note"></div>
           </div>
