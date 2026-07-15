@@ -95,11 +95,11 @@
 
     <div class="app-main">
       <header class="topbar">
-        <div class="title-block">
+        <div class="title-block" style="display: flex; align-items: center; gap: 12px;">
           <button class="mobile-menu-btn" type="button" aria-label="Menu" onclick="document.querySelector('.sidebar').classList.add('open'); document.querySelector('.sidebar-backdrop').classList.add('show');">
             <i class="fa-solid fa-bars"></i>
           </button>
-          <h1>Báo vắng học sinh</h1>
+          <h1 style="margin: 0;">Báo vắng học sinh</h1>
         </div>
         <div class="header-actions">
           
@@ -138,36 +138,38 @@
     <section id="absenceTab" class="tab-panel active">
       <section class="attendance-layout">
         <aside class="class-panel">
-          <div class="class-panel-header">
-            <div class="panel-heading">
-              <div>
-                <h2>Danh sách lớp</h2>
-                <span id="classCount" class="muted">0 lớp</span>
+          <div class="class-panel-header" style="display: flex; flex-direction: column; gap: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+              <div class="panel-heading" style="margin: 0; min-width: 150px;">
+                <h2 style="font-size: 18px; margin: 0 0 4px 0;">Danh sách lớp</h2>
+                <span id="classCount" class="muted" style="font-size: 14px;">0 lớp</span>
+              </div>
+              <div style="display: flex; gap: 16px; flex-wrap: wrap; flex: 1; justify-content: flex-end;">
+                <div class="field class-dropdown-field" style="margin: 0; flex: 1; min-width: 160px; max-width: 250px;">
+                  <label for="dayDropdown">Chọn thứ</label>
+                  <select id="dayDropdown">
+                    <option value="ALL">Theo ngày hiện tại</option>
+                    <option value="2">Thứ 2</option>
+                    <option value="3">Thứ 3</option>
+                    <option value="4">Thứ 4</option>
+                    <option value="5">Thứ 5</option>
+                    <option value="6">Thứ 6</option>
+                    <option value="7">Thứ 7</option>
+                    <option value="8">Chủ nhật</option>
+                  </select>
+                </div>
+                <div class="field class-dropdown-field" style="margin: 0; flex: 1; min-width: 160px; max-width: 250px;">
+                  <label for="sessionDropdown">Chọn buổi</label>
+                  <select id="sessionDropdown">
+                    <option value="ALL">Tất cả các buổi</option>
+                    <option value="Sáng">Buổi Sáng</option>
+                    <option value="Chiều">Buổi Chiều</option>
+                    <option value="Tối">Buổi Tối</option>
+                  </select>
+                </div>
               </div>
             </div>
-            <div class="field class-dropdown-field" style="margin-bottom: 12px;">
-              <label for="dayDropdown">Chọn thứ</label>
-              <select id="dayDropdown">
-                <option value="ALL">Theo ngày hiện tại</option>
-                <option value="2">Thứ 2</option>
-                <option value="3">Thứ 3</option>
-                <option value="4">Thứ 4</option>
-                <option value="5">Thứ 5</option>
-                <option value="6">Thứ 6</option>
-                <option value="7">Thứ 7</option>
-                <option value="8">Chủ nhật</option>
-              </select>
-            </div>
-            <div class="field class-dropdown-field" style="margin-bottom: 12px;">
-              <label for="sessionDropdown">Chọn buổi</label>
-              <select id="sessionDropdown">
-                <option value="ALL">Tất cả các buổi</option>
-                <option value="Sáng">Buổi Sáng</option>
-                <option value="Chiều">Buổi Chiều</option>
-                <option value="Tối">Buổi Tối</option>
-              </select>
-            </div>
-            <div class="field class-dropdown-field">
+            <div class="field class-dropdown-field" style="margin: 0; width: 100%; max-width: none;">
               <label for="classDropdown">Chọn lớp</label>
               <select id="classDropdown"></select>
             </div>
