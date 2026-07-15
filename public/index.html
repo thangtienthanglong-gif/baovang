@@ -398,16 +398,26 @@
     </section>
 
     <section id="historyTab" class="tab-panel">
-      <section class="card filters">
-        <div class="field">
+      <section class="card filters" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+        <div class="field" style="margin: 0;">
           <label for="historyDate">Ngày vắng</label>
           <input id="historyDate" type="date">
         </div>
-        <div class="field grow">
+        <div class="field grow" style="margin: 0;">
           <label for="historyKeyword">Tìm kiếm</label>
           <input id="historyKeyword" type="search" placeholder="Tên, lớp, phụ huynh, SĐT, trạng thái...">
         </div>
-        <button class="btn" id="historyFilterBtn" type="button">Lọc lịch sử</button>
+        <button class="btn" id="historyFilterBtn" type="button" style="margin-bottom: 0;">Lọc lịch sử</button>
+        <div class="dropdown-wrapper" style="position: relative; display: inline-block;">
+          <button class="btn blue" type="button" style="margin-bottom: 0;" onclick="const m = this.nextElementSibling; const isVis = m.style.display==='block'; document.querySelectorAll('.dropdown-menu').forEach(x=>x.style.display='none'); if(!isVis) m.style.display='block'; event.stopPropagation();">
+            Xuất Excel <i class="fa-solid fa-chevron-down" style="margin-left: 6px;"></i>
+          </button>
+          <div class="dropdown-menu" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; background: white; border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 100; min-width: 220px; padding: 4px 0; overflow: hidden;">
+            <div id="exportFailedZaloHistoryBtn" style="padding: 10px 16px; cursor: pointer; color: var(--text-color); font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'" onclick="this.parentElement.style.display='none'">Xuất Excel lỗi Zalo</div>
+            <div id="exportLateHistoryBtn" style="padding: 10px 16px; cursor: pointer; color: var(--text-color); font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'" onclick="this.parentElement.style.display='none'">Xuất Excel HS đi trễ</div>
+            <div id="exportCallListBtn" style="padding: 10px 16px; cursor: pointer; color: var(--text-color); font-size: 14px; transition: background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'" onclick="this.parentElement.style.display='none'">Xuất danh sách cần gọi</div>
+          </div>
+        </div>
       </section>
 
       <div class="inner-tabs" style="margin-bottom: 16px; display: flex; gap: 8px; overflow-x: auto;">
@@ -423,7 +433,6 @@
               <h2>Lịch sử gửi Zalo</h2>
             </div>
             <div class="section-actions">
-              <button class="btn danger" id="exportFailedZaloHistoryBtn" type="button">Xuất Excel lỗi Zalo</button>
               <button class="btn danger" id="clearNoticeHistoryBtn" type="button">Xóa lịch sử Zalo</button>
             </div>
           </div>
@@ -453,8 +462,6 @@
               <h2>Lịch sử cuộc gọi</h2>
             </div>
             <div class="section-actions">
-              <button class="btn ghost" id="exportLateHistoryBtn" type="button">Xuất Excel HS đi trễ</button>
-              <button class="btn ghost" id="exportCallListBtn" type="button">Xuất danh sách cần gọi</button>
               <button class="btn danger" id="clearCallHistoryBtn" type="button">Xóa lịch sử</button>
             </div>
           </div>
@@ -615,9 +622,15 @@
 
   <div id="toastContainer" class="toast-container" role="status"></div>
   <script src="/app.js?v=20260711-3"></script>
-
-
-
+  <script>
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.dropdown-wrapper')) {
+        document.querySelectorAll('.dropdown-menu').forEach(function(m) {
+          m.style.display = 'none';
+        });
+      }
+    });
+  </script>
 </body>
 </html>
 
