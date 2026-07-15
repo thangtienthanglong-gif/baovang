@@ -2007,11 +2007,15 @@ function initChatbox() {
 
 function initEvents() {
   $$('.tab').forEach(button => {
-    button.addEventListener('click', async () => activateTab(button.dataset.tab));
+    if (button.dataset.tab) {
+      button.addEventListener('click', async () => activateTab(button.dataset.tab));
+    }
   });
 
   $$('.shortcut-tab').forEach(button => {
-    button.addEventListener('click', async () => activateTab(button.dataset.tab, button));
+    if (button.dataset.tab) {
+      button.addEventListener('click', async () => activateTab(button.dataset.tab, button));
+    }
   });
 
   $$('.side-link[data-tab]').forEach(button => {
