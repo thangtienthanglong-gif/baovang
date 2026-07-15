@@ -45,14 +45,14 @@ textarea {
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 210px minmax(0, 1fr);
+  grid-template-columns: 260px minmax(0, 1fr);
 }
 
 .sidebar {
   position: sticky;
   top: 0;
   height: 100vh;
-  padding: 16px;
+  padding: 24px 16px;
   background: linear-gradient(135deg, #fffbeb, #ffffff);
   color: var(--text);
   display: flex;
@@ -109,9 +109,9 @@ textarea {
 .tabs.side-nav {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   padding: 0;
-  margin-top: 14px;
+  margin-top: 24px;
   border: 0;
   background: transparent;
   overflow: visible;
@@ -120,19 +120,23 @@ textarea {
 .tab,
 .side-link {
   width: 100%;
-  min-height: 58px;
+  min-height: 52px;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   border: 1px solid transparent;
   border-radius: 10px;
   padding: 0 16px;
   background: transparent;
   color: #475569;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 600;
   text-align: left;
   cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: all 0.2s ease;
 }
 
 .tab:hover,
@@ -151,13 +155,12 @@ textarea {
 .nav-icon {
   display: grid;
   place-items: center;
-  width: 30px;
-  min-width: 30px;
-  height: 30px;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
   border-radius: 8px;
   color: inherit;
-  font-size: 20px;
-  font-weight: 800;
+  font-size: 18px;
 }
 
 .side-extra {
