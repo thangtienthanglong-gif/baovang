@@ -157,8 +157,6 @@
             <p>Theo dõi trạng thái gửi Zalo theo danh sách báo vắng trong ngày.</p>
           </div>
           <div class="section-actions">
-            <button class="btn ghost" id="exportLateQueueBtn" type="button">Xuất HS đi trễ</button>
-            <button class="btn danger" id="exportFailedZaloQueueBtn" type="button">Xuất DS lỗi Zalo</button>
             <button class="btn blue" id="bulkSendTuitionBtn" type="button">Nhắc trễ học phí</button>
             <button class="btn blue" id="bulkSendZaloBtn" type="button">Gửi Zalo hàng loạt</button>
           </div>
@@ -401,87 +399,99 @@
         <button class="btn" id="historyFilterBtn" type="button">Lọc lịch sử</button>
       </section>
 
-      <section class="card table-card">
-        <div class="section-title">
-          <div>
-            <h2>Lịch sử gửi Zalo</h2>
-          </div>
-          <div class="section-actions">
-            <button class="btn danger" id="exportFailedZaloHistoryBtn" type="button">Xuất Excel lỗi Zalo</button>
-            <button class="btn danger" id="clearNoticeHistoryBtn" type="button">Xóa lịch sử Zalo</button>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Thời gian</th>
-                <th>Ngày vắng</th>
-                <th>Học sinh</th>
-                <th>Lớp</th>
-                <th>Phụ huynh</th>
-                <th>UID/SĐT</th>
-                <th>Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody id="noticeRows"></tbody>
-          </table>
-        </div>
-      </section>
-      <section class="card table-card">
-        <div class="section-title">
-          <div>
-            <h2>Lịch sử học sinh nghỉ học</h2>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Ngày nghỉ</th>
-                <th>Học sinh</th>
-                <th>Lớp</th>
-                <th>Phụ huynh</th>
-                <th>SĐT</th>
-                <th>Lý do</th>
-              </tr>
-            </thead>
-            <tbody id="quitRows"></tbody>
-          </table>
-        </div>
-      </section>
+      <div class="inner-tabs" style="margin-bottom: 16px; display: flex; gap: 8px; overflow-x: auto;">
+        <button class="inner-tab active" data-subtab="zaloHistoryPanel" type="button">Lịch sử Zalo</button>
+        <button class="inner-tab" data-subtab="callHistoryPanel" type="button">Lịch sử Cuộc gọi</button>
+        <button class="inner-tab" data-subtab="quitHistoryPanel" type="button">Học sinh nghỉ học</button>
+      </div>
 
+      <div id="zaloHistoryPanel" class="sub-panel active">
+        <section class="card table-card">
+          <div class="section-title">
+            <div>
+              <h2>Lịch sử gửi Zalo</h2>
+            </div>
+            <div class="section-actions">
+              <button class="btn danger" id="exportFailedZaloHistoryBtn" type="button">Xuất Excel lỗi Zalo</button>
+              <button class="btn danger" id="clearNoticeHistoryBtn" type="button">Xóa lịch sử Zalo</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Thời gian</th>
+                  <th>Ngày vắng</th>
+                  <th>Học sinh</th>
+                  <th>Lớp</th>
+                  <th>Phụ huynh</th>
+                  <th>UID/SĐT</th>
+                  <th>Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody id="noticeRows"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
 
-      <section class="card table-card">
-        <div class="section-title">
-          <div>
-            <h2>Lịch sử cuộc gọi</h2>
+      <div id="callHistoryPanel" class="sub-panel" style="display: none;">
+        <section class="card table-card">
+          <div class="section-title">
+            <div>
+              <h2>Lịch sử cuộc gọi</h2>
+            </div>
+            <div class="section-actions">
+              <button class="btn ghost" id="exportLateHistoryBtn" type="button">Xuất Excel HS đi trễ</button>
+              <button class="btn ghost" id="exportCallListBtn" type="button">Xuất danh sách cần gọi</button>
+              <button class="btn danger" id="clearCallHistoryBtn" type="button">Xóa lịch sử</button>
+            </div>
           </div>
-          <div class="section-actions">
-            <button class="btn ghost" id="exportLateHistoryBtn" type="button">Xuất Excel HS đi trễ</button>
-            <button class="btn ghost" id="exportCallListBtn" type="button">Xuất danh sách cần gọi</button>
-            <button class="btn danger" id="clearCallHistoryBtn" type="button">Xóa lịch sử</button>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Thời gian</th>
+                  <th>Ngày vắng</th>
+                  <th>Học sinh</th>
+                  <th>Lớp</th>
+                  <th>SĐT gọi</th>
+                  <th>Trạng thái</th>
+                  <th>Kết quả</th>
+                  <th>Người gọi</th>
+                  <th>Ghi chú</th>
+                </tr>
+              </thead>
+              <tbody id="historyRows"></tbody>
+            </table>
           </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Thời gian</th>
-                <th>Ngày vắng</th>
-                <th>Học sinh</th>
-                <th>Lớp</th>
-                <th>SĐT gọi</th>
-                <th>Trạng thái</th>
-                <th>Kết quả</th>
-                <th>Người gọi</th>
-                <th>Ghi chú</th>
-              </tr>
-            </thead>
-            <tbody id="historyRows"></tbody>
-          </table>
-        </div>
-      </section>
+        </section>
+      </div>
+
+      <div id="quitHistoryPanel" class="sub-panel" style="display: none;">
+        <section class="card table-card">
+          <div class="section-title">
+            <div>
+              <h2>Lịch sử học sinh nghỉ học</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ngày nghỉ</th>
+                  <th>Học sinh</th>
+                  <th>Lớp</th>
+                  <th>Phụ huynh</th>
+                  <th>SĐT</th>
+                  <th>Lý do</th>
+                </tr>
+              </thead>
+              <tbody id="quitRows"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
     </section>
     <section id="staffTab" class="tab-panel">
       <div class="panel-heading">

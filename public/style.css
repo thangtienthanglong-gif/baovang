@@ -1828,3 +1828,34 @@ code {
     display: block;
   }
 }
+
+/* Inner Tabs for History */
+.inner-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
+}
+.inner-tab {
+  padding: 8px 16px;
+  border-radius: 99px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.inner-tab:hover {
+  background: #f8fafc;
+  color: #334155;
+}
+.inner-tab.active {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #bfdbfe;
+}
+

@@ -2021,20 +2021,6 @@ function initEvents() {
 
   $('#refreshBtn').addEventListener('click', event => refreshCurrentView(event.currentTarget));
   $('#applyFilterBtn').addEventListener('click', loadAbsences);
-  $('#exportLateQueueBtn')?.addEventListener('click', () => {
-    exportLateAbsences({
-      date: $('#filterDate')?.value || '',
-      className: $('#filterClass')?.value || 'ALL',
-      q: $('#filterKeyword')?.value.trim() || ''
-    });
-  });
-  $('#exportFailedZaloQueueBtn')?.addEventListener('click', () => {
-    exportFailedZalo({
-      date: $('#filterDate')?.value || '',
-      className: $('#filterClass')?.value || 'ALL',
-      q: $('#filterKeyword')?.value.trim() || ''
-    });
-  });
   $('#bulkSendTuitionBtn')?.addEventListener('click', () => {
     setChatboxOpen(true);
     sendChatPrompt('Gửi nhắc trễ học phí');
@@ -2460,6 +2446,25 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // Inner Tabs Logic for History Tab
+  document.addEventListener('click', (e) => {
+    if (e.target.matches('.inner-tab')) {
+      const parent = e.target.closest('.inner-tabs');
+      if (!parent) return;
+      
+      // Update active tab button
+      parent.querySelectorAll('.inner-tab').forEach(t => t.classList.remove('active'));
+      e.target.classList.add('active');
+      
+      // Show corresponding panel
+      const targetPanelId = e.target.dataset.subtab;
+      const tabContainer = e.target.closest('.tab-panel');
+      tabContainer.querySelectorAll('.sub-panel').forEach(panel => {
+        panel.style.display = panel.id === targetPanelId ? 'block' : 'none';
+      });
+    }
+  });
 });
 
 // ==================== STAFF MANAGEMENT ====================
