@@ -409,6 +409,7 @@ function filterAbsences(db, query) {
   const status = query.status || 'ALL';
   const noticeStatus = query.noticeStatus || 'ALL';
   const keyword = String(query.q || '').toLowerCase().trim();
+  const session = query.session || 'ALL';
 
   return (db.absences || [])
     .map(absence => enrichAbsence(absence, studentsMap))
@@ -419,13 +420,14 @@ function filterAbsences(db, query) {
       } else if (dateStart) {
         matchesDate = absence.date === dateStart;
       }
+      const matchesSession = session === 'ALL' || absence.session === session;
       const matchesClass = className === 'ALL' || absence.className === className;
       const matchesAbsenceStatus = absenceStatus === 'ALL' || normalizeAbsenceStatus(absence.absenceStatus) === absenceStatus;
       const matchesStatus = status === 'ALL' || absence.callStatus === status;
       const matchesNotice = noticeStatus === 'ALL' || absence.noticeStatus === noticeStatus;
       const haystack = `${absence.studentCode} ${absence.studentName} ${absence.className} ${absence.parentName} ${absence.phone1} ${absence.phone2} ${absence.zaloUserId}`.toLowerCase();
       const matchesKeyword = !keyword || haystack.includes(keyword);
-      return matchesDate && matchesClass && matchesAbsenceStatus && matchesStatus && matchesNotice && matchesKeyword;
+      return matchesDate && matchesSession && matchesClass && matchesAbsenceStatus && matchesStatus && matchesNotice && matchesKeyword;
     })
     .sort((a, b) => `${a.className} ${a.studentName}`.localeCompare(`${b.className} ${b.studentName}`, 'vi'));
 }

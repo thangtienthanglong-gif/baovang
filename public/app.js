@@ -198,6 +198,7 @@ function selectedClass() {
 function getFilters() {
   return {
     date: selectedDate(),
+    session: $('#filterSession')?.value || 'ALL',
     className: $('#filterClass')?.value || 'ALL',
     absenceStatus: $('#filterAbsenceStatus')?.value || 'ALL',
     status: $('#filterStatus')?.value || 'ALL',
