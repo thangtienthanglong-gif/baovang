@@ -59,7 +59,8 @@ let currentSuggestions = [];
 let currentRejected = [];
 
 const elements = {
-
+  classInputText: document.getElementById("classInputText"),
+  loadBtn: document.getElementById("loadBtn"),
   totalClasses: document.getElementById("totalClasses"),
   totalSessions: document.getElementById("totalSessions"),
   totalAssignments: document.getElementById("totalAssignments"),
@@ -2798,6 +2799,26 @@ document.querySelectorAll("[data-view-shortcut]").forEach((button) => {
 });
 
 elements.branchSelect.addEventListener("change", () => switchBranch(elements.branchSelect.value));
+
+if (elements.loadBtn) {
+  elements.loadBtn.addEventListener("click", () => {
+    const text = elements.classInputText.value;
+    const parsed = parseClassData(text);
+    if (parsed.errors && parsed.errors.length > 0) {
+      alert("Có lỗi xảy ra:\n" + parsed.errors.join("\n"));
+      return;
+    }
+    data.rooms = parsed.rooms;
+    data.classes = parsed.classes;
+    data.classSessions = parsed.classSessions;
+    data.classInputText = text;
+    
+    triggerAutoSave();
+    renderAll();
+    alert("Nhập dữ liệu thành công!");
+  });
+}
+
 elements.saveClassBtn.addEventListener("click", () => {
   window.clearTimeout(autoSaveTimer);
   upsertClassFromForm();

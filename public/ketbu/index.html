@@ -246,6 +246,28 @@
             </div>
             <p id="classFormStatus" class="status-text"></p>
           </article>
+
+          <article class="panel editor-panel settings-editor">
+            <div class="card-title">
+              <span class="icon-box icon-red"><i class="fa-solid fa-file-excel"></i></span>
+              <div>
+                <h2>Nhập hàng loạt từ Excel</h2>
+                <p style="color: var(--color-gray-500); font-size: 0.875rem; margin-top: 4px;">Copy 2 cột (Mã Lớp, Tên Phòng) từ Excel và dán vào đây để thêm nhanh. Không cần thiết phải có dòng tiêu đề.</p>
+              </div>
+            </div>
+            
+            <div class="form-grid settings-form" style="margin-top: 16px;">
+              <div class="form-field">
+                <textarea id="classInputText" rows="6" placeholder="Ví dụ:&#10;8AC4&#9;4C&#10;8AC5&#9;2G&#10;8AS2&#9;3E" style="width: 100%; border: 1px solid var(--line-strong); border-radius: 8px; padding: 12px; font-family: inherit; font-size: 0.875rem; resize: vertical;"></textarea>
+              </div>
+            </div>
+            
+            <div class="panel-actions" style="margin-top: 16px;">
+              <button class="primary-button" id="loadBtn" type="button">
+                <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 6px;"></i> Nhập dữ liệu
+              </button>
+            </div>
+          </article>
           
           <article class="panel editor-panel settings-editor">
             <div class="section-heading" style="margin-bottom: 16px;">
