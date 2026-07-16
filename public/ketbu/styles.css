@@ -301,12 +301,10 @@ button {
   gap: 16px;
   padding: 14px 18px;
   overflow: hidden;
-  border: 1px solid #163461;
+  border: 1px solid var(--line);
   border-radius: 18px;
-  background:
-    radial-gradient(circle at 78% 58%, rgba(255, 213, 109, 0.20), transparent 24%),
-    radial-gradient(circle at 84% 20%, rgba(255, 255, 255, 0.12), transparent 8%),
-    linear-gradient(125deg, var(--navy-strong) 0%, var(--navy) 52%, #0d305e 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #f4f7fb 100%);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
 }
 
 .app-header::after {
@@ -315,8 +313,8 @@ button {
   inset: auto -60px 10px 44%;
   height: 120px;
   background:
-    radial-gradient(circle at 15% 80%, rgba(255, 216, 128, 0.40) 0 1px, transparent 2px),
-    radial-gradient(circle at 44% 55%, rgba(255, 216, 128, 0.34) 0 2px, transparent 3px),
+    radial-gradient(circle at 15% 80%, rgba(38, 133, 217, 0.06) 0 1px, transparent 2px),
+    radial-gradient(circle at 44% 55%, rgba(38, 133, 217, 0.04) 0 2px, transparent 3px),
     linear-gradient(180deg, transparent, transparent);
   opacity: 0.9;
   pointer-events: none;
@@ -329,7 +327,7 @@ button {
 
 .eyebrow {
   margin: 0 0 5px;
-  color: #98b5ff;
+  color: var(--muted);
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.12em;
@@ -338,7 +336,7 @@ button {
 
 .app-header h1 {
   margin: 0;
-  color: #ffffff;
+  color: var(--ink);
   font-size: clamp(25px, 2.35vw, 34px);
   line-height: 1.02;
   letter-spacing: -0.02em;
@@ -346,7 +344,7 @@ button {
 
 .app-header p:not(.eyebrow) {
   margin: 6px 0 0;
-  color: rgba(255, 255, 255, 0.86);
+  color: var(--muted);
   font-size: 15px;
 }
 
@@ -355,10 +353,9 @@ button {
   align-items: center;
   justify-content: flex-end;
   flex: 0 0 auto;
-  padding: 5px;
-  border-radius: 14px;
-  background: #ffffff;
-  box-shadow: 0 14px 24px rgba(0, 0, 0, 0.24);
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .company-logo {
