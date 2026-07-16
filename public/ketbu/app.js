@@ -1062,7 +1062,6 @@ function parseClassLine(line, lineNumber) {
     subjectLabel: codeDetails.subjectLabel,
     levelCode: codeDetails.levelCode,
     baseCode: codeDetails.baseCode,
-    roomId,
     roomName,
     capacity,
     officialCount,
