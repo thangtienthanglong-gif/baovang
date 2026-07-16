@@ -530,11 +530,18 @@ function buildMessage(settings, absence, student) {
   let template = settings.messageTemplate || 'Kính gửi Quý phụ huynh, {schoolName} thông báo học sinh {studentName}, lớp {className}.\nVắng học {session} ngày {date}.\nHọc sinh: {absenceStatus}.\nPhụ huynh vui lòng phản hồi với nhà trường nếu cần bổ sung thông tin.';
   if (status === 'Học phí' || status === 'Trễ học phí') {
     template = settings.tuitionTemplate || 'Kính gửi Quý phụ huynh, {schoolName} thông báo học phí/tiền nợ của em {studentName}, lớp {className} hiện tại là: {tuitionDebt}.\nVui lòng hoàn thành sớm. Trân trọng!';
-  } else if (['Định kì', 'Khóa mới', 'Thông báo chung'].includes(status)) {
-    template = settings.periodicTemplate || 'Kính gửi Quý phụ huynh, {schoolName} gửi thông báo định kì/khóa mới cho em {studentName}, lớp {className}.';
+  } else if (['Định kỳ', 'Khóa mới', 'Thông báo chung'].includes(status)) {
+    template = settings.periodicTemplate || 'Kính gửi Quý phụ huynh, {schoolName} gửi thông báo định kỳ/khóa mới cho em {studentName}, lớp {className}.';
   }
   
-  return template.replace(/\{(\w+)\}/g, (_, key) => dict[key] ?? '');
+  let msg = template.replace(/\{(\w+)\}/g, (_, key) => dict[key] ?? '');
+  
+  if (status === 'Đi trễ') {
+    msg = msg.replace(/vắng học/gi, 'đi trễ');
+    msg = msg.replace(/không có mặt trong lớp/gi, 'đã đến lớp trễ');
+  }
+  
+  return msg;
 }
 
 function normalizeCozeBaseUrl(value) {
@@ -2589,9 +2596,9 @@ app.post('/api/absences', async (req, res, next) => {
       throw err;
     }
 
-    const shouldAutoSend = req.body.sendZalo !== false;
-    const noticeDelayMinutes = shouldAutoSend ? delayMinutesFromSettings(db.settings || defaultSettings()) : 0;
     const absenceStatus = normalizeAbsenceStatus(req.body.absenceStatus);
+    const shouldAutoSend = req.body.sendZalo !== false && absenceStatus !== 'Đi trễ';
+    const noticeDelayMinutes = shouldAutoSend ? delayMinutesFromSettings(db.settings || defaultSettings()) : 0;
     const absence = {
       id: id('abs'),
       date: cleanText(req.body.date),
@@ -2641,14 +2648,14 @@ app.put('/api/absences/:id/status', async (req, res, next) => {
       err.status = 404;
       throw err;
     }
-    const shouldAutoSend = req.body.sendZalo !== false;
-    const noticeDelayMinutes = shouldAutoSend ? delayMinutesFromSettings(db.settings || defaultSettings()) : 0;
     const absenceStatus = normalizeAbsenceStatus(req.body.absenceStatus);
+    const shouldAutoSend = req.body.sendZalo !== false && absenceStatus !== 'Đi trễ';
+    const noticeDelayMinutes = shouldAutoSend ? delayMinutesFromSettings(db.settings || defaultSettings()) : 0;
     db.absences[index] = {
       ...db.absences[index],
       absenceStatus,
       initialReason: normalizeInitialReason(req.body.initialReason || db.absences[index].initialReason, absenceStatus),
-      noticeStatus: shouldAutoSend && noticeDelayMinutes > 0 ? 'Chờ gửi' : db.absences[index].noticeStatus,
+      noticeStatus: shouldAutoSend ? (noticeDelayMinutes > 0 ? 'Chờ gửi' : db.absences[index].noticeStatus) : (['Chờ gửi', 'Chưa gửi'].includes(db.absences[index].noticeStatus) ? 'Không gửi' : db.absences[index].noticeStatus),
       noticeDueAt: shouldAutoSend && noticeDelayMinutes > 0 ? addMinutesISO(noticeDelayMinutes) : db.absences[index].noticeDueAt,
       noticeDelayMinutes,
       autoNotice: shouldAutoSend && noticeDelayMinutes > 0,
