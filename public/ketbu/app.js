@@ -1280,8 +1280,8 @@ function defaultLessonFor(details, index) {
   const options = lessonOptionsForDetails(details);
   if (details.subjectCode !== "TOAN") return options[0];
 
-  const isGroup1 = /[ACSME]/i.test(details.classCode);
-  const isGroup2 = /[BD]/i.test(details.classCode);
+  const isGroup1 = /[ACSME]$/i.test(details.classCode);
+  const isGroup2 = /[BD]$/i.test(details.classCode);
 
   let shiftDefaults;
   if (isGroup1) {
