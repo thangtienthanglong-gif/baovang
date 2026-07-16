@@ -2298,10 +2298,9 @@ function renderStudentInfo() {
     `<li>${escapeHtml(sessionLabel(session))}: <strong>${escapeHtml(session.lessonParts)}</strong></li>`
   ).join("");
   const displayName = student.hasName ? student.name : "Tên sẽ nhập khi lưu lịch sử";
-  const levelText = mainDetails.levelCode ? `${mainDetails.levelCode} (tham khảo)` : "Không lọc trình độ";
+  const levelText = mainDetails.levelCode ? `${mainDetails.levelCode}` : "Không lọc trình độ";
 
   elements.studentInfo.innerHTML = `
-    <div class="avatar">${escapeHtml(initials(student.hasName ? student.name : student.mainClassCode))}</div>
     <div>
       <h3>${escapeHtml(displayName)}</h3>
       <p>Lớp chính: <strong>${escapeHtml(student.mainClassCode)}</strong></p>
