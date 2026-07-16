@@ -4,53 +4,56 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>App xếp lịch học bù</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <div class="app-frame">
     <aside class="taskbar">
-      <div class="taskbar-brand">
-        <div class="logo-mark">LB</div>
-        <div>
-          <strong>Lịch bù</strong>
-          <span>Webapp quản lý lớp</span>
+      <div class="taskbar-left">
+        <a href="/" class="back-link" title="Trở về Báo vắng">
+          <i class="fa-solid fa-arrow-left"></i>
+        </a>
+        <div class="taskbar-brand">
+          <div class="logo-mark">LB</div>
+          <div>
+            <strong>Lịch bù</strong>
+          </div>
         </div>
       </div>
 
       <nav class="task-nav" aria-label="Thanh chức năng">
         <button class="task-item is-active" type="button" data-view="planner">
-          <span class="task-index">01</span>
-          <span class="task-icon task-icon-planner" aria-hidden="true"></span>
+          <i class="fa-solid fa-calendar-plus task-icon"></i>
           <span class="task-label">Xếp lịch bù</span>
         </button>
         <button class="task-item" type="button" data-view="settings">
-          <span class="task-index">02</span>
-          <span class="task-icon task-icon-settings" aria-hidden="true"></span>
+          <i class="fa-solid fa-gear task-icon"></i>
           <span class="task-label">Cài đặt lớp</span>
         </button>
         <button class="task-item" type="button" data-view="assignments">
-          <span class="task-index">03</span>
-          <span class="task-icon task-icon-list" aria-hidden="true"></span>
+          <i class="fa-solid fa-list-check task-icon"></i>
           <span class="task-label">Lịch đã xếp</span>
         </button>
-        <a href="/" class="task-item" style="text-decoration: none; color: inherit; display: flex; align-items: center; justify-content: center; font-weight: 500;">
-          <span class="task-label" style="font-size: 14px;">‹ Trở về Báo vắng</span>
-        </a>
       </nav>
 
-      <label class="toggle-row capacity-toggle taskbar-capacity-toggle" for="capacityCheckToggle">
-        <input id="capacityCheckToggle" type="checkbox" />
-        <span class="switch-track" aria-hidden="true"><span></span></span>
-        <strong>Kiểm tra sức chứa</strong>
-      </label>
+      <div class="taskbar-utilities">
+        <label class="toggle-row capacity-toggle taskbar-capacity-toggle" for="capacityCheckToggle" title="Kiểm tra sức chứa phòng">
+          <input id="capacityCheckToggle" type="checkbox" />
+          <span class="switch-track" aria-hidden="true"><span></span></span>
+          <span class="util-label">Sức chứa</span>
+        </label>
 
-      <div class="branch-switcher" aria-label="Quản lý chi nhánh">
-        <label for="branchSelect">Chi nhánh</label>
-        <div class="branch-control-row">
-          <select id="branchSelect"></select>
-          <button id="addBranchBtn" class="branch-button" type="button" title="Thêm chi nhánh">+</button>
-          <button id="renameBranchBtn" class="branch-button" type="button">Đổi tên</button>
-          <button id="deleteBranchBtn" class="branch-button danger" type="button">Xóa</button>
+        <div class="branch-switcher" aria-label="Quản lý chi nhánh">
+          <div class="branch-control-row">
+            <select id="branchSelect"></select>
+            <button id="addBranchBtn" class="branch-button" type="button" title="Thêm chi nhánh"><i class="fa-solid fa-plus"></i></button>
+            <button id="renameBranchBtn" class="branch-button" type="button" title="Đổi tên"><i class="fa-solid fa-pen"></i></button>
+            <button id="deleteBranchBtn" class="branch-button danger" type="button" title="Xóa"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </div>
+      </div>
+    </aside>utton">Xóa</button>
         </div>
       </div>
 
