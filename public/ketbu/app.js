@@ -93,10 +93,7 @@ const elements = {
   exportDateTo: document.getElementById("exportDateTo"),
   exportAssignmentsBtn: document.getElementById("exportAssignmentsBtn"),
   clearAssignmentsBtn: document.getElementById("clearAssignmentsBtn"),
-  branchSelect: document.getElementById("branchSelect"),
-  addBranchBtn: document.getElementById("addBranchBtn"),
-  renameBranchBtn: document.getElementById("renameBranchBtn"),
-  deleteBranchBtn: document.getElementById("deleteBranchBtn")
+  branchSelect: document.getElementById("branchSelect")
 };
 
 const pageCopy = {
@@ -1706,10 +1703,6 @@ function renderBranchSelector() {
     `<option value="${escapeHtml(branch.id)}">${escapeHtml(branch.name)}</option>`
   ).join("");
   elements.branchSelect.value = activeBranch.id;
-
-  if (elements.deleteBranchBtn) {
-    elements.deleteBranchBtn.disabled = appState.branches.length <= 1;
-  }
 }
 
 function currentWeekdayValue(date = new Date()) {
@@ -1748,54 +1741,49 @@ function switchBranch(branchId) {
   data = nextBranch.data;
   resetBranchWorkspace();
   persistAppState();
+  
+  // Sync with main app
+  localStorage.setItem('activeBranch', nextBranch.id);
+  
   renderAll();
   setNotice(`Đang làm việc tại chi nhánh ${nextBranch.name}.`);
 }
 
-function addBranch() {
-  const branchName = prompt("Nhập tên chi nhánh mới:", `Chi nhánh ${appState.branches.length + 1}`);
-  const trimmedName = String(branchName || "").trim();
-  if (!trimmedName) return;
-
-  saveData();
-  const branch = createBranch(trimmedName);
-  appState.branches.push(branch);
-  appState.activeBranchId = branch.id;
-  data = branch.data;
-  resetBranchWorkspace();
-  persistAppState();
-  renderAll();
-  setNotice(`Đã tạo chi nhánh ${branch.name}.`);
-}
-
-function renameBranch() {
-  const branch = getActiveBranch();
-  const branchName = prompt("Đổi tên chi nhánh:", branch.name);
-  const trimmedName = String(branchName || "").trim();
-  if (!trimmedName) return;
-
-  branch.name = trimmedName;
-  saveData();
-  renderBranchSelector();
-  setNotice(`Đã đổi tên chi nhánh thành ${branch.name}.`);
-}
-
-function deleteBranch() {
-  if (appState.branches.length <= 1) {
-    alert("Cần giữ lại ít nhất một chi nhánh.");
-    return;
+async function syncBranches() {
+  const token = localStorage.getItem('token');
+  if (!token) return;
+  
+  try {
+    const res = await fetch('/api/branches', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (!res.ok) return;
+    const branchesData = await res.json();
+    if (!branchesData || branchesData.length === 0) return;
+    
+    const existingMap = new Map(appState.branches.map(b => [b.id, b]));
+    appState.branches = branchesData.map(b => {
+      const existing = existingMap.get(b.id);
+      if (existing) {
+        existing.name = b.name;
+        return existing;
+      }
+      return createBranch(b.name, defaultData, b.id);
+    });
+    
+    const mainAppActiveBranch = localStorage.getItem('activeBranch') || 'main';
+    if (appState.branches.find(b => b.id === mainAppActiveBranch)) {
+      appState.activeBranchId = mainAppActiveBranch;
+    } else {
+      appState.activeBranchId = appState.branches[0].id;
+    }
+    
+    data = getActiveBranch().data;
+    persistAppState();
+    renderBranchSelector();
+  } catch (err) {
+    console.error("Failed to sync branches", err);
   }
-
-  const branch = getActiveBranch();
-  if (!confirm(`Xóa chi nhánh ${branch.name} và toàn bộ cài đặt/lịch bù riêng của chi nhánh này?`)) return;
-
-  appState.branches = appState.branches.filter((item) => item.id !== branch.id);
-  appState.activeBranchId = appState.branches[0].id;
-  data = getActiveBranch().data;
-  resetBranchWorkspace();
-  persistAppState();
-  renderAll();
-  setNotice(`Đã xóa chi nhánh ${branch.name}.`);
 }
 
 function renderStats() {
@@ -2728,10 +2716,6 @@ document.querySelectorAll("[data-view-shortcut]").forEach((button) => {
 });
 
 elements.branchSelect.addEventListener("change", () => switchBranch(elements.branchSelect.value));
-elements.addBranchBtn.addEventListener("click", addBranch);
-elements.renameBranchBtn.addEventListener("click", renameBranch);
-elements.deleteBranchBtn.addEventListener("click", deleteBranch);
-
 elements.saveClassBtn.addEventListener("click", () => {
   window.clearTimeout(autoSaveTimer);
   upsertClassFromForm();
@@ -2881,7 +2865,10 @@ elements.assignmentsBody.addEventListener("change", (event) => {
 
 setPreferredMakeupToCurrentTime();
 renderAll();
-initializeCloudSync();
+
+syncBranches().then(() => {
+  initializeCloudSync();
+});
 
 // Auto-fill from URL params
 document.addEventListener("DOMContentLoaded", () => {
