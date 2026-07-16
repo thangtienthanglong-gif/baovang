@@ -1280,9 +1280,19 @@ function defaultLessonFor(details, index) {
   const options = lessonOptionsForDetails(details);
   if (details.subjectCode !== "TOAN") return options[0];
 
-  const shiftDefaults = details.shift === "Sáng"
-    ? ["H1-D2-H2", "H3-D3-TH", "D1-H4-D4"]
-    : ["H3-D3-TH", "H1-D2-H2", "D1-H4-D4"];
+  const isGroup1 = /[ACSME]/i.test(details.classCode);
+  const isGroup2 = /[BD]/i.test(details.classCode);
+
+  let shiftDefaults;
+  if (isGroup1) {
+    shiftDefaults = ["H1-D2-H2", "H3-D3-TH", "D1-H4-D4"];
+  } else if (isGroup2) {
+    shiftDefaults = ["H3-D3-TH", "H1-D2-H2", "D1-H4-D4"];
+  } else {
+    shiftDefaults = details.shift === "Sáng"
+      ? ["H1-D2-H2", "H3-D3-TH", "D1-H4-D4"]
+      : ["H3-D3-TH", "H1-D2-H2", "D1-H4-D4"];
+  }
 
   return shiftDefaults[index % shiftDefaults.length];
 }

@@ -929,59 +929,6 @@ textarea:focus {
   background: linear-gradient(135deg, rgba(120, 150, 255, 0.16), rgba(72, 107, 255, 0.28));
   pointer-events: none;
 }
-
-.settings-hero > * {
-  position: relative;
-  z-index: 1;
-}
-
-.settings-hero-icon {
-  position: relative;
-  display: inline-grid;
-  place-items: center;
-  width: 58px;
-  height: 58px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #526cff, #6b4df1);
-  box-shadow: 0 20px 34px rgba(71, 91, 232, 0.24);
-  flex: 0 0 auto;
-}
-
-.settings-hero-icon::before {
-  content: "";
-  width: 24px;
-  height: 24px;
-  border: 6px solid #ffffff;
-  border-radius: 50%;
-  box-shadow:
-    0 -18px 0 -12px #ffffff,
-    0 18px 0 -12px #ffffff,
-    18px 0 0 -12px #ffffff,
-    -18px 0 0 -12px #ffffff,
-    13px 13px 0 -12px #ffffff,
-    -13px -13px 0 -12px #ffffff,
-    13px -13px 0 -12px #ffffff,
-    -13px 13px 0 -12px #ffffff;
-}
-
-.settings-hero .eyebrow {
-  color: #4f79ff;
-}
-
-.settings-hero h2 {
-  margin: 0;
-  color: var(--ink);
-  font-size: clamp(26px, 2.7vw, 36px);
-  line-height: 1.05;
-  font-weight: 900;
-}
-
-.settings-hero p:not(.eyebrow) {
-  margin: 8px 0 0;
-  color: var(--muted);
-  font-size: 16px;
-}
-
 .settings-editor {
   padding: 0;
   overflow: hidden;
@@ -1784,16 +1731,6 @@ tbody tr:hover {
     width: clamp(76px, 7vw, 96px);
     max-height: 86px;
   }
-
-  .settings-hero {
-    min-height: 92px;
-    padding-bottom: 12px;
-  }
-
-  .settings-hero::after {
-    height: 92px;
-  }
-
   .settings-form {
     padding-top: 18px;
     padding-bottom: 18px;
@@ -1864,26 +1801,6 @@ tbody tr:hover {
   .app-header .header-actions {
     align-self: flex-start;
   }
-
-  .settings-hero {
-    align-items: flex-start;
-    padding: 8px 0 22px;
-  }
-
-  .settings-hero::after {
-    left: 38%;
-  }
-
-  .settings-hero-icon {
-    width: 58px;
-    height: 58px;
-    border-radius: 18px;
-  }
-
-  .settings-hero h2 {
-    font-size: 30px;
-  }
-
   .settings-form,
   .editor-actions,
   .settings-editor .status-text {
