@@ -961,10 +961,10 @@ function isWeekdayInClassCode(details, weekday) {
   return Boolean(details && details.weekdays.some((item) => Number(item) === Number(weekday)));
 }
 
-function normalizeSessionsToClassCode(sessions, details) {
-  if (!details || !sessions.length) return [];
+function normalizeSessionsToClassCode(sessions, details, fallbackRoomId = "") {
+  if (!details) return [];
 
-  const fallbackSession = sessions[0] || {};
+  const fallbackSession = sessions[0] || { roomId: fallbackRoomId };
   const sessionsByValidWeekday = new Map();
 
   sessions.forEach((session) => {
@@ -985,15 +985,15 @@ function normalizeSessionsToClassCode(sessions, details) {
       weekday,
       shift: details.shift,
       lessonParts: normalizeLessonPartsForSubject(sourceSession.lessonParts || defaultLessonFor(details, index), details),
-      roomId: sourceSession.roomId || fallbackSession.roomId || "",
+      roomId: sourceSession.roomId || fallbackRoomId || "",
       officialCount: Number.isFinite(countValue) ? countValue : 0
     };
   });
 }
 
 function parseClassLine(line, lineNumber) {
-  const source = line.trim().replace(/[.。]+$/, "");
-  const classMatch = source.match(/^\s*([0-9]{1,2}[A-Z]*[SCT][2-8]+[A-Z]?)\s*[-–:]?\s*(.+)$/i);
+  const source = line.trim().replace(/[.a?,;]+$/, "");
+  const classMatch = source.match(/^\s*([0-9]{1,2}[A-Z]*[SCT][2-8]+[A-Z]?)(?:\s+|$)(.*)/i);
 
   if (!classMatch) {
     return { error: `Dòng ${lineNumber}: chưa nhận được mã lớp.` };
@@ -1006,8 +1006,9 @@ function parseClassLine(line, lineNumber) {
   }
 
   let rest = classMatch[2].trim();
-  const capacityMatch = rest.match(/(?:sức\s*chứa|suc\s*chua|capacity)\s*[:=]?\s*(\d+)/i);
+  rest = rest.replace(/^[-–—:,\t]+\s*/, "");
 
+  const capacityMatch = rest.match(/(?:sức\s*chứa|suc\s*chua|capacity)\s*[:=]?\s*(\d+)/i);
   const capacity = capacityMatch ? Number(capacityMatch[1]) : "";
   if (capacityMatch) rest = rest.replace(capacityMatch[0], "").trim();
 
@@ -1015,20 +1016,35 @@ function parseClassLine(line, lineNumber) {
   const officialCount = countMatch ? Number(countMatch[1]) : 0;
   if (countMatch) rest = rest.replace(countMatch[0], "").trim();
 
-  rest = rest.replace(/\s+/g, " ").replace(/(?:\s*[-–]\s*)+$/, "").trim();
+  rest = rest.replace(/\s+/g, " ").replace(/(?:\s*[-–—]\s*)+$/, "").trim();
 
-  const roomMatch = rest.match(/[-–]\s*([A-Za-zÀ-ỹ. ]*\d[A-Za-z0-9À-ỹ. ]*)\s*$/);
-  if (!roomMatch) {
-    return { error: `Dòng ${lineNumber}: thiếu phòng học.` };
+  let roomName = "";
+  let roomId = "";
+  let sessionSource = "";
+
+  const hasSchedule = /^(?:T|Thứ|Thu)\s*[0-9CN]/i.test(rest);
+  if (!hasSchedule && rest) {
+    roomName = rest;
+    roomId = normalizeRoomId(roomName);
+  } else {
+    const roomMatch = rest.match(/[-–—]\s*([A-Za-zÀ-ỹ0-9. ,]*\d[A-Za-z0-9À-ỹ. ,]*)\s*$/);
+    if (roomMatch) {
+      roomName = roomMatch[1].trim();
+      roomId = normalizeRoomId(roomName);
+      sessionSource = rest.slice(0, roomMatch.index).trim();
+    } else {
+      sessionSource = rest;
+    }
   }
 
-  const roomName = roomMatch[1].trim();
-  const roomId = normalizeRoomId(roomName);
-  const sessionSource = rest.slice(0, roomMatch.index).trim();
-  const sessions = parseScheduleText(sessionSource, lineNumber);
+  let sessions = [];
+  if (sessionSource) {
+    const parsedSessions = parseScheduleText(sessionSource, lineNumber);
+    if (parsedSessions.error) return { error: parsedSessions.error };
+    sessions = parsedSessions;
+  }
 
-  if (sessions.error) return { error: sessions.error };
-  const normalizedSessions = normalizeSessionsToClassCode(sessions, codeDetails);
+  const normalizedSessions = normalizeSessionsToClassCode(sessions, codeDetails, roomId);
 
   return {
     classCode,
@@ -1052,7 +1068,7 @@ function parseScheduleText(scheduleText, lineNumber = 1) {
   const sessions = [];
 
   for (const piece of sessionPieces) {
-    const sessionMatch = piece.match(/^(?:T|Thứ|Thu)\s*([0-9]|CN|Chủ nhật|Chu nhat)\s*:\s*(.+)$/i);
+    const sessionMatch = piece.match(/^(?:T|Thứ|Thu)\s*([0-9]|CN|Chủ\s*nhật|Chu nhat)\s*:\s*(.+)$/i);
     if (!sessionMatch) {
       return { error: `Dòng ${lineNumber}: không đọc được phần "${piece}".` };
     }
@@ -1068,7 +1084,7 @@ function parseScheduleText(scheduleText, lineNumber = 1) {
     });
   }
 
-  if (!sessions.length) return { error: `Dòng ${lineNumber}: chưa có phần học nào.` };
+  if (!sessions.length) return [];
   return sessions;
 }
 
