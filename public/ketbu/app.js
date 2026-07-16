@@ -886,30 +886,49 @@ function classCodeDetails(classCode) {
   }
 
   const subjectMatch = normalizedCode.match(/^([0-9]{1,2})([A-Z]+)([SCT])([2-8]+)([A-Z]*)$/);
-  if (!subjectMatch) return null;
+  if (subjectMatch) {
+    const weekdays = Array.from(new Set(subjectMatch[4].split("").map(Number)))
+      .filter((weekday) => weekday >= 2 && weekday <= 8);
 
-  const weekdays = Array.from(new Set(subjectMatch[4].split("").map(Number)))
-    .filter((weekday) => weekday >= 2 && weekday <= 8);
+    if (weekdays.length) {
+      const subjectCode = subjectMatch[2].toUpperCase();
+      const levelCode = subjectMatch[5].toUpperCase();
+      const baseCode = `${subjectMatch[1]}${subjectCode}${subjectMatch[3].toUpperCase()}${subjectMatch[4]}`;
 
-  if (!weekdays.length) return null;
+      return {
+        code: normalizedCode,
+        grade: Number(subjectMatch[1]),
+        shift: shiftLabelFromToken(subjectMatch[3]),
+        shiftToken: subjectMatch[3].toUpperCase(),
+        programGroup: levelCode,
+        subjectCode,
+        subjectLabel: subjectLabelFromCode(subjectCode),
+        levelCode,
+        baseCode,
+        weekdays,
+        format: "subject"
+      };
+    }
+  }
 
-  const subjectCode = subjectMatch[2].toUpperCase();
-  const levelCode = subjectMatch[5].toUpperCase();
-  const baseCode = `${subjectMatch[1]}${subjectCode}${subjectMatch[3].toUpperCase()}${subjectMatch[4]}`;
+  const genericMatch = normalizedCode.match(/^([0-9]{1,2})([A-Z0-9]+)$/);
+  if (genericMatch) {
+    return {
+      code: normalizedCode,
+      grade: Number(genericMatch[1]),
+      shift: "",
+      shiftToken: "",
+      programGroup: genericMatch[2],
+      subjectCode: "TOAN",
+      subjectLabel: "Toán",
+      levelCode: genericMatch[2],
+      baseCode: genericMatch[0],
+      weekdays: [],
+      format: "generic"
+    };
+  }
 
-  return {
-    code: normalizedCode,
-    grade: Number(subjectMatch[1]),
-    shift: shiftLabelFromToken(subjectMatch[3]),
-    shiftToken: subjectMatch[3].toUpperCase(),
-    programGroup: levelCode,
-    subjectCode,
-    subjectLabel: subjectLabelFromCode(subjectCode),
-    levelCode,
-    baseCode,
-    weekdays,
-    format: "subject"
-  };
+  return null;
 }
 
 function lessonOptionsForDetails(details) {
@@ -960,7 +979,9 @@ function normalizeLessonPartsForSubject(value, details) {
 }
 
 function isWeekdayInClassCode(details, weekday) {
-  return Boolean(details && details.weekdays.some((item) => Number(item) === Number(weekday)));
+  if (!details) return false;
+  if (!details.weekdays || details.weekdays.length === 0) return true;
+  return Boolean(details.weekdays.some((item) => Number(item) === Number(weekday)));
 }
 
 function normalizeSessionsToClassCode(sessions, details, fallbackRoomNamesString = "") {
@@ -980,7 +1001,11 @@ function normalizeSessionsToClassCode(sessions, details, fallbackRoomNamesString
     }
   });
 
-  return details.weekdays.map((weekday, index) => {
+  const targetWeekdays = details.weekdays && details.weekdays.length > 0 
+    ? details.weekdays 
+    : Array.from(sessionsByValidWeekday.keys()).sort();
+
+  return targetWeekdays.map((weekday, index) => {
     const sourceSession = sessionsByValidWeekday.get(weekday) || sessions[index] || fallbackSession;
     const countValue = Number(sourceSession.officialCount ?? fallbackSession.officialCount ?? 0);
 
@@ -1035,7 +1060,7 @@ function parseClassLine(line, lineNumber) {
   if (!hasSchedule && rest) {
     roomName = rest;
   } else {
-    const roomMatch = rest.match(/[-–—]\s*([A-Za-zÀ-ỹ0-9. ,]*\d[A-Za-z0-9À-ỹ. ,]*)\s*$/);
+    const roomMatch = rest.match(/[-–—]\s*([^:–—]+)\s*$/);
     if (roomMatch) {
       roomName = roomMatch[1].trim();
       sessionSource = rest.slice(0, roomMatch.index).trim();
@@ -1296,12 +1321,12 @@ function initials(name) {
 }
 
 function createGroupRegex(suffixesString) {
-  const chars = suffixesString
+  const parts = suffixesString
     .split(",")
-    .map(s => s.trim())
+    .map(s => s.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
     .filter(Boolean)
-    .join("");
-  return chars ? new RegExp(`[${chars}]$`, "i") : /(?!)/;
+    .sort((a, b) => b.length - a.length);
+  return parts.length ? new RegExp(`(?:${parts.join('|')})$`, "i") : /(?!)/;
 }
 
 function getClassSessions(classCode) {
