@@ -42,7 +42,9 @@ const emptyData = {
   classSessions: [],
   classInputText: "",
   makeupAssignments: [],
-  capacityCheckEnabled: false
+  capacityCheckEnabled: false,
+  group1Suffixes: "A, C, S, M, E",
+  group2Suffixes: "B, D"
 };
 
 let cloudSyncReady = false;
@@ -68,6 +70,10 @@ const elements = {
   settingRoom: document.getElementById("settingRoom"),
   settingCapacity: document.getElementById("settingCapacity"),
   settingCount: document.getElementById("settingCount"),
+  settingGroup1: document.getElementById("settingGroup1"),
+  settingGroup2: document.getElementById("settingGroup2"),
+  saveConfigBtn: document.getElementById("saveConfigBtn"),
+  configFormStatus: document.getElementById("configFormStatus"),
   autoSaveIndicator: document.getElementById("autoSaveIndicator"),
   saveClassBtn: document.getElementById("saveClassBtn"),
   clearClassFormBtn: document.getElementById("clearClassFormBtn"),
@@ -294,6 +300,8 @@ function normalizeDataRecords(sourceData) {
     ? normalizedData.makeupAssignments
     : [];
   normalizedData.capacityCheckEnabled = Boolean(normalizedData.capacityCheckEnabled);
+  normalizedData.group1Suffixes = String(normalizedData.group1Suffixes || emptyData.group1Suffixes);
+  normalizedData.group2Suffixes = String(normalizedData.group2Suffixes || emptyData.group2Suffixes);
 
   normalizedData.classes = (normalizedData.classes || []).map((classItem) => {
     const details = classCodeDetails(classItem.code);
@@ -1264,6 +1272,15 @@ function initials(name) {
     .toUpperCase();
 }
 
+function createGroupRegex(suffixesString) {
+  const chars = suffixesString
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean)
+    .join("");
+  return chars ? new RegExp(`[${chars}]$`, "i") : /(?!)/;
+}
+
 function getClassSessions(classCode) {
   return data.classSessions
     .filter((session) => session.classCode === classCode)
@@ -1280,8 +1297,11 @@ function defaultLessonFor(details, index) {
   const options = lessonOptionsForDetails(details);
   if (details.subjectCode !== "TOAN") return options[0];
 
-  const isGroup1 = /[ACSME]$/i.test(details.code);
-  const isGroup2 = /[BD]$/i.test(details.code);
+  const group1Regex = createGroupRegex(data.group1Suffixes || emptyData.group1Suffixes);
+  const group2Regex = createGroupRegex(data.group2Suffixes || emptyData.group2Suffixes);
+
+  const isGroup1 = group1Regex.test(details.code);
+  const isGroup2 = group2Regex.test(details.code);
 
   let shiftDefaults;
   if (isGroup1) {
@@ -2724,10 +2744,27 @@ function renderAutocomplete(value = "") {
   list.classList.add("show");
 }
 
+function renderAlgorithmConfigForm() {
+  if (elements.settingGroup1 && elements.settingGroup2) {
+    elements.settingGroup1.value = data.group1Suffixes || emptyData.group1Suffixes;
+    elements.settingGroup2.value = data.group2Suffixes || emptyData.group2Suffixes;
+  }
+}
+
+function saveAlgorithmConfig() {
+  if (!elements.settingGroup1 || !elements.settingGroup2) return;
+  data.group1Suffixes = elements.settingGroup1.value.trim();
+  data.group2Suffixes = elements.settingGroup2.value.trim();
+  persistAppState();
+  setStatus(elements.configFormStatus, "Đã lưu cấu hình thuật toán.", "success");
+  setTimeout(() => setStatus(elements.configFormStatus, "", ""), 3000);
+}
+
 function renderAll() {
   renderBranchSelector();
   renderStats();
   renderCapacityCheckToggle();
+  renderAlgorithmConfigForm();
   renderParsedClasses();
   renderStudentInfo();
   renderMissedSessions();
@@ -2749,6 +2786,9 @@ elements.saveClassBtn.addEventListener("click", () => {
   window.clearTimeout(autoSaveTimer);
   upsertClassFromForm();
 });
+if (elements.saveConfigBtn) {
+  elements.saveConfigBtn.addEventListener("click", saveAlgorithmConfig);
+}
 elements.clearClassFormBtn.addEventListener("click", clearClassForm);
 elements.deleteClassBtn.addEventListener("click", () => deleteClass());
 elements.settingClassCode.addEventListener("input", () => {

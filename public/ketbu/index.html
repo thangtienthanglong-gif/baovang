@@ -246,6 +246,37 @@
             </div>
             <p id="classFormStatus" class="status-text"></p>
           </article>
+          
+          <article class="panel editor-panel settings-editor">
+            <div class="section-heading" style="margin-bottom: 16px;">
+              <div>
+                <h2>Cấu hình thuật toán (Hậu tố lớp)</h2>
+                <p style="color: var(--color-gray-500); font-size: 0.875rem; margin-top: 4px;">Tùy chỉnh nhóm để hệ thống gợi ý lịch học mặc định chuẩn xác.</p>
+              </div>
+            </div>
+            <div class="form-grid one-col settings-form">
+              <div class="form-field">
+                <div class="field-label-row">
+                  <span class="field-icon" aria-hidden="true"></span>
+                  <label for="settingGroup1">Nhóm 1 (Học phần H1-D2-H2 trước)</label>
+                </div>
+                <input id="settingGroup1" type="text" placeholder="A, C, S, M, E" />
+                <small style="color: var(--color-gray-500); margin-top: 4px; display: block;">Các ký tự nhận diện, cách nhau bởi dấu phẩy.</small>
+              </div>
+              <div class="form-field" style="margin-top: 8px;">
+                <div class="field-label-row">
+                  <span class="field-icon" aria-hidden="true"></span>
+                  <label for="settingGroup2">Nhóm 2 (Học phần H3-D3-TH trước)</label>
+                </div>
+                <input id="settingGroup2" type="text" placeholder="B, D" />
+                <small style="color: var(--color-gray-500); margin-top: 4px; display: block;">Các ký tự nhận diện, cách nhau bởi dấu phẩy.</small>
+              </div>
+            </div>
+            <div class="button-row editor-actions" style="margin-top: auto; padding-top: 16px;">
+              <button id="saveConfigBtn" class="primary-button" style="width: 100%; justify-content: center;" type="button">Lưu cấu hình</button>
+            </div>
+            <p id="configFormStatus" class="status-text"></p>
+          </article>
 
         </div>
 
