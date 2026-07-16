@@ -2032,3 +2032,22 @@ tbody tr:hover {
     align-items: flex-start;
   }
 }
+
+/* Micro-animations and Select styling */
+.planner-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.planner-card:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+.planner-search-button { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.planner-search-button:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.15); }
+
+.status-select { padding: 4px 8px; border-radius: 12px; border: 1px solid transparent; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+.status-new { background-color: var(--line); color: var(--muted); }
+.status-done { background-color: var(--green-soft); color: var(--green); }
+.status-missed { background-color: var(--coral-soft); color: var(--danger); }
+.status-select:hover { border-color: var(--line-strong); }
+
+#studentClassCode { text-transform: uppercase; }
+
+.autocomplete-items { position: absolute; border: 1px solid var(--line); border-bottom: none; border-top: none; z-index: 99; top: 100%; left: 0; right: 0; max-height: 200px; overflow-y: auto; border-radius: 0 0 8px 8px; box-shadow: var(--shadow); background-color: var(--surface); display: none; }
+.autocomplete-items div { padding: 10px; cursor: pointer; border-bottom: 1px solid var(--line); font-size: 14px; font-weight: 500; }
+.autocomplete-items div:hover { background-color: var(--surface-soft); color: var(--indigo); }
+.autocomplete-items.show { display: block; }

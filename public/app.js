@@ -897,6 +897,11 @@ function renderAbsences() {
         <label>Trạng thái vắng</label>
         <span class="absence-status-pill">${escapeHtml(normalizeAbsenceStatus(row.absenceStatus))}</span>
         ${row.initialReason && row.initialReason !== row.absenceStatus ? `<span class="muted">${escapeHtml(row.initialReason)}</span>` : ''}
+        <button class="btn primary btn-sm schedule-makeup-btn" type="button" 
+          onclick="window.open('/ketbu/index.html?class=' + encodeURIComponent('${escapeHtml(row.className)}') + '&student=' + encodeURIComponent('${escapeHtml(row.studentName)}'), '_blank')"
+          style="margin-top: 8px; font-size: 12px; padding: 4px 8px;">
+          Xếp lịch bù
+        </button>
       </div>
 
       <div class="stack notice-cell">

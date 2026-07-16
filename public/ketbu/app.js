@@ -1943,6 +1943,7 @@ function renderParsedClasses() {
     elements.parsedClassesBody.innerHTML = `
       <div class="empty-state class-tree-empty">Chưa có dữ liệu lớp học.</div>
     `;
+
     return;
   }
 
@@ -1986,6 +1987,8 @@ function renderParsedClasses() {
         </details>
       `;
     }).join("");
+
+
 }
 
 function setAutoSaveState(state, text) {
@@ -2600,7 +2603,7 @@ function confirmMakeup(sessionId) {
     makeupShift: makeupSession.shift,
     makeupLessonParts: makeupSession.lessonParts,
     roomId: makeupSession.roomId,
-    status: "Đã xác nhận",
+    status: "new",
     createdAt: new Date().toISOString()
   });
 
@@ -2651,6 +2654,13 @@ function renderAssignments() {
       <td>${escapeHtml(item.missedLessonParts)}</td>
       <td><strong>${escapeHtml(item.makeupClassCode)}</strong></td>
       <td>${escapeHtml(item.makeupShift)} ${escapeHtml(weekdayLabel(item.makeupWeekday))}</td>
+      <td>
+        <select class="status-select status-${item.status || 'new'}" data-assignment-id="${escapeHtml(item.id)}">
+          <option value="new" ${(item.status || 'new') === 'new' ? 'selected' : ''}>[Mới xếp]</option>
+          <option value="done" ${item.status === 'done' ? 'selected' : ''}>[Đã đi bù]</option>
+          <option value="missed" ${item.status === 'missed' ? 'selected' : ''}>[Vắng bù]</option>
+        </select>
+      </td>
       <td><button class="small-button danger" type="button" data-action="remove" data-assignment-id="${escapeHtml(item.id)}">Hủy</button></td>
     </tr>
   `).join("");
@@ -2661,6 +2671,41 @@ function clearResults() {
   currentRejected = [];
   elements.resultSummary.innerHTML = "Chọn đủ thông tin rồi bấm “Tìm lớp bù phù hợp”.";
   renderResults();
+}
+
+function renderAutocomplete(value = "") {
+  const list = document.getElementById("classAutocompleteList");
+  if (!list) return;
+  list.innerHTML = "";
+  
+  if (!data.classes || !data.classes.length) {
+    list.classList.remove("show");
+    return;
+  }
+  
+  const query = value.trim().toUpperCase();
+  const matches = query 
+    ? data.classes.filter(c => c.code.includes(query))
+    : data.classes;
+    
+  if (!matches.length) {
+    list.classList.remove("show");
+    return;
+  }
+  
+  matches.forEach(c => {
+    const item = document.createElement("div");
+    item.textContent = c.code;
+    item.addEventListener("click", () => {
+      elements.studentClassCode.value = c.code;
+      list.classList.remove("show");
+      setNotice("");
+      renderStudentInfo();
+      renderMissedSessions();
+    });
+    list.appendChild(item);
+  });
+  list.classList.add("show");
 }
 
 function renderAll() {
@@ -2763,11 +2808,22 @@ elements.parsedClassesBody.addEventListener("change", (event) => {
   scheduleInlineClassAutoSave(editor);
 });
 
-elements.studentClassCode.addEventListener("input", () => {
-  elements.studentClassCode.value = elements.studentClassCode.value.toUpperCase();
+elements.studentClassCode.addEventListener("input", (e) => {
+  renderAutocomplete(e.target.value);
   setNotice("");
   renderStudentInfo();
   renderMissedSessions();
+});
+
+elements.studentClassCode.addEventListener("focus", (e) => {
+  renderAutocomplete(e.target.value);
+});
+
+document.addEventListener("click", (e) => {
+  if (e.target !== elements.studentClassCode) {
+    const list = document.getElementById("classAutocompleteList");
+    if (list) list.classList.remove("show");
+  }
 });
 elements.studentNameInput.addEventListener("input", () => {
   setNotice("");
@@ -2808,6 +2864,38 @@ elements.assignmentsBody.addEventListener("click", (event) => {
   removeAssignment(button.dataset.assignmentId);
 });
 
+elements.assignmentsBody.addEventListener("change", (event) => {
+  const select = event.target.closest(".status-select");
+  if (!select) return;
+  const assignmentId = select.dataset.assignmentId;
+  const newStatus = select.value;
+  
+  const assignment = data.makeupAssignments.find(a => a.id === assignmentId);
+  if (assignment) {
+    assignment.status = newStatus;
+    saveData();
+    
+    // Update class to reflect new status color immediately
+    select.className = `status-select status-${newStatus}`;
+  }
+});
+
 setPreferredMakeupToCurrentTime();
 renderAll();
 initializeCloudSync();
+
+// Auto-fill from URL params
+document.addEventListener("DOMContentLoaded", () => {
+  const params = new URLSearchParams(window.location.search);
+  const classCode = params.get('class');
+  const student = params.get('student');
+  
+  if (classCode) {
+    elements.studentClassCode.value = classCode;
+    renderStudentInfo();
+  }
+  if (student) {
+    elements.studentNameInput.value = student;
+    renderStudentInfo();
+  }
+});

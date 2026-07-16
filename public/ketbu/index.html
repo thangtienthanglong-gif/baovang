@@ -82,7 +82,10 @@
                 </div>
 
                 <label for="studentClassCode">Mã lớp học sinh</label>
-                <input id="studentClassCode" type="text" placeholder="VD: 8S35, 8S35A, 8VC2, 8AT2..." autocomplete="off" />
+                <div style="position: relative;">
+                  <input id="studentClassCode" type="text" placeholder="VD: 8S35, 8S35A, 8VC2, 8AT2..." autocomplete="off" />
+                  <div id="classAutocompleteList" class="autocomplete-items"></div>
+                </div>
 
                 <label for="studentNameInput">Tên học sinh để lưu lịch sử</label>
                 <input id="studentNameInput" type="text" placeholder="VD: Lê Hoàng Phúc" autocomplete="off" />
@@ -304,6 +307,7 @@
                   <th>Phần bù</th>
                   <th>Lớp bù</th>
                   <th>Buổi bù</th>
+                  <th>Trạng thái</th>
                   <th>Thao tác</th>
                 </tr>
               </thead>

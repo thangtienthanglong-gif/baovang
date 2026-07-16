@@ -10,7 +10,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 const multer = require('multer');
-const XLSX = require('xlsx');
+const XLSX = require('xlsx-js-style');
 
 const app = express();
 
@@ -498,6 +498,31 @@ function sendWorkbook(res, filename, sheets) {
         return { wch: max + 2 };
       });
       worksheet['!cols'] = wscols;
+
+      // Center align all cells and apply border
+      const range = XLSX.utils.decode_range(worksheet['!ref']);
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cellAddress = { c: C, r: R };
+          const cellRef = XLSX.utils.encode_cell(cellAddress);
+          if (!worksheet[cellRef]) continue;
+          
+          worksheet[cellRef].s = {
+            alignment: { vertical: 'center', horizontal: 'center', wrapText: true },
+            border: {
+              top: { style: 'thin', color: { auto: 1 } },
+              bottom: { style: 'thin', color: { auto: 1 } },
+              left: { style: 'thin', color: { auto: 1 } },
+              right: { style: 'thin', color: { auto: 1 } }
+            }
+          };
+          
+          // Bold header
+          if (R === 0) {
+            worksheet[cellRef].s.font = { bold: true };
+          }
+        }
+      }
     }
 
     XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name);
