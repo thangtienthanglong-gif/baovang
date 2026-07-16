@@ -1051,7 +1051,7 @@ function parseClassLine(line, lineNumber) {
     sessions = parsedSessions;
   }
 
-  const normalizedSessions = normalizeSessionsToClassCode(sessions, codeDetails, roomId);
+  const normalizedSessions = normalizeSessionsToClassCode(sessions, codeDetails, roomName);
 
   return {
     classCode,
