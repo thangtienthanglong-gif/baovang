@@ -57,8 +57,7 @@ let currentSuggestions = [];
 let currentRejected = [];
 
 const elements = {
-  pageTitle: document.getElementById("pageTitle"),
-  pageSubtitle: document.getElementById("pageSubtitle"),
+
   totalClasses: document.getElementById("totalClasses"),
   totalSessions: document.getElementById("totalSessions"),
   totalAssignments: document.getElementById("totalAssignments"),
@@ -1690,9 +1689,7 @@ function switchView(viewName) {
     button.classList.toggle("is-active", button.dataset.view === viewName);
   });
 
-  const copy = pageCopy[viewName] || pageCopy.planner;
-  elements.pageTitle.textContent = copy.title;
-  elements.pageSubtitle.textContent = copy.subtitle;
+
 }
 
 function renderBranchSelector() {
