@@ -6,6 +6,7 @@
   <title>App xếp lịch học bù</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <link rel="stylesheet" href="./styles.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
   <div class="app-frame">
@@ -262,10 +263,14 @@
               </div>
             </div>
             
-            <div class="panel-actions" style="margin-top: 16px;">
+            <div class="panel-actions" style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
               <button class="primary-button" id="loadBtn" type="button">
                 <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 6px;"></i> Nhập dữ liệu
               </button>
+              <label class="soft-button" style="cursor: pointer;">
+                <i class="fa-solid fa-file-excel" style="margin-right: 6px; color: #217346;"></i> Upload Excel
+                <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" style="display: none;" />
+              </label>
             </div>
           </article>
           

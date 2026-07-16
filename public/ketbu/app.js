@@ -60,6 +60,7 @@ let currentRejected = [];
 
 const elements = {
   classInputText: document.getElementById("classInputText"),
+  excelFileInput: document.getElementById("excelFileInput"),
   loadBtn: document.getElementById("loadBtn"),
   totalClasses: document.getElementById("totalClasses"),
   totalSessions: document.getElementById("totalSessions"),
@@ -962,10 +963,14 @@ function isWeekdayInClassCode(details, weekday) {
   return Boolean(details && details.weekdays.some((item) => Number(item) === Number(weekday)));
 }
 
-function normalizeSessionsToClassCode(sessions, details, fallbackRoomId = "") {
+function normalizeSessionsToClassCode(sessions, details, fallbackRoomNamesString = "") {
   if (!details) return [];
 
-  const fallbackSession = sessions[0] || { roomId: fallbackRoomId };
+  const fallbackRooms = fallbackRoomNamesString
+    ? fallbackRoomNamesString.split(",").map(r => r.trim()).filter(Boolean)
+    : [];
+
+  const fallbackSession = sessions[0] || {};
   const sessionsByValidWeekday = new Map();
 
   sessions.forEach((session) => {
@@ -979,6 +984,9 @@ function normalizeSessionsToClassCode(sessions, details, fallbackRoomId = "") {
     const sourceSession = sessionsByValidWeekday.get(weekday) || sessions[index] || fallbackSession;
     const countValue = Number(sourceSession.officialCount ?? fallbackSession.officialCount ?? 0);
 
+    const mappedRoomName = sourceSession.roomName || fallbackRooms[index] || fallbackRooms[fallbackRooms.length - 1] || fallbackRooms[0] || "";
+    const mappedRoomId = sourceSession.roomId || (mappedRoomName ? normalizeRoomId(mappedRoomName) : "");
+
     return {
       ...sourceSession,
       id: `${details.code}-T${weekday}`,
@@ -986,7 +994,8 @@ function normalizeSessionsToClassCode(sessions, details, fallbackRoomId = "") {
       weekday,
       shift: details.shift,
       lessonParts: normalizeLessonPartsForSubject(sourceSession.lessonParts || defaultLessonFor(details, index), details),
-      roomId: sourceSession.roomId || fallbackRoomId || "",
+      roomId: mappedRoomId,
+      roomName: mappedRoomName,
       officialCount: Number.isFinite(countValue) ? countValue : 0
     };
   });
@@ -1020,18 +1029,15 @@ function parseClassLine(line, lineNumber) {
   rest = rest.replace(/\s+/g, " ").replace(/(?:\s*[-–—]\s*)+$/, "").trim();
 
   let roomName = "";
-  let roomId = "";
   let sessionSource = "";
 
   const hasSchedule = /^(?:T|Thứ|Thu)\s*[0-9CN]/i.test(rest);
   if (!hasSchedule && rest) {
     roomName = rest;
-    roomId = normalizeRoomId(roomName);
   } else {
     const roomMatch = rest.match(/[-–—]\s*([A-Za-zÀ-ỹ0-9. ,]*\d[A-Za-z0-9À-ỹ. ,]*)\s*$/);
     if (roomMatch) {
       roomName = roomMatch[1].trim();
-      roomId = normalizeRoomId(roomName);
       sessionSource = rest.slice(0, roomMatch.index).trim();
     } else {
       sessionSource = rest;
@@ -1103,12 +1109,6 @@ function parseClassData(inputText) {
       return;
     }
 
-    roomsById.set(parsed.roomId, {
-      id: parsed.roomId,
-      name: parsed.roomName,
-      capacity: parsed.capacity
-    });
-
     classesByCode.set(parsed.classCode, {
       code: parsed.classCode,
       grade: parsed.grade,
@@ -1122,13 +1122,20 @@ function parseClassData(inputText) {
     });
 
     parsed.sessions.forEach((session) => {
+      if (session.roomId) {
+        roomsById.set(session.roomId, {
+          id: session.roomId,
+          name: session.roomName,
+          capacity: parsed.capacity
+        });
+      }
       classSessions.push({
         id: `${parsed.classCode}-T${session.weekday}`,
         classCode: parsed.classCode,
         weekday: session.weekday,
         shift: parsed.shift,
         lessonParts: session.lessonParts,
-        roomId: parsed.roomId,
+        roomId: session.roomId,
         officialCount: parsed.officialCount
       });
     });
@@ -2816,6 +2823,43 @@ if (elements.loadBtn) {
     triggerAutoSave();
     renderAll();
     alert("Nhập dữ liệu thành công!");
+  });
+}
+
+if (elements.excelFileInput) {
+  elements.excelFileInput.addEventListener("change", (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const dataBuffer = e.target.result;
+        const workbook = XLSX.read(dataBuffer, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        // Convert sheet to JSON, array of arrays
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        
+        // Generate tab-separated text
+        const text = jsonData
+          .map(row => row.join("\t").trim())
+          .filter(line => line.length > 0)
+          .join("\n");
+          
+        elements.classInputText.value = text;
+        
+        // Trigger load button automatically
+        elements.loadBtn.click();
+        
+      } catch (error) {
+        alert("Lỗi đọc file Excel: " + error.message);
+      }
+      // Reset input so the same file can be uploaded again if needed
+      elements.excelFileInput.value = "";
+    };
+    reader.readAsArrayBuffer(file);
   });
 }
 
