@@ -477,6 +477,24 @@ function sendWorkbook(res, filename, sheets) {
   const workbook = XLSX.utils.book_new();
   sheets.forEach(sheet => {
     const worksheet = XLSX.utils.json_to_sheet(sheet.rows);
+    
+    // Auto-fit columns width
+    if (sheet.rows && sheet.rows.length > 0) {
+      const keys = Object.keys(sheet.rows[0]);
+      const wscols = keys.map(key => {
+        let max = key.length;
+        sheet.rows.forEach(row => {
+          const val = row[key];
+          if (val) {
+            const len = String(val).length;
+            if (len > max) max = len;
+          }
+        });
+        return { wch: max + 2 };
+      });
+      worksheet['!cols'] = wscols;
+    }
+
     XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name);
   });
   const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
@@ -2495,11 +2513,13 @@ app.get('/api/absences/export-late', async (req, res, next) => {
       if (row.createdAt) {
         const d = new Date(row.createdAt);
         if (!isNaN(d.getTime())) {
-          const h = String(d.getHours()).padStart(2, '0');
-          const m = String(d.getMinutes()).padStart(2, '0');
-          const day = String(d.getDate()).padStart(2, '0');
-          const month = String(d.getMonth() + 1).padStart(2, '0');
-          timeStr = `${h}:${m} ${day}/${month}/${d.getFullYear()}`;
+          const localTime = d.getTime() + (7 * 60 * 60 * 1000);
+          const vnDate = new Date(localTime);
+          const h = String(vnDate.getUTCHours()).padStart(2, '0');
+          const m = String(vnDate.getUTCMinutes()).padStart(2, '0');
+          const day = String(vnDate.getUTCDate()).padStart(2, '0');
+          const month = String(vnDate.getUTCMonth() + 1).padStart(2, '0');
+          timeStr = `${h}:${m} ${day}/${month}/${vnDate.getUTCFullYear()}`;
         }
       }
       return {
