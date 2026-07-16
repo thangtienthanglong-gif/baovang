@@ -546,9 +546,9 @@ button {
   --card-soft: #fff0ec;
 }
 
-.planner-card-orange {
-  --card-accent: #ff9b2f;
-  --card-soft: #fff4e7;
+.planner-card-purple {
+  --card-accent: #8b5cf6;
+  --card-soft: #f5f3ff;
 }
 
 .planner-card-green {
@@ -569,10 +569,7 @@ button {
   box-shadow: 0 12px 22px color-mix(in srgb, var(--card-accent) 16%, transparent);
 }
 
-.planner-card .card-title p {
-  color: #5b5de6;
-  font-size: 18px;
-}
+
 
 .planner-card .card-title h2 {
   font-size: 20px;
@@ -741,9 +738,9 @@ button {
   background: var(--coral-soft);
 }
 
-.icon-orange {
-  color: var(--orange);
-  background: var(--orange-soft);
+.icon-purple {
+  color: #7c3aed;
+  background: #f5f3ff;
 }
 
 .icon-green {
