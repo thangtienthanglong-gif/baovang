@@ -470,7 +470,10 @@ function filterNotificationLogs(db, query) {
     rows = rows.filter(log => `${log.studentCode} ${log.studentName} ${log.className} ${log.parentName} ${log.phone1} ${log.zaloUserId} ${log.status} ${log.result}`.toLowerCase().includes(q));
   }
 
-  return rows.sort((a, b) => String(b.time).localeCompare(String(a.time)));
+  return rows.sort((a, b) => String(b.time).localeCompare(String(a.time))).map(log => {
+    const absence = db.absences ? db.absences.find(abs => abs.id === log.absenceId) : null;
+    return { ...log, absenceStatus: absence ? absence.absenceStatus : 'Khác' };
+  });
 }
 
 function sendWorkbook(res, filename, sheets) {

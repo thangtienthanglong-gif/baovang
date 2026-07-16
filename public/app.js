@@ -1011,19 +1011,15 @@ async function loadNotices() {
   tbody.innerHTML = rows.map(row => `
     <tr>
       <td>${escapeHtml(formatDateTime(row.time))}</td>
-      <td>${escapeHtml(row.date)}</td>
       <td>
         <div class="person-main">${escapeHtml(row.studentName)}</div>
         <div class="muted">${escapeHtml(row.studentCode)}</div>
       </td>
       <td>${escapeHtml(row.className)}</td>
-      <td>${escapeHtml(row.parentName)}</td>
+      <td>${escapeHtml(row.phone1 || '')}</td>
       <td>
-        <div>${escapeHtml(row.zaloUserId || 'Chưa có UID')}</div>
-        <div class="muted">${escapeHtml(row.phone1 || '')}</div>
-      </td>
-      <td>
-        <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+          <span style="font-weight: 500;">${escapeHtml(row.absenceStatus || 'Khác')}</span>
           <span class="badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span>
           ${row.status === 'Chờ gửi thủ công' && row.message ? `
             <button class="btn ghost btn-sm copy-log-msg-btn" type="button" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;" data-msg="${escapeHtml(row.message)}">
