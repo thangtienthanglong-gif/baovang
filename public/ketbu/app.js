@@ -2472,12 +2472,34 @@ function findMakeupSuggestions() {
   `;
 
   renderResults();
+  
+  if (currentSuggestions.length === 0) {
+    showToast("Không tìm thấy lớp bù phù hợp với yêu cầu của bạn.", "warning");
+  }
+}
+
+function showToast(message, type = "error") {
+  const toast = document.createElement("div");
+  toast.className = `floating-toast toast-${type}`;
+  toast.innerHTML = `<i class="fa-solid ${type === 'error' ? 'fa-circle-xmark' : type === 'warning' ? 'fa-triangle-exclamation' : 'fa-circle-check'}"></i> <span>${message}</span>`;
+  document.body.appendChild(toast);
+  
+  setTimeout(() => toast.classList.add("show"), 10);
+  
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 400);
+  }, 4000);
 }
 
 function renderResults() {
   renderSuggestions();
   renderRejected();
-  elements.resultCount.textContent = `(${currentSuggestions.length} lớp phù hợp)`;
+  if (currentSuggestions.length > 0) {
+    elements.resultCount.textContent = `(${currentSuggestions.length} lớp phù hợp)`;
+  } else {
+    elements.resultCount.textContent = ``;
+  }
 }
 
 function renderSuggestions() {

@@ -1998,3 +1998,10 @@ tbody tr:hover {
 .autocomplete-items div { padding: 10px; cursor: pointer; border-bottom: 1px solid var(--line); font-size: 14px; font-weight: 500; }
 .autocomplete-items div:hover { background-color: var(--surface-soft); color: var(--indigo); }
 .autocomplete-items.show { display: block; }
+
+.floating-toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%) translateY(-100px); padding: 12px 24px; border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); font-size: 15px; font-weight: 500; z-index: 9999; opacity: 0; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); display: flex; align-items: center; gap: 12px; }
+.floating-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+.floating-toast i { font-size: 18px; }
+.toast-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+.toast-warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.toast-success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
