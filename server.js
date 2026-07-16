@@ -2490,22 +2490,27 @@ app.get('/api/absences/export-late', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
     const absences = filterAbsences(db, { ...req.query, absenceStatus: 'Đi trễ' });
-    const rows = absences.map((row, index) => ({
-      STT: index + 1,
-      'Ngày': row.date,
-      'Buổi': row.session,
-      'Lớp': row.className,
-      'Mã HS': row.studentCode,
-      'Họ tên học sinh': row.studentName,
-      'Phụ huynh': row.parentName,
-      'SĐT phụ huynh': row.phone1 || row.phone2,
-      'Trạng thái': normalizeAbsenceStatus(row.absenceStatus),
-      'Trạng thái gọi': row.callStatus,
-      'Kết quả gọi': row.callResult,
-      'Trạng thái Zalo': row.noticeStatus,
-      'Thời gian xử lý': row.noticeSentAt || row.lastCallAt || row.updatedAt || '',
-      'Ghi chú': row.note || row.initialReason || ''
-    }));
+    const rows = absences.map((row, index) => {
+      let timeStr = '';
+      if (row.createdAt) {
+        const d = new Date(row.createdAt);
+        if (!isNaN(d.getTime())) {
+          const h = String(d.getHours()).padStart(2, '0');
+          const m = String(d.getMinutes()).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          timeStr = `${h}:${m} ${day}/${month}/${d.getFullYear()}`;
+        }
+      }
+      return {
+        'STT': index + 1,
+        'Họ Và Tên': row.studentName,
+        'Lớp': row.className,
+        'số điện thoại': row.phone1 || row.phone2,
+        'Thời gian': timeStr,
+        'Ghi chú': row.note || row.initialReason || ''
+      };
+    });
     const suffix = req.query.date ? cleanText(req.query.date) : 'tat-ca';
     sendWorkbook(res, `hoc-sinh-di-tre-${suffix}.xlsx`, [
       { name: 'Hoc sinh di tre', rows }
