@@ -1101,7 +1101,10 @@ $link = ""
 if ($env:ZALO_AUTOPASTE_LINK_B64) {
   $link = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:ZALO_AUTOPASTE_LINK_B64))
 }
-if ($link) { Start-Process $link }
+if ($link) { 
+  Start-Process $link 
+  Start-Sleep -Milliseconds 2500
+}
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
@@ -2731,8 +2734,9 @@ async function runBulkZaloAction(db, filters, reason = 'bulk_send') {
 
   for (let i = 0; i < selection.candidates.length; i++) {
     const row = selection.candidates[i];
-    logs.push(await sendZaloNotice(db, row.id, reason));
-    if (i < selection.candidates.length - 1) {
+    const log = await sendZaloNotice(db, row.id, reason);
+    logs.push(log);
+    if (i < selection.candidates.length - 1 && log.status !== 'Chờ gửi thủ công' && log.status !== 'Lỗi gửi') {
       if ((i + 1) % cycleSize === 0) {
         // Nghỉ giữa chu kì
         await new Promise(resolve => setTimeout(resolve, cycleDelayMs));
