@@ -1885,14 +1885,18 @@ tbody tr:hover {
   }
   .ticket {
     width: 100%;
-    margin: 0 auto;
+    max-width: 105mm;
+    padding-left: 20mm;
+    padding-right: 5mm;
+    box-sizing: border-box;
+    margin: 0;
     font-family: Arial, sans-serif;
     color: #000;
   }
   .ticket-print-time {
     position: absolute;
-    top: 0;
-    right: 0;
+    bottom: -15px;
+    right: 5mm;
     font-size: 10px;
     color: #333;
   }
