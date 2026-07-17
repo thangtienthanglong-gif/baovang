@@ -838,7 +838,7 @@ function renderRosterStudent(student) {
     <article class="student-card ${absence ? 'is-absent' : ''}">
       <div class="student-main">
         <div>
-          <div class="person-main">
+          <div class="person-main clickable-name" onclick="openStudentProfile('${escapeHtml(student.id)}')">
             ${escapeHtml(student.fullName)}
             ${student.recentAbsenceCount >= 3 ? `<span title="Vắng ${student.recentAbsenceCount} buổi trong 30 ngày qua" style="color: #ef4444; font-size: 14px; margin-left: 4px;">⚠️ (${student.recentAbsenceCount})</span>` : ''}
           </div>
@@ -889,7 +889,7 @@ function renderAbsences() {
     return `
     <article class="absence-item" data-id="${row.id}">
       <div class="absence-student">
-        <div class="person-main">${escapeHtml(row.studentName)}</div>
+        <div class="person-main clickable-name" onclick="openStudentProfile('${escapeHtml(row.studentId)}')">${escapeHtml(row.studentName)}</div>
         <div class="student-phone">${escapeHtml(phone)}</div>
       </div>
 
@@ -2626,4 +2626,69 @@ document.addEventListener("DOMContentLoaded", () => {
   } else {
     document.querySelectorAll(".admin-only").forEach(el => el.style.display = "none");
   }
+});
+
+// ==================== STUDENT PROFILE DRAWER ====================
+function openStudentProfile(studentId) {
+  const student = state.students.find(s => s.id === studentId);
+  if (!student) return;
+
+  const drawer = document.getElementById('studentProfileDrawer');
+  const backdrop = document.getElementById('studentDrawerBackdrop');
+  if (!drawer || !backdrop) return;
+  
+  // Populate info
+  document.getElementById('drawerStudentName').textContent = student.fullName || 'Chưa cập nhật';
+  document.getElementById('drawerStudentClass').textContent = student.className || 'Chưa có lớp';
+  const phone = student.phone1 || student.phone2 || 'Chưa có SĐT';
+  document.getElementById('drawerStudentPhone').textContent = phone;
+  document.getElementById('drawerStudentParent').textContent = student.parentName || 'Chưa cập nhật';
+  
+  // Setup quick actions
+  const callBtn = document.getElementById('drawerCallBtn');
+  if (phone !== 'Chưa có SĐT') {
+    callBtn.href = `tel:${phone.replace(/\\D/g,'')}`;
+    callBtn.style.opacity = '1';
+    callBtn.style.pointerEvents = 'auto';
+  } else {
+    callBtn.href = '#';
+    callBtn.style.opacity = '0.5';
+    callBtn.style.pointerEvents = 'none';
+  }
+  
+  document.getElementById('drawerZaloBtn').onclick = () => {
+    if (phone === 'Chưa có SĐT') return toast('Học sinh chưa có số điện thoại', 'error');
+    navigator.clipboard.writeText(phone);
+    toast('Đã copy SĐT để tìm trên Zalo');
+  };
+
+  // Populate history (recent absences)
+  const historyList = document.getElementById('drawerAbsenceHistory');
+  const allAbsences = state.absences.filter(a => a.studentId === student.id).sort((a,b) => new Date(b.date) - new Date(a.date));
+  
+  if (allAbsences.length === 0) {
+    historyList.innerHTML = '<div class="empty muted">Học sinh đi học đầy đủ hoặc dữ liệu cũ chưa tải.</div>';
+  } else {
+    historyList.innerHTML = allAbsences.slice(0, 5).map(a => `
+      <div class="drawer-history-item">
+        <strong style="color: var(--danger)">Ngày ${a.date}</strong> - ${normalizeAbsenceStatus(a.absenceStatus)}
+      </div>
+    `).join('');
+  }
+
+  // Open drawer
+  backdrop.classList.add('show');
+  setTimeout(() => drawer.classList.add('open'), 10);
+}
+
+function closeStudentProfile() {
+  const drawer = document.getElementById('studentProfileDrawer');
+  const backdrop = document.getElementById('studentDrawerBackdrop');
+  if (drawer) drawer.classList.remove('open');
+  if (backdrop) backdrop.classList.remove('show');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('closeStudentDrawer')?.addEventListener('click', closeStudentProfile);
+  document.getElementById('studentDrawerBackdrop')?.addEventListener('click', closeStudentProfile);
 });

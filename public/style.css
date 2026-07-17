@@ -1930,6 +1930,130 @@ code {
   color: var(--primary);
 }
 
+/* Student Profile Drawer */
+.drawer-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1040;
+  transition: opacity 0.3s ease;
+  opacity: 0;
+}
+.drawer-backdrop.show {
+  display: block;
+  opacity: 1;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: -400px;
+  bottom: 0;
+  width: 400px;
+  max-width: 100vw;
+  background: var(--surface);
+  box-shadow: -4px 0 24px rgba(0,0,0,0.1);
+  z-index: 1050;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--line);
+}
+.drawer.open {
+  right: 0;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(135deg, var(--surface), var(--surface-soft));
+}
+.drawer-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: var(--text);
+}
+.drawer-close {
+  background: transparent;
+  border: none;
+  font-size: 28px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.2s;
+}
+.drawer-close:hover {
+  color: var(--danger);
+}
+
+.drawer-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+.drawer-section {
+  margin-bottom: 24px;
+}
+.drawer-section h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.drawer-section p {
+  margin: 0 0 8px;
+  font-size: 15px;
+  color: var(--text);
+}
+.drawer-section p strong {
+  display: inline-block;
+  width: 110px;
+  color: var(--muted);
+}
+.drawer-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.drawer-history-item {
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.clickable-name {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 700;
+  transition: color 0.2s;
+}
+.clickable-name:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+body.dark-mode .drawer {
+  background: var(--bg);
+  border-left-color: rgba(255,255,255,0.1);
+}
+body.dark-mode .drawer-header {
+  background: rgba(30, 41, 59, 0.75);
+  border-bottom-color: rgba(255,255,255,0.1);
+}
+body.dark-mode .drawer-history-item {
+  background: var(--surface);
+}
+
 @media (max-width: 900px) {
   .bottom-nav {
     display: flex;

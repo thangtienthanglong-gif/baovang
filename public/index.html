@@ -629,7 +629,37 @@
   </section>
 
   <div id="toastContainer" class="toast-container" role="status"></div>
-  <script src="/app.js?v=20260711-3"></script>
+  
+  <div class="drawer-backdrop" id="studentDrawerBackdrop"></div>
+  <aside id="studentProfileDrawer" class="drawer">
+    <header class="drawer-header">
+      <h2 id="drawerStudentName">Tên học sinh</h2>
+      <button class="drawer-close" id="closeStudentDrawer" type="button" aria-label="Đóng">&times;</button>
+    </header>
+    <div class="drawer-body">
+      <div class="drawer-section">
+        <h3>Thông tin chung</h3>
+        <p><strong>Lớp:</strong> <span id="drawerStudentClass"></span></p>
+        <p><strong>Số điện thoại:</strong> <span id="drawerStudentPhone"></span></p>
+        <p><strong>Phụ huynh:</strong> <span id="drawerStudentParent"></span></p>
+      </div>
+      <div class="drawer-section">
+        <h3>Hành động nhanh</h3>
+        <div style="display: flex; gap: 8px; margin-top: 8px;">
+          <a href="#" id="drawerCallBtn" class="btn link-call" style="flex: 1;"><i class="fa-solid fa-phone"></i> Gọi điện</a>
+          <button type="button" id="drawerZaloBtn" class="btn blue" style="flex: 1;"><i class="fa-solid fa-comment-dots"></i> Nhắn Zalo</button>
+        </div>
+      </div>
+      <div class="drawer-section">
+        <h3>Lịch sử vắng học gần đây</h3>
+        <div id="drawerAbsenceHistory" class="drawer-history-list">
+          <div class="empty muted">Chưa tải lịch sử...</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <script src="/app.js?v=20260717-3"></script>
   <nav class="bottom-nav">
     <button class="bottom-tab active" data-tab="absenceTab" type="button"><i class="fa-solid fa-clipboard-user"></i><span>Điểm danh</span></button>
     <button class="bottom-tab" data-tab="queueTab" type="button"><i class="fa-solid fa-list-check"></i><span>Hàng xử lý</span></button>
