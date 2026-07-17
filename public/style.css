@@ -1850,9 +1850,6 @@ code {
   .sidebar-backdrop.show {
     display: block;
   }
-  .bottom-nav {
-    display: flex;
-  }
 }
 
 /* Inner Tabs for History */
@@ -1931,6 +1928,12 @@ code {
 
 .bottom-tab.active {
   color: var(--primary);
+}
+
+@media (max-width: 900px) {
+  .bottom-nav {
+    display: flex;
+  }
 }
 
 /* Glassmorphism Dark Mode */
