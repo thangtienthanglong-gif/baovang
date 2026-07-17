@@ -230,8 +230,7 @@ async function pushCloudState() {
     const response = await fetch(CLOUD_STATE_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ state: appState }),
-      keepalive: true
+      body: JSON.stringify({ state: appState })
     });
     const payload = await response.json().catch(() => ({}));
 
@@ -3209,3 +3208,13 @@ document.addEventListener("DOMContentLoaded", () => {
     renderStudentInfo();
   }
 });
+
+window.deleteAllClasses = function() {
+  if (confirm('Bạn có chắc chắn muốn xóa TẤT CẢ các lớp không? Hành động này không thể hoàn tác.')) {
+    appState.classes = [];
+    appState.classSessions = [];
+    appState.rooms = [];
+    saveData();
+    renderClassTree();
+  }
+};
