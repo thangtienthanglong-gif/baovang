@@ -254,6 +254,10 @@
               <label for="contactsFile">File danh bạ .xlsx</label>
               <input id="contactsFile" name="contacts" type="file" accept=".xlsx,.xls" multiple required>
             </div>
+            <div class="field span-4" style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="overwriteContacts" name="overwrite" value="true" style="width: auto;">
+              <label for="overwriteContacts" style="margin: 0; font-weight: normal; color: var(--danger);">Xóa sạch học sinh cũ (Chỉ giữ lại học sinh trong file này)</label>
+            </div>
             <div class="actions span-4">
               <button class="btn" type="submit">Nạp và tách lớp</button>
               <button class="btn ghost" type="button" id="clearContactsBtn" style="margin-left: 8px;">Xóa file</button>

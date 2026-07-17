@@ -2581,6 +2581,9 @@ app.post('/api/import/students', upload.array('contacts', 50), async (req, res, 
 
     for (const file of req.files) {
       const imported = parseContactsWorkbook(file.buffer);
+      if (req.body.overwrite === 'true' && imported.length > 0) {
+        db.students = [];
+      }
       const result = upsertImportedStudents(db, imported);
       totalParsed += imported.length;
       totalCreated += result.created;

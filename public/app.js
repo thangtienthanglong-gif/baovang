@@ -2211,6 +2211,8 @@ function initEvents() {
     for (let i = 0; i < files.length; i++) {
       formData.append('contacts', files[i]);
     }
+    const overwrite = $('#overwriteContacts') ? $('#overwriteContacts').checked : false;
+    formData.append('overwrite', overwrite);
     $('#importResult').textContent = 'Đang nạp danh bạ...';
     const result = await apiForm('/api/import/students', formData);
     $('#importResult').textContent = JSON.stringify({
