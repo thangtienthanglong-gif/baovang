@@ -2648,7 +2648,9 @@ function openStudentProfile(studentId) {
 
   // Populate history (recent absences)
   const historyList = document.getElementById('drawerAbsenceHistory');
-  const allAbsences = state.absences.filter(a => a.studentId === student.id).sort((a,b) => new Date(b.date) - new Date(a.date));
+  const allAbsences = state.absences
+    .filter(a => a.studentId === student.id && a.absenceStatus !== 'Học phí')
+    .sort((a,b) => new Date(b.date) - new Date(a.date));
   
   if (allAbsences.length === 0) {
     historyList.innerHTML = '<div class="empty muted">Học sinh đi học đầy đủ hoặc dữ liệu cũ chưa tải.</div>';
