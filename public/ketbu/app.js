@@ -1765,18 +1765,54 @@ function getActiveViewName() {
   return activePanel ? activePanel.dataset.viewPanel : "planner";
 }
 
-function confirmSettingsAccess() {
-  const password = window.prompt("Nhập mật khẩu cài đặt lớp:");
-  if (password === null) return false;
-  if (password === SETTINGS_PASSWORD) return true;
+async function confirmSettingsAccess() {
+  return new Promise((resolve) => {
+    const modal = document.createElement("div");
+    modal.className = "custom-prompt-overlay";
+    modal.innerHTML = `
+      <div class="custom-prompt-modal">
+        <h3>Xác thực truy cập</h3>
+        <p>Nhập mật khẩu cài đặt lớp:</p>
+        <input type="password" id="settingsPasswordInput" autocomplete="off" />
+        <div class="custom-prompt-actions">
+          <button class="btn ghost" id="settingsPasswordCancel">Hủy</button>
+          <button class="btn primary" id="settingsPasswordOk">Đồng ý</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
 
-  window.alert("Mật khẩu không đúng.");
-  return false;
+    const input = modal.querySelector("#settingsPasswordInput");
+    const btnOk = modal.querySelector("#settingsPasswordOk");
+    const btnCancel = modal.querySelector("#settingsPasswordCancel");
+
+    input.focus();
+
+    const cleanup = () => document.body.removeChild(modal);
+    const submit = () => {
+      if (input.value === SETTINGS_PASSWORD) {
+        cleanup();
+        resolve(true);
+      } else {
+        alert("Mật khẩu không đúng.");
+        cleanup();
+        resolve(false);
+      }
+    };
+
+    btnOk.addEventListener("click", submit);
+    btnCancel.addEventListener("click", () => { cleanup(); resolve(false); });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submit();
+      if (e.key === "Escape") { cleanup(); resolve(false); }
+    });
+  });
 }
 
-function switchView(viewName) {
-  if (viewName === "settings" && getActiveViewName() !== "settings" && !confirmSettingsAccess()) {
-    return;
+async function switchView(viewName) {
+  if (viewName === "settings" && getActiveViewName() !== "settings") {
+    const ok = await confirmSettingsAccess();
+    if (!ok) return;
   }
 
   document.querySelectorAll("[data-view-panel]").forEach((panel) => {
