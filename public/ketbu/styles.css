@@ -1910,18 +1910,18 @@ tbody tr:hover {
     position: relative;
   }
   .ticket-logo {
-    width: 60px;
+    width: 45px;
     height: auto;
   }
   .ticket-title-group {
     text-align: center;
   }
   .ticket-center {
-    font-size: 16px;
+    font-size: 11px;
     font-weight: bold;
   }
   .ticket-title {
-    font-size: 20px;
+    font-size: 16px;
     font-weight: bold;
     margin-top: 5px;
   }
