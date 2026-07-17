@@ -2718,18 +2718,18 @@ function confirmMakeup(sessionId) {
 
   if (!student || !missedSession || !makeupSession) {
     setNotice("Thiếu dữ liệu để xếp lịch bù.", "error");
-    return;
+    return false;
   }
 
   if (!student.hasName) {
     setNotice("Vui lòng nhập tên học sinh để lưu lịch sử tra cứu.", "error");
-    return;
+    return false;
   }
 
   if (hasDuplicateMakeup(student.id, missedSession.id)) {
     setNotice("Học sinh này đã có lịch bù cho buổi bị kẹt đã chọn.", "error");
     findMakeupSuggestions();
-    return;
+    return false;
   }
 
   const capacity = getCapacity(makeupSession);
@@ -2738,7 +2738,7 @@ function confirmMakeup(sessionId) {
   if (isCapacityCheckEnabled() && capacity > 0 && currentCount >= capacity) {
     setNotice(`Không thể xếp. Lớp ${makeupSession.classCode} đã đủ ${currentCount}/${capacity} học sinh.`, "error");
     findMakeupSuggestions();
-    return;
+    return false;
   }
 
   data.makeupAssignments.push({
@@ -2766,6 +2766,7 @@ function confirmMakeup(sessionId) {
   renderParsedClasses();
   findMakeupSuggestions();
   setNotice(`Đã xếp ${student.name} bù lớp ${makeupSession.classCode} - ${sessionLabel(makeupSession)}.`);
+  return true;
 }
 
 function removeAssignment(assignmentId) {
@@ -3089,8 +3090,10 @@ elements.clearAssignmentsBtn.addEventListener("click", clearAssignmentHistory);
 elements.suggestionsBody.addEventListener("click", (event) => {
   const button = event.target.closest("[data-action='confirm']");
   if (!button) return;
-  confirmMakeup(button.dataset.sessionId);
-  closeResultModal();
+  const success = confirmMakeup(button.dataset.sessionId);
+  if (success) {
+    closeResultModal();
+  }
 });
 
 elements.assignmentsBody.addEventListener("click", (event) => {
