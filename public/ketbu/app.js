@@ -1028,7 +1028,7 @@ function normalizeSessionsToClassCode(sessions, details, fallbackRoomNamesString
 
 function parseClassLine(line, lineNumber) {
   const source = line.trim().replace(/[.a?,;]+$/, "");
-  const classMatch = source.match(/^\s*([0-9]{1,2}[A-Z]*[SCT][2-8]+[A-Z]?)(?:\s+|$)(.*)/i);
+  const classMatch = source.match(/^\s*([a-zA-Z0-9]+)(?:\s+|$)(.*)/i);
 
   if (!classMatch) {
     return { error: `Dòng ${lineNumber}: chưa nhận được mã lớp.` };
@@ -1056,7 +1056,7 @@ function parseClassLine(line, lineNumber) {
   let roomName = "";
   let sessionSource = "";
 
-  const hasSchedule = /^(?:T|Thứ|Thu)\s*[0-9CN]/i.test(rest);
+  const hasSchedule = /^(?:T|Thứ|Thu)\s*(?:[2-8]|CN|Chủ\s*nhật|Chu\s*nhat)\s*:/i.test(rest);
   if (!hasSchedule && rest) {
     roomName = rest;
   } else {
