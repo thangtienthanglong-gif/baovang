@@ -2653,7 +2653,7 @@ function openStudentProfile(studentId) {
     .sort((a,b) => new Date(b.date) - new Date(a.date));
   
   if (allAbsences.length === 0) {
-    historyList.innerHTML = '<div class="empty muted">Học sinh đi học đầy đủ hoặc dữ liệu cũ chưa tải.</div>';
+    historyList.innerHTML = '<div class="empty muted">Học sinh đi học đầy đủ</div>';
   } else {
     historyList.innerHTML = allAbsences.slice(0, 5).map(a => `
       <div class="drawer-history-item">
