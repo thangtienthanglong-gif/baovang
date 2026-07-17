@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>App xếp lịch học bù</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=2" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
@@ -202,14 +202,14 @@
             <div class="form-grid one-col settings-form">
               <div class="form-field">
                 <div class="field-label-row">
-                  <span class="field-icon field-icon-code" aria-hidden="true"></span>
+                  <span class="field-icon field-icon-code" aria-hidden="true"><i class="fa-solid fa-id-badge"></i></span>
                   <label for="settingClassCode">Mã lớp</label>
                 </div>
                 <input id="settingClassCode" type="text" placeholder="Ví dụ: 8S35A, 8VC2, 8AT2" />
               </div>
               <div class="form-field">
                 <div class="field-label-row">
-                  <span class="field-icon field-icon-calendar" aria-hidden="true"></span>
+                  <span class="field-icon field-icon-calendar" aria-hidden="true"><i class="fa-solid fa-calendar-days"></i></span>
                   <label>Phần học theo buổi</label>
                 </div>
                 <div id="settingScheduleFields" class="schedule-fields"></div>
@@ -217,21 +217,21 @@
               <div class="settings-triple-grid">
                 <div class="form-field compact-field">
                   <div class="field-label-row">
-                    <span class="field-icon field-icon-room" aria-hidden="true"></span>
+                    <span class="field-icon field-icon-room" aria-hidden="true"><i class="fa-solid fa-chalkboard-user"></i></span>
                     <label for="settingRoom">Phòng mặc định</label>
                   </div>
                   <input id="settingRoom" type="text" placeholder="P1B" />
                 </div>
                 <div class="form-field compact-field">
                   <div class="field-label-row">
-                    <span class="field-icon field-icon-capacity" aria-hidden="true"></span>
+                    <span class="field-icon field-icon-capacity" aria-hidden="true"><i class="fa-solid fa-users"></i></span>
                     <label for="settingCapacity">Sức chứa mặc định</label>
                   </div>
                   <input id="settingCapacity" type="number" min="1" placeholder="20" />
                 </div>
                 <div class="form-field compact-field">
                   <div class="field-label-row">
-                    <span class="field-icon field-icon-count" aria-hidden="true"></span>
+                    <span class="field-icon field-icon-count" aria-hidden="true"><i class="fa-solid fa-user-check"></i></span>
                     <label for="settingCount">Sĩ số hiện tại</label>
                   </div>
                   <input id="settingCount" type="number" min="0" placeholder="18" />

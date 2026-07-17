@@ -171,6 +171,7 @@ button {
 .task-item:hover {
   background: var(--surface-soft);
   color: var(--ink);
+  transform: translateY(-2px);
 }
 
 .task-item:hover .task-icon {
@@ -975,25 +976,9 @@ textarea:focus {
   flex: 0 0 auto;
 }
 
-.field-icon::before,
-.field-icon::after {
-  content: "";
-  position: absolute;
-  box-sizing: border-box;
-}
-
-.field-icon-code::before {
-  width: 16px;
-  height: 20px;
-  border: 2px solid currentColor;
-  border-radius: 3px;
-}
-
-.field-icon-code::after {
-  width: 7px;
-  height: 7px;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
+.field-icon-code {
+  color: #315eff;
+  background: #eef2ff;
 }
 
 .field-icon-calendar {
@@ -1001,39 +986,9 @@ textarea:focus {
   background: #e5fbff;
 }
 
-.field-icon-calendar::before {
-  width: 20px;
-  height: 18px;
-  border: 2px solid currentColor;
-  border-radius: 4px;
-}
-
-.field-icon-calendar::after {
-  width: 14px;
-  height: 7px;
-  border-top: 2px solid currentColor;
-  border-left: 2px solid currentColor;
-  border-right: 2px solid currentColor;
-  top: 13px;
-}
-
 .field-icon-room {
   color: #6f61ff;
   background: #f0eeff;
-}
-
-.field-icon-room::before {
-  width: 18px;
-  height: 22px;
-  border: 2px solid currentColor;
-  border-radius: 2px;
-}
-
-.field-icon-room::after {
-  width: 3px;
-  height: 3px;
-  background: currentColor;
-  box-shadow: 6px 0 0 currentColor, 0 6px 0 currentColor, 6px 6px 0 currentColor;
 }
 
 .field-icon-capacity {
@@ -1044,25 +999,6 @@ textarea:focus {
 .field-icon-count {
   color: #12a87d;
   background: #e7fbf4;
-}
-
-.field-icon-capacity::before,
-.field-icon-count::before {
-  width: 10px;
-  height: 10px;
-  border: 2px solid currentColor;
-  border-radius: 50%;
-  top: 11px;
-}
-
-.field-icon-capacity::after,
-.field-icon-count::after {
-  width: 24px;
-  height: 13px;
-  border: 2px solid currentColor;
-  border-top: 0;
-  border-radius: 0 0 12px 12px;
-  bottom: 9px;
 }
 
 .settings-triple-grid {
