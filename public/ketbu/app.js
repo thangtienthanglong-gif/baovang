@@ -3211,9 +3211,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
 window.deleteAllClasses = function() {
   if (confirm('Bạn có chắc chắn muốn xóa TẤT CẢ các lớp không? Hành động này không thể hoàn tác.')) {
-    appState.classes = [];
-    appState.classSessions = [];
-    appState.rooms = [];
+    data.classes = [];
+    data.classSessions = [];
+    data.rooms = [];
+    syncClassInputFromData();
+    if (elements.classInputText) elements.classInputText.value = data.classInputText;
     saveData();
     renderClassTree();
   }
