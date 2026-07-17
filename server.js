@@ -91,8 +91,14 @@ const pendingAiActions = new Map();
 
 app.use(express.json({ limit: '5mb' }));
 app.use((req, res, next) => {
-  if (['/', '/index.html', '/app.js', '/style.css'].includes(req.path)) {
-    res.setHeader('Cache-Control', 'no-store');
+  if (
+    ['/', '/index.html', '/app.js', '/style.css'].includes(req.path) ||
+    req.path.startsWith('/ketbu/') ||
+    req.path.startsWith('/api/')
+  ) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
   }
   next();
 });
@@ -2117,9 +2123,13 @@ app.post('/api/ketbu/state', async (req, res, next) => {
       state: body.state,
       updatedAt: new Date().toISOString()
     };
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
     fs.writeFileSync(KETBU_STATE_FILE, JSON.stringify(payload, null, 2));
     res.json({ ok: true, updatedAt: payload.updatedAt });
   } catch (error) {
+    console.error("Lỗi khi lưu ketbu-state.json:", error);
     next(error);
   }
 });

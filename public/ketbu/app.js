@@ -230,7 +230,8 @@ async function pushCloudState() {
     const response = await fetch(CLOUD_STATE_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ state: appState })
+      body: JSON.stringify({ state: appState }),
+      keepalive: true
     });
     const payload = await response.json().catch(() => ({}));
 
@@ -238,6 +239,7 @@ async function pushCloudState() {
     cloudLastUpdatedAt = payload.updatedAt || cloudLastUpdatedAt;
   } catch (error) {
     console.warn("Cloud sync save failed:", error);
+    alert("Lỗi khi lưu cấu hình lớp lên máy chủ: " + error.message + "\n\nDữ liệu chỉ được lưu tạm thời trên máy này. Vui lòng kiểm tra lại kết nối hoặc khởi động lại phần mềm.");
   }
 }
 
@@ -261,7 +263,8 @@ function applyCloudState(nextState, updatedAt, showMessage = false) {
 }
 
 async function pullCloudState({ seedWhenEmpty = false, showMessage = false } = {}) {
-  const response = await fetch(CLOUD_STATE_ENDPOINT, { cache: "no-store" });
+  const ts = new Date().getTime();
+  const response = await fetch(`${CLOUD_STATE_ENDPOINT}?_t=${ts}`, { cache: "no-store" });
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) throw new Error(payload.error || "Không tải được dữ liệu cloud.");
@@ -292,6 +295,17 @@ async function initializeCloudSync() {
     console.warn("Cloud sync unavailable:", error);
   }
 }
+
+window.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && cloudSyncReady) {
+    fetch(CLOUD_STATE_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state: appState }),
+      keepalive: true
+    }).catch(e => console.warn(e));
+  }
+});
 
 function normalizeDataRecords(sourceData) {
   const normalizedData = { ...sourceData };
