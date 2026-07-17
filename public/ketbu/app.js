@@ -1250,7 +1250,7 @@ function getSelectedMissedSession() {
 }
 
 function activeAssignments() {
-  return data.makeupAssignments.filter((item) => item.status === "Đã xác nhận");
+  return data.makeupAssignments;
 }
 
 function getMakeupCount(sessionId) {
@@ -2765,7 +2765,12 @@ function renderAssignments() {
           <option value="missed" ${item.status === 'missed' ? 'selected' : ''}>[Vắng bù]</option>
         </select>
       </td>
-      <td><button class="small-button danger" type="button" data-action="remove" data-assignment-id="${escapeHtml(item.id)}">Hủy</button></td>
+      <td>
+        <div style="display: flex; gap: 8px;">
+          <button class="small-button primary-button" style="padding: 4px 8px;" type="button" data-action="print" data-assignment-id="${escapeHtml(item.id)}">In phiếu</button>
+          <button class="small-button danger" type="button" data-action="remove" data-assignment-id="${escapeHtml(item.id)}">Hủy</button>
+        </div>
+      </td>
     </tr>
   `).join("");
 }
@@ -3036,10 +3041,81 @@ elements.suggestionsBody.addEventListener("click", (event) => {
 });
 
 elements.assignmentsBody.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-action='remove']");
-  if (!button) return;
-  removeAssignment(button.dataset.assignmentId);
+  const printBtn = event.target.closest("[data-action='print']");
+  if (printBtn) {
+    printTicket(printBtn.dataset.assignmentId);
+    return;
+  }
+  
+  const removeBtn = event.target.closest("[data-action='remove']");
+  if (!removeBtn) return;
+  removeAssignment(removeBtn.dataset.assignmentId);
 });
+
+function printTicket(assignmentId) {
+  const assignment = data.makeupAssignments.find(a => a.id === assignmentId);
+  if (!assignment) return;
+  
+  let printContainer = document.getElementById("printTicketContainer");
+  if (!printContainer) {
+    printContainer = document.createElement("div");
+    printContainer.id = "printTicketContainer";
+    document.body.appendChild(printContainer);
+  }
+  
+  printContainer.innerHTML = `
+    <div class="ticket">
+      <div class="ticket-header">
+        <div class="ticket-logo-wrapper">
+          <img src="../assets/logo.png" alt="Logo" class="ticket-logo" onerror="this.style.display='none'">
+        </div>
+        <div class="ticket-title-group">
+          <div class="ticket-center">TRUNG TÂM BDVH THĂNG TIẾN THĂNG LONG</div>
+          <div class="ticket-title">PHIẾU HỌC BÙ</div>
+        </div>
+      </div>
+      <div class="ticket-divider"></div>
+      <div class="ticket-grid">
+        <div class="ticket-field">
+          <div class="ticket-label">HỌC SINH</div>
+          <div class="ticket-value">${escapeHtml(assignment.studentName)}</div>
+        </div>
+        <div class="ticket-field">
+          <div class="ticket-label">LỚP CHÍNH</div>
+          <div class="ticket-value">${escapeHtml(assignment.mainClassCode)}</div>
+        </div>
+        
+        <div class="ticket-divider-light" style="grid-column: 1 / -1; margin-top: 5px; margin-bottom: 5px;"></div>
+        
+        <div class="ticket-field">
+          <div class="ticket-label">VÀO LỚP BÙ</div>
+          <div class="ticket-value">${escapeHtml(assignment.makeupClassCode)}</div>
+        </div>
+        <div class="ticket-field">
+          <div class="ticket-label">PHẦN HỌC</div>
+          <div class="ticket-value">${escapeHtml(assignment.makeupLessonParts || "N/A")}</div>
+        </div>
+        
+        <div class="ticket-divider-light" style="grid-column: 1 / -1; margin-top: 5px; margin-bottom: 5px;"></div>
+        
+        <div class="ticket-field">
+          <div class="ticket-label">THỜI GIAN</div>
+          <div class="ticket-value">${escapeHtml(assignment.makeupShift)} ${escapeHtml(weekdayLabel(assignment.makeupWeekday))}</div>
+        </div>
+        <div class="ticket-field">
+          <div class="ticket-label">PHÒNG HỌC</div>
+          <div class="ticket-value">${escapeHtml(assignment.roomId || "N/A")}</div>
+        </div>
+      </div>
+      <div class="ticket-divider"></div>
+      <div class="ticket-footer">
+        Vui lòng nộp phiếu này cho giáo viên khi vào lớp.
+      </div>
+    </div>
+  `;
+  
+  window.print();
+}
 
 elements.assignmentsBody.addEventListener("change", (event) => {
   const select = event.target.closest(".status-select");

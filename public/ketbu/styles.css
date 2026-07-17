@@ -1858,3 +1858,79 @@ tbody tr:hover {
 .toast-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
 .toast-warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
 .toast-success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+
+/* Print Styles for Tickets */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printTicketContainer, #printTicketContainer * {
+    visibility: visible;
+  }
+  #printTicketContainer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .ticket {
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    font-family: Arial, sans-serif;
+    color: #000;
+  }
+  .ticket-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+  .ticket-logo {
+    width: 60px;
+    height: auto;
+  }
+  .ticket-title-group {
+    text-align: center;
+  }
+  .ticket-center {
+    font-size: 16px;
+    font-weight: bold;
+  }
+  .ticket-title {
+    font-size: 24px;
+    font-weight: bold;
+    margin-top: 5px;
+  }
+  .ticket-divider {
+    border-top: 2px dashed #000;
+    margin: 15px 0;
+  }
+  .ticket-divider-light {
+    border-top: 1px dashed #ccc;
+    margin: 10px 0;
+  }
+  .ticket-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin: 20px 0;
+  }
+  .ticket-label {
+    font-size: 12px;
+    color: #555;
+    text-transform: uppercase;
+  }
+  .ticket-value {
+    font-size: 18px;
+    font-weight: bold;
+    margin-top: 5px;
+  }
+  .ticket-footer {
+    text-align: center;
+    font-size: 14px;
+    margin-top: 20px;
+  }
+}
+
