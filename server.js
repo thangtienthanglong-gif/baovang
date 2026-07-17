@@ -2216,7 +2216,7 @@ app.post('/api/ai-actions/confirm', async (req, res, next) => {
   try {
     requireFields(req.body, ['actionId']);
     const action = consumePendingAiAction(cleanText(req.body.actionId));
-    if (!['send_zalo_bulk', 'send_zalo_tuition', 'send_zalo_birthday'].includes(action.type)) {
+    if (!['send_zalo_bulk', 'send_zalo_tuition', 'send_zalo_birthday', 'send_zalo_periodic'].includes(action.type)) {
       const err = new Error('App chưa hỗ trợ thực hiện hành động AI này.');
       err.status = 400;
       throw err;
@@ -2224,8 +2224,9 @@ app.post('/api/ai-actions/confirm', async (req, res, next) => {
 
     const db = await getBranchDb(req);
     
-    if (['send_zalo_birthday'].includes(action.type)) {
-      const selection = selectSpecialZaloCandidates(db, action.filters, 'birthday');
+    if (['send_zalo_birthday', 'send_zalo_periodic'].includes(action.type)) {
+      const typeArg = action.type === 'send_zalo_birthday' ? 'birthday' : null;
+      const selection = selectSpecialZaloCandidates(db, action.filters, typeArg);
       for (const row of selection.candidates) {
         const absence = {
           id: id('abs'),
