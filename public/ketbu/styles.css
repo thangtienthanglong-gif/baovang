@@ -1970,3 +1970,64 @@ tbody tr:hover {
 .custom-prompt-actions .btn.ghost:hover { background: #f1f5f9; color: #1e293b; }
 .custom-prompt-actions .btn.primary { background: #3b82f6; color: #fff; }
 .custom-prompt-actions .btn.primary:hover { background: #2563eb; }
+
+/* ================== DARK MODE SYNC ================== */
+body.dark-mode {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface-soft: #334155;
+  --line: #334155;
+  --line-strong: #475569;
+  --ink: #f8fafc;
+  --muted: #94a3b8;
+  --navy: #e2e8f0;
+  --navy-strong: #ffffff;
+  --shadow: 0 18px 42px rgba(0, 0, 0, 0.5);
+  background: var(--bg) !important;
+  color: var(--ink);
+}
+
+body.dark-mode .taskbar {
+  background: var(--surface);
+  border-right-color: var(--line);
+}
+
+body.dark-mode .taskbar-brand strong,
+body.dark-mode .taskbar-brand {
+  color: var(--navy-strong) !important;
+}
+
+body.dark-mode .work-card,
+body.dark-mode .autocomplete-items,
+body.dark-mode .custom-prompt-modal {
+  background: var(--surface) !important;
+  border-color: var(--line) !important;
+  color: var(--ink) !important;
+}
+
+body.dark-mode .work-card h2,
+body.dark-mode .custom-prompt-modal h3,
+body.dark-mode .custom-prompt-modal p {
+  color: var(--ink) !important;
+}
+
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode .custom-prompt-modal input {
+  background: var(--surface-soft) !important;
+  border-color: var(--line) !important;
+  color: var(--ink) !important;
+}
+
+body.dark-mode .history-row {
+  border-color: var(--line) !important;
+}
+
+body.dark-mode .history-row:hover {
+  background: var(--surface-soft) !important;
+}
+
+body.dark-mode .student-profile {
+  background: var(--surface-soft) !important;
+  color: var(--ink) !important;
+}

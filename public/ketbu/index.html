@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>App xếp lịch học bù</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <link rel="stylesheet" href="./styles.css?v=7" />
+  <link rel="stylesheet" href="./styles.css?v=20260717-5" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
@@ -40,6 +40,35 @@
       </nav>
 
       <div class="taskbar-utilities">
+        <button type="button" onclick="toggleDarkMode()" title="Đổi chế độ Sáng/Tối" style="background:transparent; border:none; font-size:20px; color:var(--ink); cursor:pointer; margin-right: 12px; padding: 0;">
+          <i id="ketbuDarkModeIcon" class="fa-solid fa-moon"></i>
+        </button>
+        
+        <script>
+          function updateKetbuDarkModeIcon(isDark) {
+            const icon = document.getElementById('ketbuDarkModeIcon');
+            if (!icon) return;
+            if (isDark) {
+              icon.classList.remove('fa-moon');
+              icon.classList.add('fa-sun');
+            } else {
+              icon.classList.remove('fa-sun');
+              icon.classList.add('fa-moon');
+            }
+          }
+          function toggleDarkMode() {
+            const isDark = document.body.classList.toggle('dark-mode');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            updateKetbuDarkModeIcon(isDark);
+          }
+          document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('theme') === 'dark') {
+              document.body.classList.add('dark-mode');
+              updateKetbuDarkModeIcon(true);
+            }
+          });
+        </script>
+
         <label class="toggle-row capacity-toggle taskbar-capacity-toggle" for="capacityCheckToggle" title="Kiểm tra sức chứa phòng">
           <input id="capacityCheckToggle" type="checkbox" />
           <span class="switch-track" aria-hidden="true"><span></span></span>
