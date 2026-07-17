@@ -2024,13 +2024,16 @@ body.dark-mode .history-row {
   border-color: var(--line) !important;
 }
 
-body.dark-mode .history-row:hover {
+body.dark-mode .history-row:hover,
+body.dark-mode tbody tr:hover {
   background: var(--surface-soft) !important;
 }
 
-body.dark-mode .student-profile {
+body.dark-mode .student-profile,
+body.dark-mode .info-box {
   background: var(--surface-soft) !important;
   color: var(--ink) !important;
+  border-color: var(--line) !important;
 }
 
 body.dark-mode label,
