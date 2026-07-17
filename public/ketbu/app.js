@@ -860,6 +860,26 @@ function subjectLabelFromCode(subjectCode) {
 
 function classCodeDetails(classCode) {
   const normalizedCode = String(classCode || "").trim().toUpperCase();
+
+  const ctMatch = normalizedCode.match(/^([0-9]{1,2})CT([12])$/);
+  if (ctMatch) {
+    const group = ctMatch[2];
+    const weekdays = group === '1' ? [3, 5, 7] : [2, 4, 6];
+    return {
+      code: normalizedCode,
+      grade: Number(ctMatch[1]),
+      shift: "",
+      shiftToken: "",
+      programGroup: `CT${group}`,
+      subjectCode: "TOAN",
+      subjectLabel: "Toán",
+      levelCode: `CT${group}`,
+      baseCode: normalizedCode,
+      weekdays,
+      format: "generic"
+    };
+  }
+
   const mathMatch = normalizedCode.match(/^([0-9]{1,2})([SCT])([2-8]+)([A-Z]*)$/);
   if (mathMatch) {
     const weekdays = Array.from(new Set(mathMatch[3].split("").map(Number)))
