@@ -2031,3 +2031,17 @@ body.dark-mode .student-profile {
   background: var(--surface-soft) !important;
   color: var(--ink) !important;
 }
+
+body.dark-mode label,
+body.dark-mode .student-profile p,
+body.dark-mode .student-profile ul,
+body.dark-mode .info-box p {
+  color: var(--ink) !important;
+}
+
+body.dark-mode .switch-track {
+  background: var(--line-strong) !important;
+}
+body.dark-mode .switch-track span {
+  background: var(--ink) !important;
+}
