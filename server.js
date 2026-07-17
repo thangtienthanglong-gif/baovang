@@ -567,7 +567,7 @@ function buildMessage(settings, absence, student) {
   let template = settings.messageTemplate || 'Kính gửi Quý phụ huynh, {schoolName} thông báo học sinh {studentName}, lớp {className}.\nVắng học {session} ngày {date}.\nHọc sinh: {absenceStatus}.\nPhụ huynh vui lòng phản hồi với nhà trường nếu cần bổ sung thông tin.';
   if (status === 'Học phí' || status === 'Trễ học phí') {
     template = settings.tuitionTemplate || 'Kính gửi Quý phụ huynh, {schoolName} thông báo học phí/tiền nợ của em {studentName}, lớp {className} hiện tại là: {tuitionDebt}.\nVui lòng hoàn thành sớm. Trân trọng!';
-  } else if (['Định kỳ', 'Khóa mới', 'Thông báo chung'].includes(status)) {
+  } else if (['Định kỳ', 'Định kì', 'Khóa mới', 'Thông báo chung'].includes(status)) {
     template = settings.periodicTemplate || 'Kính gửi Quý phụ huynh, {schoolName} gửi thông báo định kỳ/khóa mới cho em {studentName}, lớp {className}.';
   }
   
@@ -1883,7 +1883,7 @@ async function sendZaloNotice(db, absenceId, reason = 'auto') {
     if (reason === 'ai_confirmed_bulk_send' && process.platform === 'win32' && phone) {
       try {
         let imageBase64 = null;
-        if (['Định kì', 'Khóa mới', 'Thông báo chung'].includes(normalizeAbsenceStatus(absence.absenceStatus))) {
+        if (['Định kỳ', 'Định kì', 'Khóa mới', 'Thông báo chung'].includes(normalizeAbsenceStatus(absence.absenceStatus))) {
           imageBase64 = settings.periodicImageBase64 || null;
         }
         await runWindowsZaloPaste(message, link, imageBase64);
