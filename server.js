@@ -2102,9 +2102,20 @@ const KETBU_STATE_FILE = path.join(DATA_DIR, 'ketbu-state.json');
 app.get('/api/ketbu/state', async (req, res, next) => {
   try {
     let payload = { state: null, updatedAt: null };
-    if (fs.existsSync(KETBU_STATE_FILE)) {
-      payload = JSON.parse(fs.readFileSync(KETBU_STATE_FILE, 'utf8'));
+    
+    if (getApps().length) {
+      // Firebase mode
+      const snapshot = await getDatabase().ref('/ketbu_state').once('value');
+      if (snapshot.exists()) {
+        payload = snapshot.val();
+      }
+    } else {
+      // Local mode
+      if (fs.existsSync(KETBU_STATE_FILE)) {
+        payload = JSON.parse(fs.readFileSync(KETBU_STATE_FILE, 'utf8'));
+      }
     }
+    
     res.json({ state: payload.state || null, updatedAt: payload.updatedAt || null });
   } catch (error) {
     next(error);
@@ -2119,14 +2130,23 @@ app.post('/api/ketbu/state', async (req, res, next) => {
       err.status = 400;
       throw err;
     }
+
     const payload = {
       state: body.state,
       updatedAt: new Date().toISOString()
     };
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
+
+    if (getApps().length) {
+      // Firebase mode
+      await getDatabase().ref('/ketbu_state').set(payload);
+    } else {
+      // Local mode
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(KETBU_STATE_FILE, JSON.stringify(payload, null, 2));
     }
-    fs.writeFileSync(KETBU_STATE_FILE, JSON.stringify(payload, null, 2));
+    
     res.json({ ok: true, updatedAt: payload.updatedAt });
   } catch (error) {
     console.error("Lỗi khi lưu ketbu-state.json:", error);
