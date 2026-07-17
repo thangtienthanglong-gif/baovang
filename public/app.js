@@ -2644,23 +2644,7 @@ function openStudentProfile(studentId) {
   document.getElementById('drawerStudentPhone').textContent = phone;
   document.getElementById('drawerStudentParent').textContent = student.parentName || 'Chưa cập nhật';
   
-  // Setup quick actions
-  const callBtn = document.getElementById('drawerCallBtn');
-  if (phone !== 'Chưa có SĐT') {
-    callBtn.href = `tel:${phone.replace(/\\D/g,'')}`;
-    callBtn.style.opacity = '1';
-    callBtn.style.pointerEvents = 'auto';
-  } else {
-    callBtn.href = '#';
-    callBtn.style.opacity = '0.5';
-    callBtn.style.pointerEvents = 'none';
-  }
-  
-  document.getElementById('drawerZaloBtn').onclick = () => {
-    if (phone === 'Chưa có SĐT') return toast('Học sinh chưa có số điện thoại', 'error');
-    navigator.clipboard.writeText(phone);
-    toast('Đã copy SĐT để tìm trên Zalo');
-  };
+
 
   // Populate history (recent absences)
   const historyList = document.getElementById('drawerAbsenceHistory');
