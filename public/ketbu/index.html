@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>App xếp lịch học bù</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <link rel="stylesheet" href="./styles.css?v=20260717-6" />
+  <link rel="stylesheet" href="./styles.css?v=20260717-7" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
@@ -154,43 +154,49 @@
 
             </div>
 
-            <section class="panel result-panel planner-result-panel">
-              <div class="section-heading">
-                <div>
-                  <p class="eyebrow">Kết quả</p>
-                  <h2>Kết quả gợi ý <span id="resultCount">(0 lớp phù hợp)</span></h2>
+            <div id="resultModalBackdrop" class="modal-backdrop result-modal-backdrop" style="display: none;">
+              <section class="panel result-panel planner-result-panel">
+                <button type="button" class="close-modal-btn" onclick="closeResultModal()" title="Đóng">
+                  <i class="fa-solid fa-xmark"></i>
+                </button>
+                <div class="section-heading">
+                  <div>
+                    <p class="eyebrow">Kết quả</p>
+                    <h2>Kết quả gợi ý <span id="resultCount">(0 lớp phù hợp)</span></h2>
+                  </div>
+                  <div id="notice" class="notice" hidden></div>
                 </div>
-                <div id="notice" class="notice" hidden></div>
-              </div>
-
-              <div id="resultSummary" class="result-summary"></div>
-
-              <div class="table-wrap">
-                <table class="suggestion-table">
-                  <thead>
-                    <tr>
-                      <th>Lớp bù gợi ý</th>
-                      <th>Thời gian</th>
-                      <th>Phần học</th>
-                      <th>Phòng học</th>
-                      <th>Số chỗ còn lại</th>
-                      <th>Mức độ phù hợp</th>
-                      <th>Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody id="suggestionsBody"></tbody>
-                </table>
-              </div>
-
-              <div class="planner-legend">
-                <span>Gợi ý được sắp xếp theo mức độ phù hợp và số chỗ còn lại.</span>
-                <div class="planner-legend-tags">
-                  <span class="badge success">Phù hợp cao</span>
-                  <span class="badge warning">Phù hợp trung bình</span>
-                  <span class="badge danger">Phù hợp thấp</span>
+  
+                <div id="resultSummary" class="result-summary"></div>
+  
+                <div class="table-wrap">
+                  <table class="suggestion-table">
+                    <thead>
+                      <tr>
+                        <th>Lớp bù gợi ý</th>
+                        <th>Thời gian</th>
+                        <th>Phần học</th>
+                        <th>Phòng học</th>
+                        <th>Số chỗ còn lại</th>
+                        <th>Mức độ phù hợp</th>
+                        <th>Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody id="suggestionsBody"></tbody>
+                  </table>
                 </div>
-              </div>
-            </section>
+  
+                <div class="planner-legend">
+                  <span>Gợi ý được sắp xếp theo mức độ phù hợp và số chỗ còn lại.</span>
+                  <div class="planner-legend-tags">
+                    <span class="badge success">Phù hợp cao</span>
+                    <span class="badge warning">Phù hợp trung bình</span>
+                    <span class="badge danger">Phù hợp thấp</span>
+                  </div>
+                </div>
+              </section>
+            </div>
+
 
             <section class="panel">
               <div class="section-heading">

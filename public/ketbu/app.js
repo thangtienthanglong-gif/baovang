@@ -3079,7 +3079,10 @@ elements.capacityCheckToggle.addEventListener("change", () => {
   setNotice("");
   findMakeupSuggestions();
 });
-elements.findBtn.addEventListener("click", findMakeupSuggestions);
+elements.findBtn.addEventListener("click", () => {
+  findMakeupSuggestions();
+  openResultModal();
+});
 elements.exportAssignmentsBtn.addEventListener("click", exportAssignmentsToExcel);
 elements.clearAssignmentsBtn.addEventListener("click", clearAssignmentHistory);
 
@@ -3087,6 +3090,7 @@ elements.suggestionsBody.addEventListener("click", (event) => {
   const button = event.target.closest("[data-action='confirm']");
   if (!button) return;
   confirmMakeup(button.dataset.sessionId);
+  closeResultModal();
 });
 
 elements.assignmentsBody.addEventListener("click", (event) => {
@@ -3220,3 +3224,17 @@ window.deleteAllClasses = function() {
     renderClassTree();
   }
 };
+
+function openResultModal() {
+  document.getElementById('resultModalBackdrop').style.display = 'flex';
+}
+
+function closeResultModal() {
+  document.getElementById('resultModalBackdrop').style.display = 'none';
+}
+
+document.getElementById('resultModalBackdrop').addEventListener('click', (e) => {
+  if (e.target.id === 'resultModalBackdrop') {
+    closeResultModal();
+  }
+});

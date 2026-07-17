@@ -1997,6 +1997,7 @@ body.dark-mode .taskbar-brand {
   color: var(--navy-strong) !important;
 }
 
+body.dark-mode .panel,
 body.dark-mode .work-card,
 body.dark-mode .autocomplete-items,
 body.dark-mode .custom-prompt-modal {
@@ -2044,4 +2045,54 @@ body.dark-mode .switch-track {
 }
 body.dark-mode .switch-track span {
   background: var(--ink) !important;
+}
+
+/* ================== MODAL BACKDROP (RESULT) ================== */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease;
+}
+.result-modal-backdrop .planner-result-panel {
+  position: relative;
+  width: 100%;
+  max-width: 1000px;
+  max-height: 90vh;
+  overflow-y: auto;
+  margin: 0;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+  animation: slideUp 0.3s ease;
+}
+.close-modal-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.2s;
+  z-index: 10;
+}
+.close-modal-btn:hover {
+  color: var(--danger);
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
