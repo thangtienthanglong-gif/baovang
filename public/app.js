@@ -1006,7 +1006,13 @@ async function loadNotices() {
     q: $('#historyKeyword').value.trim()
   }));
   
-  rows = rows.filter(row => row.status !== 'Chưa kết bạn - Cần gọi');
+  rows = rows.filter(row => 
+    row.status !== 'Chưa kết bạn - Cần gọi' && 
+    row.absenceCallStatus !== 'Cần gọi điện' && 
+    row.absenceCallStatus !== 'Đã gọi' && 
+    row.absenceCallStatus !== 'Đã nhắc' &&
+    row.absenceCallStatus !== 'Không nghe máy'
+  );
 
   const tbody = $('#noticeRows');
   if (!rows.length) {

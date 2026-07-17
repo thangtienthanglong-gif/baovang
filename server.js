@@ -474,7 +474,11 @@ function filterNotificationLogs(db, query) {
 
   return rows.sort((a, b) => String(b.time).localeCompare(String(a.time))).map(log => {
     const absence = db.absences ? db.absences.find(abs => abs.id === log.absenceId) : null;
-    return { ...log, absenceStatus: absence ? absence.absenceStatus : 'Khác' };
+    return { 
+      ...log, 
+      absenceStatus: absence ? absence.absenceStatus : 'Khác',
+      absenceCallStatus: absence ? absence.status : ''
+    };
   });
 }
 
@@ -1290,6 +1294,50 @@ if ($msg -or $env:ZALO_AUTOPASTE_IMAGE_B64) {
   [Win32ZaloPaste]::keybd_event(0x56, 0, 2, [UIntPtr]::Zero)
   [Win32ZaloPaste]::keybd_event(0x11, 0, 2, [UIntPtr]::Zero)
   
+  if ($msg -and -not $env:ZALO_AUTOPASTE_IMAGE_B64) {
+    Start-Sleep -Milliseconds 300
+    
+    # Check if paste was successful (i.e., we are not on a stranger screen)
+    # Put a dummy value in clipboard
+    for ($k = 0; $k -lt 5; $k++) {
+      try { Set-Clipboard -Value "CHECK_STRANGER"; break } catch { Start-Sleep -Milliseconds 100 }
+    }
+    Start-Sleep -Milliseconds 100
+
+    # Select All and Copy
+    [Win32ZaloPaste]::keybd_event(0x11, 0, 0, [UIntPtr]::Zero)
+    [Win32ZaloPaste]::keybd_event(0x41, 0, 0, [UIntPtr]::Zero)
+    Start-Sleep -Milliseconds 50
+    [Win32ZaloPaste]::keybd_event(0x41, 0, 2, [UIntPtr]::Zero)
+    [Win32ZaloPaste]::keybd_event(0x11, 0, 2, [UIntPtr]::Zero)
+    
+    Start-Sleep -Milliseconds 150
+    
+    [Win32ZaloPaste]::keybd_event(0x11, 0, 0, [UIntPtr]::Zero)
+    [Win32ZaloPaste]::keybd_event(0x43, 0, 0, [UIntPtr]::Zero)
+    Start-Sleep -Milliseconds 50
+    [Win32ZaloPaste]::keybd_event(0x43, 0, 2, [UIntPtr]::Zero)
+    [Win32ZaloPaste]::keybd_event(0x11, 0, 2, [UIntPtr]::Zero)
+    
+    Start-Sleep -Milliseconds 250
+    
+    $verifyText = "CHECK_STRANGER"
+    try { $verifyText = Get-Clipboard } catch {}
+    
+    # If text is very long, Zalo might truncate it when selecting, or we might just check a substring
+    $expected = $msg.Trim()
+    if ($expected.Length -gt 20) { $expected = $expected.Substring(0, 20) }
+    
+    if (-not $verifyText -or -not $verifyText.Contains($expected)) {
+      throw "OCR_STRANGER_DETECTED"
+    }
+    
+    # Move cursor to end to deselect text, otherwise Enter might just delete it in some versions
+    [Win32ZaloPaste]::keybd_event(0x27, 0, 0, [UIntPtr]::Zero) # Right Arrow
+    Start-Sleep -Milliseconds 50
+    [Win32ZaloPaste]::keybd_event(0x27, 0, 2, [UIntPtr]::Zero)
+  }
+
   Start-Sleep -Milliseconds 400
   
   [Win32ZaloPaste]::keybd_event(0x0D, 0, 0, [UIntPtr]::Zero)
