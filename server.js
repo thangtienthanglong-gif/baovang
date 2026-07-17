@@ -1265,7 +1265,19 @@ if (-not $global:focused) {
 Start-Sleep -Milliseconds 500
 
 if (-not $env:ZALO_AUTOPASTE_IMAGE_B64) {
-  Set-Clipboard -Value $msg
+  $cbSuccess = $false
+  for ($k = 0; $k -lt 5; $k++) {
+    try {
+      Set-Clipboard -Value $msg
+      $cbSuccess = $true
+      break
+    } catch {
+      Start-Sleep -Milliseconds 200
+    }
+  }
+  if (-not $cbSuccess) {
+    throw "Không thể truy cập Clipboard để copy tin nhắn."
+  }
 }
 Start-Sleep -Milliseconds 300
 
