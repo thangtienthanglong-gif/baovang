@@ -1232,7 +1232,7 @@ for ($i = 0; $i -lt 30; $i++) {
     $isRealZalo = ($proc -and $proc.ProcessName -match '(?i)^Zalo$')
 
     Activate-Window $handle
-    Start-Sleep -Milliseconds 400
+    Start-Sleep -Milliseconds 1500
     
     # Chúng ta đã bỏ UIAutomation chậm chạp, nên có thể click luôn
     if (Focus-ChatInputArea $handle) { 
@@ -1267,7 +1267,7 @@ if (-not $env:ZALO_AUTOPASTE_IMAGE_B64) {
 Start-Sleep -Milliseconds 300
 
 if ($msg -or $env:ZALO_AUTOPASTE_IMAGE_B64) {
-  Start-Sleep -Milliseconds 1500
+  Start-Sleep -Milliseconds 300
   # Sử dụng keybd_event không đồng bộ để tránh bị treo (SendWait có thể block 30s)
   [Win32ZaloPaste]::keybd_event(0x11, 0, 0, [UIntPtr]::Zero)
   [Win32ZaloPaste]::keybd_event(0x56, 0, 0, [UIntPtr]::Zero)
