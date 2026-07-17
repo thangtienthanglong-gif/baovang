@@ -3063,8 +3063,12 @@ function printTicket(assignmentId) {
     document.body.appendChild(printContainer);
   }
   
+  const now = new Date();
+  const printTimeStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  
   printContainer.innerHTML = `
-    <div class="ticket">
+    <div class="ticket" style="position: relative;">
+      <div class="ticket-print-time" style="position: absolute; top: 0; right: 0; font-size: 10px; color: #333;">${printTimeStr}</div>
       <div class="ticket-header">
         <div class="ticket-logo-wrapper">
           <img src="../assets/logo.png" alt="Logo" class="ticket-logo" onerror="this.style.display='none'">
