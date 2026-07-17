@@ -3068,10 +3068,10 @@ function printTicket(assignmentId) {
   
   printContainer.innerHTML = `
     <div class="ticket" style="position: relative;">
-      <div class="ticket-print-time" style="position: absolute; top: 0; right: 0; font-size: 10px; color: #333;">${printTimeStr}</div>
+      <div class="ticket-print-time">${printTimeStr}</div>
       <div class="ticket-header">
         <div class="ticket-logo-wrapper">
-          <img src="../assets/logo.png" alt="Logo" class="ticket-logo" onerror="this.style.display='none'">
+          <img src="./company-logo.png" alt="Logo" class="ticket-logo" onerror="this.style.display='none'">
         </div>
         <div class="ticket-title-group">
           <div class="ticket-center">TRUNG TÂM BDVH THĂNG TIẾN THĂNG LONG</div>
