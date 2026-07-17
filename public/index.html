@@ -630,11 +630,52 @@
 
   <div id="toastContainer" class="toast-container" role="status"></div>
   <script src="/app.js?v=20260711-3"></script>
+  <nav class="bottom-nav">
+    <button class="bottom-tab active" data-tab="absenceTab" type="button"><i class="fa-solid fa-clipboard-user"></i><span>Điểm danh</span></button>
+    <button class="bottom-tab" data-tab="queueTab" type="button"><i class="fa-solid fa-list-check"></i><span>Hàng xử lý</span></button>
+    <button class="bottom-tab" data-tab="historyTab" type="button"><i class="fa-solid fa-clock-rotate-left"></i><span>Lịch sử</span></button>
+    <button class="bottom-tab" data-tab="zaloTab" type="button"><i class="fa-solid fa-comment-dots"></i><span>Zalo</span></button>
+    <button class="bottom-tab" id="mobileMenuToggleBtn" type="button"><i class="fa-solid fa-bars"></i><span>Thêm</span></button>
+  </nav>
+
   <script>
     document.addEventListener('click', function(e) {
       if (!e.target.closest('.dropdown-wrapper')) {
         document.querySelectorAll('.dropdown-menu').forEach(x => x.style.display = 'none');
       }
+    });
+
+    // Mobile Menu Toggle
+    document.getElementById('mobileMenuToggleBtn')?.addEventListener('click', function() {
+      const sidebar = document.querySelector('.sidebar');
+      const backdrop = document.querySelector('.sidebar-backdrop');
+      sidebar.classList.add('open');
+      backdrop.classList.add('show');
+    });
+    
+    document.querySelectorAll('.bottom-tab[data-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Remove active class from all bottom tabs
+        document.querySelectorAll('.bottom-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        // Sync with side tabs
+        const targetTab = btn.getAttribute('data-tab');
+        const sideBtn = document.querySelector(`.side-nav .tab[data-tab="${targetTab}"]`);
+        if (sideBtn) sideBtn.click();
+      });
+    });
+
+    // Sync from side tabs to bottom tabs
+    document.querySelectorAll('.side-nav .tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetTab = btn.getAttribute('data-tab');
+        const bottomBtn = document.querySelector(`.bottom-tab[data-tab="${targetTab}"]`);
+        if (bottomBtn) {
+          document.querySelectorAll('.bottom-tab').forEach(b => b.classList.remove('active'));
+          bottomBtn.classList.add('active');
+        }
+      });
     });
 
     // Dark Mode Logic
@@ -646,12 +687,14 @@
     
     function updateDarkModeIcon(isDark) {
       const icon = document.querySelector('.mobile-menu-btn i');
-      if (isDark) {
-        icon.classList.remove('fa-moon');
-        icon.classList.add('fa-sun');
-      } else {
-        icon.classList.remove('fa-sun');
-        icon.classList.add('fa-moon');
+      if (icon) {
+        if (isDark) {
+          icon.classList.remove('fa-moon');
+          icon.classList.add('fa-sun');
+        } else {
+          icon.classList.remove('fa-sun');
+          icon.classList.add('fa-moon');
+        }
       }
     }
 
