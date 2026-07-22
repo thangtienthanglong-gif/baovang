@@ -70,8 +70,10 @@
 
       <nav class="tabs side-nav" aria-label="Chức năng">
         <button class="tab active" data-tab="absenceTab" type="button"><span class="nav-icon"><i class="fa-solid fa-clipboard-user"></i></span> Điểm danh</button>
+        <a href="/ketbu_eval.html" class="tab" style="text-decoration: none; color: inherit; border: 1px solid #3b82f6; background: #eff6ff; color: #1e3a8a; font-weight: bold;"><span class="nav-icon"><i class="fa-solid fa-chalkboard-user" style="color:#3b82f6;"></i></span> Lên lớp</a>
         <a href="/ketbu/index.html" class="tab" style="text-decoration: none; color: inherit;"><span class="nav-icon"><i class="fa-solid fa-calendar-alt"></i></span> Lịch học bù</a>
         <button class="tab" data-tab="queueTab" type="button"><span class="nav-icon"><i class="fa-solid fa-list-check"></i></span> Hàng xử lý</button>
+        <button class="tab" data-tab="logTab" type="button"><span class="nav-icon"><i class="fa-solid fa-book-open"></i></span> Tiến độ phân phối</button>
         <button class="tab" data-tab="historyTab" type="button"><span class="nav-icon"><i class="fa-solid fa-clock-rotate-left"></i></span> Lịch sử liên hệ</button>
         <button class="tab" data-tab="importTab" type="button"><span class="nav-icon"><i class="fa-solid fa-file-excel"></i></span> Nạp Excel</button>
         <button class="tab" data-tab="zaloTab" type="button"><span class="nav-icon"><i class="fa-solid fa-comment-dots"></i></span> Zalo</button>
@@ -403,6 +405,52 @@
       </section>
     </section>
 
+    <!-- TAB TIẾN ĐỘ PHÂN PHỐI -->
+    <section id="logTab" class="tab-panel">
+      <section class="card filters" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+        <div class="field" style="margin: 0;">
+          <label style="font-size: 13px; color: #64748b;">Từ ngày</label>
+          <input type="date" id="logFilterStartDate" style="padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+        </div>
+        <div class="field" style="margin: 0;">
+          <label style="font-size: 13px; color: #64748b;">Đến ngày</label>
+          <input type="date" id="logFilterEndDate" style="padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+        </div>
+        <div class="field" style="margin: 0; min-width: 150px; flex-grow: 1;">
+          <label for="logFilterClass">Lớp</label>
+          <select id="logFilterClass">
+            <option value="">Tất cả</option>
+          </select>
+        </div>
+        <button class="btn" id="logFilterBtn" type="button" style="margin-bottom: 0;"><i class="fa-solid fa-table"></i> Xem tiến độ</button>
+        <button class="btn" id="openCompareBtn" type="button" style="margin-bottom: 0; background-color: #8b5cf6; color: white;"><i class="fa-solid fa-code-compare"></i> So sánh nhiều lớp</button>
+      </section>
+
+      <section class="card" style="margin-top: 15px; padding: 0;">
+        <div style="overflow-x: auto; padding: 10px;">
+          <table class="data-table" style="width: 100%; border-collapse: collapse; min-width: 1000px;">
+            <thead>
+              <tr style="background: #f8fafc; border-bottom: 2px solid #cbd5e1; text-align: center; color: #1e293b; font-weight: bold;">
+                <th style="padding: 12px; border-right: 1px solid #e2e8f0; width: 120px;">TỪ NGÀY<br>ĐẾN NGÀY</th>
+                <th id="th-H1" style="padding: 12px; border-right: 1px solid #e2e8f0; width: 14%; color:#ef4444;">PHẦN H1</th>
+                <th id="th-D2" style="padding: 12px; border-right: 1px solid #e2e8f0; width: 14%; color:#d97706;">PHẦN Đ2</th>
+                <th id="th-H2" style="padding: 12px; border-right: 1px solid #e2e8f0; width: 14%; color:#3b82f6;">PHẦN H2</th>
+                <th id="th-H3" style="padding: 12px; border-right: 1px solid #e2e8f0; width: 14%; color:#10b981;">PHẦN H3</th>
+                <th id="th-D3" style="padding: 12px; border-right: 1px solid #e2e8f0; width: 14%; color:#8b5cf6;">PHẦN Đ3</th>
+                <th id="th-TH" style="padding: 12px; width: 14%; color:#0ea5e9;">PHẦN TH</th>
+              </tr>
+            </thead>
+            <tbody id="distributionTableBody">
+              <!-- Rendered via JS -->
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 30px; color: #64748b;">Vui lòng chọn 1 Lớp cụ thể để xem Tiến độ phân phối.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
     <section id="historyTab" class="tab-panel">
       <section class="card filters" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
         <div class="field" style="margin: 0;">
@@ -597,6 +645,39 @@
       </section>
     </section>
   </main>
+  
+  <!-- Compare Modal -->
+  <div id="compareModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4);">
+    <div class="modal-content" style="background-color: #fefefe; margin: 3% auto; padding: 20px; border: 1px solid #888; width: 95%; max-width: 1400px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+      <span class="close" id="closeCompareModal" style="color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
+      <h2 style="margin-top: 0; color: #1e293b;">So sánh Tiến độ phân phối</h2>
+      <p style="color: #64748b; font-size: 13px;">* Bảng so sánh sẽ lấy mốc thời gian Từ ngày - Đến ngày ở ngoài màn hình chính.</p>
+      <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; align-items: flex-end;">
+        <div style="flex: 1; min-width: 300px;">
+          <label style="font-weight: bold; display: block; margin-bottom: 5px; font-size: 14px; color: #334155;">Chọn các lớp để so sánh:</label>
+          <div id="compareClassCheckboxes" style="border: 1px solid #cbd5e1; padding: 12px; border-radius: 6px; max-height: 150px; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 15px; background: #f8fafc;">
+             <!-- Checkboxes here -->
+          </div>
+        </div>
+        <div>
+          <button class="btn primary" id="runCompareBtn" style="padding: 10px 20px;"><i class="fa-solid fa-bolt"></i> So sánh ngay</button>
+        </div>
+      </div>
+      <div style="overflow-x: auto;">
+        <table class="data-table" style="width: 100%; border-collapse: collapse; min-width: 800px; border: 1px solid #e2e8f0;">
+          <thead id="compareTableHeader">
+             <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1; text-align: center; color: #1e293b; font-weight: bold;">
+                <th style="padding: 12px; border-right: 1px solid #e2e8f0; width: 120px;">THÔNG SỐ</th>
+                <th style="padding: 12px;">Vui lòng chọn lớp và bấm So sánh</th>
+             </tr>
+          </thead>
+          <tbody id="compareTableBody">
+             <tr><td colspan="2" style="text-align: center; padding: 30px; color: #64748b;">Chưa có dữ liệu.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
     </div>
   </div>
 
@@ -650,6 +731,64 @@
     </div>
   </aside>
 
+  <div id="makeupModal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+    <div style="background:#fff; padding:20px; border-radius:8px; width:400px; max-width:90%;">
+      <h3 style="margin-top:0;">Đăng ký Học Bù Cố Định</h3>
+      <div id="makeupModalStudentName" style="font-weight:bold; color:#3b82f6; margin-bottom:15px;"></div>
+      <input type="hidden" id="makeupModalStudentId">
+      <input type="hidden" id="makeupModalOriginalClass">
+      
+      <div class="form-group" style="margin-bottom: 10px;">
+        <label>Thứ bị kẹt (Lớp gốc)</label>
+        <select id="makeupModalStuckDay" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+          <option value="2">Thứ 2</option>
+          <option value="3">Thứ 3</option>
+          <option value="4">Thứ 4</option>
+          <option value="5">Thứ 5</option>
+          <option value="6">Thứ 6</option>
+          <option value="7">Thứ 7</option>
+          <option value="8">Chủ nhật</option>
+        </select>
+      </div>
+      
+      <div class="form-group" style="margin-bottom: 10px;">
+        <label>Loại xếp lịch</label>
+        <select id="makeupModalType" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+          <option value="bu_tam">Bù tạm (1 buổi)</option>
+          <option value="hoc_bu">Học bù (Cố định)</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 10px;">
+        <label>Lớp học bù</label>
+        <select id="makeupModalTargetClass" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 15px;">
+        <label>Thứ học bù</label>
+        <select id="makeupModalTargetDay" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+          <option value="2">Thứ 2</option>
+          <option value="3">Thứ 3</option>
+          <option value="4">Thứ 4</option>
+          <option value="5">Thứ 5</option>
+          <option value="6">Thứ 6</option>
+          <option value="7">Thứ 7</option>
+          <option value="8">Chủ nhật</option>
+        </select>
+      </div>
+
+      <div style="display:flex; justify-content:space-between;">
+        <button type="button" class="btn primary" onclick="saveMakeupSchedule()">Lưu lịch bù</button>
+        <button type="button" class="btn ghost" onclick="document.getElementById('makeupModal').style.display='none'">Hủy</button>
+      </div>
+      
+      <div style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 10px;">
+        <h4 style="margin: 0 0 10px 0; font-size: 13px;">Lịch học bù hiện tại:</h4>
+        <div id="makeupModalCurrentList" style="font-size: 13px; color: #64748b; max-height:150px; overflow-y:auto;"></div>
+      </div>
+    </div>
+  </div>
   <script src="/app.js?v=20260717-3"></script>
   <nav class="bottom-nav">
     <button class="bottom-tab active" data-tab="absenceTab" type="button"><i class="fa-solid fa-clipboard-user"></i><span>Điểm danh</span></button>

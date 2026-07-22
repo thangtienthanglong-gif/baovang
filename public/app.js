@@ -218,6 +218,7 @@ async function loadBootstrap() {
   const filters = activeTabId() === 'queueTab' ? getFilters() : getAttendanceFilters();
   const data = await api('/api/bootstrap?' + queryString(filters));
   Object.assign(state, data);
+  try { state.scheduleExceptions = await api('/api/schedule-exceptions'); } catch(e) { state.scheduleExceptions = []; }
   if ($('#filterDate') && !$('#filterDate').value) $('#filterDate').value = state.today;
   renderFilters();
   renderSettings();
@@ -319,6 +320,12 @@ function renderFilters() {
     if (info.matchesDate) sessionGroups[info.sessionName].push(className);
   });
   const validClasses = Object.values(sessionGroups).flat();
+
+  if ($('#logFilterClass')) {
+    const currentLogClass = $('#logFilterClass').value;
+    $('#logFilterClass').innerHTML = '<option value="">Tất cả lớp</option>' + state.classes.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    $('#logFilterClass').value = currentLogClass;
+  }
 
   const currentClass = $('#filterClass')?.value || 'ALL';
   if ($('#filterClass')) {
@@ -843,6 +850,7 @@ function renderRosterStudent(student) {
             ${student.recentAbsenceCount >= 3 ? `<span title="Vắng ${student.recentAbsenceCount} buổi trong 30 ngày qua" style="color: #ef4444; font-size: 14px; margin-left: 4px;">⚠️ (${student.recentAbsenceCount})</span>` : ''}
           </div>
           <div class="student-phone">${escapeHtml(phone)}</div>
+          ${(state.scheduleExceptions || []).filter(e => e.studentId === student.id).map(e => `<div style="font-size:12px; color:#3b82f6; margin-top:4px; font-weight:600;"><i class="fa-solid fa-repeat"></i> Kẹt T${e.stuckDay} ➔ ${e.type === 'hoc_bu' ? 'Học bù' : 'Bù tạm'} T${e.makeupDay} (${e.makeupClass})</div>`).join('')}
         </div>
       </div>
       <div class="student-status-control">
@@ -850,6 +858,7 @@ function renderRosterStudent(student) {
         <select id="status-${escapeHtml(student.id)}" class="roster-status-select" data-student-id="${escapeHtml(student.id)}" data-absence-id="${escapeHtml(absence?.id || '')}">
           ${statusOptions.map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === currentStatus ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}
         </select>
+        <button type="button" class="btn small" onclick="openMakeupModal('${escapeHtml(student.id)}', '${escapeHtml(student.fullName)}', '${escapeHtml(student.className)}')">Kẹt & Bù</button>
       </div>
     </article>
   `;
@@ -897,6 +906,7 @@ function renderAbsences() {
         <label>Trạng thái vắng</label>
         <span class="absence-status-pill">${escapeHtml(normalizeAbsenceStatus(row.absenceStatus))}</span>
         ${row.initialReason && row.initialReason !== row.absenceStatus ? `<span class="muted">${escapeHtml(row.initialReason)}</span>` : ''}
+        ${row.evidenceUrl ? `<a href="${row.evidenceUrl}" target="_blank" style="font-size: 11px; display: inline-block; margin-top: 4px; color: #3b82f6; text-decoration: none;"><i class="fa-solid fa-image"></i> Xem ảnh</a>` : ''}
         <button class="btn primary btn-sm schedule-makeup-btn" type="button" 
           onclick="window.open('/ketbu/index.html?class=' + encodeURIComponent('${escapeHtml(row.className)}') + '&student=' + encodeURIComponent('${escapeHtml(row.studentName)}'), '_blank')"
           style="margin-top: 8px; font-size: 12px; padding: 4px 8px;">
@@ -919,6 +929,143 @@ function renderAbsences() {
     </article>
   `;
   }).join('');
+}
+
+function getWeekRange(dateStr) {
+  const d = new Date(dateStr);
+  const day = d.getDay();
+  const diffToMonday = d.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(d);
+  monday.setDate(diffToMonday);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  
+  const fmt = (dt) => {
+    const dd = String(dt.getDate()).padStart(2, '0');
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}`;
+  };
+  return {
+    key: `${monday.getFullYear()}-${monday.getMonth()}-${monday.getDate()}`,
+    label: `Từ: ${fmt(monday)}<br>Đến: ${fmt(sunday)}`,
+    mondayTimestamp: monday.getTime()
+  };
+}
+
+async function loadTeachingLog() {
+  try {
+    const tbody = $('#distributionTableBody');
+    if (!tbody) return; 
+    
+    const className = $('#logFilterClass').value;
+    const startDate = $('#logFilterStartDate')?.value; 
+    const endDate = $('#logFilterEndDate')?.value; 
+    
+    if (!className) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 30px; color: #64748b; font-weight:bold;">Vui lòng chọn 1 Lớp cụ thể ở thanh công cụ phía trên để xem Tiến độ phân phối.</td></tr>';
+      return;
+    }
+    
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 30px;">Đang tải...</td></tr>';
+    
+    let sessions = await api('/api/teaching-sessions');
+    
+    sessions = sessions.filter(s => s.className === className);
+    
+    if (startDate) {
+      sessions = sessions.filter(s => s.startTime && s.startTime >= startDate);
+    }
+    if (endDate) {
+      const eDate = new Date(endDate);
+      eDate.setHours(23, 59, 59, 999);
+      sessions = sessions.filter(s => s.startTime && new Date(s.startTime) <= eDate);
+    }
+
+    if (sessions.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 30px; color: #64748b;">Lớp này chưa có dữ liệu giảng dạy nào trong khoảng thời gian này.</td></tr>';
+      return;
+    }
+    
+    const weeksMap = {};
+
+    sessions.forEach(s => {
+      if (!s.startTime) return;
+      const weekInfo = getWeekRange(s.startTime);
+      if (!weeksMap[weekInfo.key]) {
+        weeksMap[weekInfo.key] = {
+          label: weekInfo.label,
+          mondayTs: weekInfo.mondayTimestamp,
+          H1: [], D2: [], H2: [], H3: [], D3: [], TH: []
+        };
+      }
+      
+      let partKey = (s.shift || '').toUpperCase().trim();
+      if (partKey === 'Đ2') partKey = 'D2';
+      if (partKey === 'Đ3') partKey = 'D3';
+      
+      if (weeksMap[weekInfo.key][partKey] !== undefined) {
+        weeksMap[weekInfo.key][partKey].push(s);
+      } else {
+        weeksMap[weekInfo.key]['TH'].push(s);
+      }
+    });
+    
+    const sortedWeeks = Object.values(weeksMap).sort((a, b) => b.mondayTs - a.mondayTs); 
+    
+    const formatTeacherName = (name) => {
+      const m = name.match(/^(.*?)\s*\((Ca\s*\d+)\)$/i);
+      if (m) return `${m[2]}: ${m[1]}`;
+      return `GV: ${name}`;
+    };
+
+    const partTeachers = { 'H1': '', 'Đ2': '', 'H2': '', 'H3': '', 'Đ3': '', 'TH': '' };
+    const sortedSessions = [...sessions].sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+    sortedSessions.forEach(s => {
+      let pk = (s.shift || '').toUpperCase().trim();
+      if (pk === 'D2') pk = 'Đ2';
+      if (pk === 'D3') pk = 'Đ3';
+      if (partTeachers[pk] !== undefined && partTeachers[pk] === '') {
+        partTeachers[pk] = formatTeacherName(s.teacherName);
+      }
+    });
+
+    ['H1', 'Đ2', 'H2', 'H3', 'Đ3', 'TH'].forEach(part => {
+      const thId = part === 'Đ2' ? 'th-D2' : (part === 'Đ3' ? 'th-D3' : `th-${part}`);
+      const th = document.getElementById(thId);
+      if (th) {
+        const teacherHtml = partTeachers[part] ? `<br><span style="color:#475569; font-size:13px; display:inline-block; margin-top:4px;">${escapeHtml(partTeachers[part])}</span>` : '';
+        th.innerHTML = `PHẦN ${part}${teacherHtml}`;
+      }
+    });
+
+    const renderCell = (sessionsArray) => {
+      if (!sessionsArray || sessionsArray.length === 0) return '';
+      return sessionsArray.map((s, index) => `
+        <div style="${index > 0 ? 'border-top: 1px dashed #cbd5e1; padding-top: 8px; margin-top: 8px;' : ''}">
+          <div style="color: #3b82f6; font-size: 13px; margin-bottom: 4px; line-height: 1.4;"><b>BH:</b> ${escapeHtml(s.lessonName)}</div>
+          <div style="color: #ef4444; font-size: 13px; line-height: 1.4;"><b>BTL:</b> ${escapeHtml(s.exercises)}</div>
+        </div>
+      `).join('');
+    };
+
+    tbody.innerHTML = sortedWeeks.map(w => {
+      return `
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="padding: 12px; font-weight: bold; color: #475569; text-align: center; border-right: 1px solid #e2e8f0; vertical-align: top;">${w.label}</td>
+          <td style="padding: 12px; border-right: 1px solid #e2e8f0; vertical-align: top;">${renderCell(w.H1)}</td>
+          <td style="padding: 12px; border-right: 1px solid #e2e8f0; vertical-align: top;">${renderCell(w.D2)}</td>
+          <td style="padding: 12px; border-right: 1px solid #e2e8f0; vertical-align: top;">${renderCell(w.H2)}</td>
+          <td style="padding: 12px; border-right: 1px solid #e2e8f0; vertical-align: top;">${renderCell(w.H3)}</td>
+          <td style="padding: 12px; border-right: 1px solid #e2e8f0; vertical-align: top;">${renderCell(w.D3)}</td>
+          <td style="padding: 12px; vertical-align: top;">${renderCell(w.TH)}</td>
+        </tr>
+      `;
+    }).join('');
+    
+  } catch (error) {
+    const tbody = $('#distributionTableBody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: red; padding: 20px;">Lỗi: ' + error.message + '</td></tr>';
+  }
 }
 
 async function loadHistory() {
@@ -2279,6 +2426,11 @@ function initEvents() {
   $('#historyFilterBtn').addEventListener('click', async () => {
     await Promise.all([loadHistory(), loadNotices(), loadQuitStudents()]);
   });
+  
+  $('#logFilterBtn')?.addEventListener('click', () => {
+    loadTeachingLog();
+  });
+
   $('#clearCallHistoryBtn')?.addEventListener('click', async () => {
     try {
       await clearCallHistory();
@@ -2658,6 +2810,7 @@ function openStudentProfile(studentId) {
     historyList.innerHTML = allAbsences.slice(0, 5).map(a => `
       <div class="drawer-history-item">
         <strong style="color: var(--danger)">Ngày ${a.date}</strong> - ${normalizeAbsenceStatus(a.absenceStatus)}
+        ${a.evidenceUrl ? `<a href="${a.evidenceUrl}" target="_blank" style="margin-left:8px; font-size:12px; color:#3b82f6; text-decoration: none;"><i class="fa-solid fa-image"></i> Ảnh</a>` : ''}
       </div>
     `).join('');
   }
@@ -2678,3 +2831,167 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('closeStudentDrawer')?.addEventListener('click', closeStudentProfile);
   document.getElementById('studentDrawerBackdrop')?.addEventListener('click', closeStudentProfile);
 });
+
+// --- Makeup Modal Logic ---
+async function openMakeupModal(studentId, studentName, originalClass) {
+  document.getElementById('makeupModalStudentId').value = studentId;
+  document.getElementById('makeupModalOriginalClass').value = originalClass;
+  document.getElementById('makeupModalStudentName').textContent = studentName + ' (' + originalClass + ')';
+  
+  const classNames = [...new Set(activeStudents().map(s => s.className).filter(c => c))].sort();
+  document.getElementById('makeupModalTargetClass').innerHTML = classNames.map(c => `<option value="${c}">${c}</option>`).join('');
+  
+  await reloadMakeupList(studentId);
+  document.getElementById('makeupModal').style.display = 'flex';
+}
+
+async function reloadMakeupList(studentId) {
+  try {
+    const listDiv = document.getElementById('makeupModalCurrentList');
+    listDiv.innerHTML = 'Đang tải...';
+    const exceptions = await api('/api/schedule-exceptions');
+    state.scheduleExceptions = exceptions; // update global cache
+    const myExceptions = exceptions.filter(e => e.studentId === studentId);
+    if (myExceptions.length === 0) {
+      listDiv.innerHTML = 'Chưa có lịch bù nào.';
+      return;
+    }
+    listDiv.innerHTML = myExceptions.map(e => `
+      <div style="background:#f1f5f9; padding:8px; border-radius:4px; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center;">
+        <div>Kẹt <b>Thứ ${e.stuckDay}</b> ➔ ${e.type === 'hoc_bu' ? 'Học bù' : 'Bù tạm'} <b>Thứ ${e.makeupDay} (${e.makeupClass})</b></div>
+        <button class="btn danger btn-sm" onclick="deleteMakeupSchedule('${e.id}', '${studentId}')"><i class="fa-solid fa-trash"></i></button>
+      </div>
+    `).join('');
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function saveMakeupSchedule() {
+  const studentId = document.getElementById('makeupModalStudentId').value;
+  const originalClass = document.getElementById('makeupModalOriginalClass').value;
+  const stuckDay = document.getElementById('makeupModalStuckDay').value;
+  const makeupClass = document.getElementById('makeupModalTargetClass').value;
+  const makeupDay = document.getElementById('makeupModalTargetDay').value;
+  const type = document.getElementById('makeupModalType').value;
+  
+  try {
+    await api('/api/schedule-exceptions', {
+      method: 'POST',
+      body: JSON.stringify({ studentId, originalClass, stuckDay, makeupClass, makeupDay, type })
+    });
+    toast('Đã lưu lịch kẹt bù thành công!');
+    await reloadMakeupList(studentId);
+    renderRoster(); // re-render roster to show badges
+  } catch (error) {
+    toast('Lỗi khi lưu lịch bù: ' + error.message);
+  }
+}
+
+async function deleteMakeupSchedule(id, studentId) {
+  if (!confirm('Bạn có chắc chắn muốn xóa lịch bù này?')) return;
+  try {
+    await api(`/api/schedule-exceptions/${id}`, { method: 'DELETE' });
+    toast('Đã xóa lịch bù.');
+    await reloadMakeupList(studentId);
+    renderRoster(); // re-render roster to hide badges
+  } catch (error) {
+    toast('Lỗi khi xóa: ' + error.message);
+  }
+}
+
+// Compare Classes Logic
+$('#openCompareBtn')?.addEventListener('click', () => {
+    $('#compareModal').style.display = 'block';
+    const cbContainer = $('#compareClassCheckboxes');
+    if (cbContainer) {
+        cbContainer.innerHTML = state.classes.map(c => `
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; padding: 4px; background: white; border: 1px solid #e2e8f0; border-radius: 4px;">
+                <input type="checkbox" class="compare-class-cb" value="${escapeHtml(c)}" style="width: 16px; height: 16px; margin: 0; cursor: pointer;">
+                <span style="white-space: nowrap;">${escapeHtml(c)}</span>
+            </label>
+        `).join('');
+    }
+});
+
+$('#closeCompareModal')?.addEventListener('click', () => {
+    $('#compareModal').style.display = 'none';
+});
+
+$('#runCompareBtn')?.addEventListener('click', async () => {
+    const selected = $$('.compare-class-cb:checked').map(cb => cb.value);
+    if (selected.length === 0) return showToast("Vui lòng chọn ít nhất 1 lớp để so sánh.");
+    
+    const thead = $('#compareTableHeader');
+    const tbody = $('#compareTableBody');
+    
+    thead.innerHTML = `
+        <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1; text-align: center; color: #1e293b; font-weight: bold;">
+            <th style="padding: 12px; border-right: 1px solid #e2e8f0; width: 120px;">THÔNG SỐ</th>
+            ${selected.map(c => `<th style="padding: 12px; border-right: 1px solid #e2e8f0;">Lớp ${escapeHtml(c)}</th>`).join('')}
+        </tr>
+    `;
+    tbody.innerHTML = `<tr><td colspan="${selected.length + 1}" style="text-align: center; padding: 30px;">Đang tải dữ liệu...</td></tr>`;
+    
+    try {
+        let sessions = await api('/api/teaching-sessions');
+        const startDate = $('#logFilterStartDate')?.value; 
+        const endDate = $('#logFilterEndDate')?.value;
+        if (startDate) sessions = sessions.filter(s => s.startTime && s.startTime >= startDate);
+        if (endDate) {
+            const eDate = new Date(endDate);
+            eDate.setHours(23, 59, 59, 999);
+            sessions = sessions.filter(s => s.startTime && new Date(s.startTime) <= eDate);
+        }
+        
+        sessions = sessions.filter(s => selected.includes(s.className));
+        
+        const formatTeacherName = (name) => {
+            const m = name.match(/^(.*?)\\s*\\((Ca\\s*\\d+)\\)$/i);
+            if (m) return `${m[2]}: ${m[1]}`;
+            return `GV: ${name}`;
+        };
+
+        const renderCell = (sessionsArray) => {
+            if (!sessionsArray || sessionsArray.length === 0) return `<div style="color: #94a3b8; font-style: italic; text-align: center;">-</div>`;
+            return sessionsArray.map((s, index) => `
+                <div style="${index > 0 ? 'border-top: 1px dashed #cbd5e1; padding-top: 8px; margin-top: 8px;' : ''}">
+                  <div style="font-weight: bold; color: #1e293b; font-size: 13px; margin-bottom: 4px;">${escapeHtml(formatTeacherName(s.teacherName))}</div>
+                  <div style="color: #3b82f6; font-size: 13px; margin-bottom: 4px; line-height: 1.4;"><b>BH:</b> ${escapeHtml(s.lessonName)}</div>
+                  <div style="color: #ef4444; font-size: 13px; line-height: 1.4;"><b>BTL:</b> ${escapeHtml(s.exercises)}</div>
+                </div>
+            `).join('');
+        };
+        
+        const parts = [
+            { id: 'H1', name: 'PHẦN H1', color: '#ef4444' },
+            { id: 'Đ2', name: 'PHẦN Đ2', color: '#d97706' },
+            { id: 'H2', name: 'PHẦN H2', color: '#3b82f6' },
+            { id: 'H3', name: 'PHẦN H3', color: '#10b981' },
+            { id: 'Đ3', name: 'PHẦN Đ3', color: '#8b5cf6' },
+            { id: 'TH', name: 'PHẦN TH', color: '#0ea5e9' }
+        ];
+        
+        let html = '';
+        parts.forEach(part => {
+            html += `<tr style="border-bottom: 1px solid #e2e8f0;">`;
+            html += `<td style="padding: 12px; font-weight: bold; color: ${part.color}; text-align: center; border-right: 1px solid #e2e8f0; vertical-align: middle;">${part.name}</td>`;
+            
+            selected.forEach(c => {
+                const classSessions = sessions.filter(s => {
+                    let pk = (s.shift || '').toUpperCase().trim();
+                    if (pk === 'D2') pk = 'Đ2';
+                    if (pk === 'D3') pk = 'Đ3';
+                    if (!pk) pk = 'TH';
+                    return s.className === c && pk === part.id;
+                });
+                classSessions.sort((a,b) => new Date(b.startTime) - new Date(a.startTime));
+                html += `<td style="padding: 12px; border-right: 1px solid #e2e8f0; vertical-align: top;">${renderCell(classSessions)}</td>`;
+            });
+            html += `</tr>`;
+        });
+        tbody.innerHTML = html;
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="${selected.length + 1}" style="color: red; padding: 20px; text-align: center;">Lỗi: ${e.message}</td></tr>`;
+    }
+});

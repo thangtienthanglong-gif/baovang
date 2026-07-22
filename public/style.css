@@ -760,7 +760,7 @@ input[type="file"]::file-selector-button:hover {
 .student-card {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
+  grid-template-columns: minmax(0, 1fr) max-content;
   gap: 16px;
   align-items: center;
   min-height: 56px;

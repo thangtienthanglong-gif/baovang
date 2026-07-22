@@ -7,3 +7,5 @@ data/
 dist/
 *.log
 .vercel
+public/uploads/
+test*
