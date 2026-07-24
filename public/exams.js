@@ -1,11 +1,16 @@
-let currentExamClass = '';
-let currentExamName = '';
+function getCurrentlySelectedClass() {
+  const cd = document.getElementById('classDropdown');
+  if (cd && cd.value && cd.value !== 'ALL') return cd.value;
+  const fc = document.getElementById('filterClass');
+  if (fc && fc.value && fc.value !== 'ALL') return fc.value;
+  return 'ALL';
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   const openExamSelectBtn = document.getElementById('openExamSelectBtn');
   if (openExamSelectBtn) {
     openExamSelectBtn.addEventListener('click', () => {
-      const cls = document.getElementById('filterClass').value;
+      const cls = getCurrentlySelectedClass();
       if (!cls || cls === 'ALL') {
         toast('Vui lòng chọn một lớp trước.', 'warning');
         return;
@@ -51,8 +56,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const exportExamBtn = document.getElementById('exportExamBtn');
   if (exportExamBtn) {
     exportExamBtn.addEventListener('click', async () => {
-      const cls = document.getElementById('filterClass').value;
-      if (!cls) {
+      const cls = getCurrentlySelectedClass();
+      if (!cls || cls === 'ALL') {
         toast('Vui lòng chọn một lớp để xuất điểm.', 'warning');
         return;
       }
