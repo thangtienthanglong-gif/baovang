@@ -3572,7 +3572,9 @@ document.addEventListener('submit', async (e) => {
       document.getElementById('transferClassModal').style.display = 'none';
       document.getElementById('studentProfileDrawer')?.classList.remove('open');
       document.getElementById('studentDrawerBackdrop')?.classList.remove('show');
-      toast('Chuyển lớp thành công!', 'success');
+      
+      showTransferSuccessModal(student.fullName || student.name || 'Học sinh', student.className, newClass, teacherName);
+      
       renderClassDropdown();
       renderFilters();
       renderRoster();
@@ -3585,6 +3587,30 @@ document.addEventListener('submit', async (e) => {
     }
   }
 });
+
+function showTransferSuccessModal(studentName, fromClass, toClass, teacherName) {
+    const modal = document.getElementById('transferSuccessModal');
+    const detailEl = document.getElementById('transferSuccessDetail');
+    if (modal) {
+        if (modal.parentNode !== document.body) document.body.appendChild(modal);
+        modal.style.zIndex = '999999';
+        if (detailEl) {
+            detailEl.innerHTML = `
+                Học sinh: <strong>${escapeHtml(studentName)}</strong><br>
+                Từ lớp: <strong>${escapeHtml(fromClass)}</strong> ➔ <strong>${escapeHtml(toClass)}</strong><br>
+                Giáo viên thực hiện: <strong>${escapeHtml(teacherName || 'Chưa rõ')}</strong>
+            `;
+        }
+        modal.style.display = 'flex';
+    } else {
+        alert(`Chuyển lớp thành công cho ${studentName} (${fromClass} ➔ ${toClass})!`);
+    }
+}
+
+window.closeTransferSuccessModal = function() {
+    const modal = document.getElementById('transferSuccessModal');
+    if (modal) modal.style.display = 'none';
+};
 
 function openTransferClassModal(studentId) {
   const student = state.students.find(s => s.id === studentId);
