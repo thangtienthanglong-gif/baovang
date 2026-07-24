@@ -331,9 +331,9 @@ function renderFilters() {
   const currentClass = $('#filterClass')?.value || 'ALL';
   if ($('#filterClass')) {
     const optionsHtml = ['<option value="ALL">Tất cả lớp</option>'];
-    ['Sáng', 'Chiều', 'Tối', 'Khác'].forEach(session => {
+  ['Sáng', 'Chiều', 'Tối', 'Khác'].forEach(session => {
       if (sessionGroups[session].length > 0) {
-        optionsHtml.push(`<optgroup label="Buổi ${session}">`);
+      optionsHtml.push(`<optgroup label="Buổi ${session}">`);
         sessionGroups[session].forEach(className => {
           optionsHtml.push(`<option value="${escapeHtml(className)}">${escapeHtml(className)}</option>`);
         });
@@ -663,8 +663,8 @@ function renderCharts() {
 
 function statusClass(status) {
   return {
-    'Chưa gọi': 'pending',
-    'Đã gọi': 'called',
+    'Chưa gửi': 'pending',
+    'Đã gửi': 'called',
     'Không nghe máy': 'no-answer',
     'Hẹn gọi lại': 'callback',
     'Sai số': 'wrong',
@@ -1021,8 +1021,8 @@ async function loadTeachingLog() {
     const sortedSessions = [...sessions].sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
     sortedSessions.forEach(s => {
       let pk = (s.shift || '').toUpperCase().trim();
-      if (pk === 'D2') pk = 'Đ2';
-      if (pk === 'D3') pk = 'Đ3';
+                    if (pk === 'D2') pk = 'Đ2';
+                    if (pk === 'D3') pk = 'Đ3';
       if (partTeachers[pk] !== undefined && partTeachers[pk] === '') {
         partTeachers[pk] = formatTeacherName(s.teacherName);
       }
@@ -1256,7 +1256,7 @@ async function updateRosterStatus(select) {
         sendZalo: true
       })
     });
-    toast('Đã cập nhật trạng thái.' + queuedMessage(result));
+  toast('Đã cập nhật trạng thái.' + queuedMessage(result));
     await loadBootstrap();
     return;
   }
@@ -1487,7 +1487,7 @@ function renderManualSendChatCards(logs = []) {
     copyBtn.textContent = 'Copy tin';
     copyBtn.addEventListener('click', async () => {
       await navigator.clipboard.writeText(textarea.value || '');
-      toast('Đã copy nội dung tin nhắn.');
+          toast('Đã copy nội dung tin nhắn.');
     });
 
     const markBtn = document.createElement('button');
@@ -1500,7 +1500,7 @@ function renderManualSendChatCards(logs = []) {
         await api(`/api/absences/${card.dataset.absenceId}/zalo/manual-sent`, { method: 'POST', body: '{}' });
         card.dataset.done = 'true';
         markBtn.textContent = 'Đã cập nhật';
-        toast('Đã đánh dấu gửi qua Zalo cá nhân.');
+      toast('Đã đánh dấu gửi qua Zalo cá nhân.');
         await loadAbsences();
       } catch (error) {
         markBtn.disabled = false;
@@ -2221,7 +2221,7 @@ function initEvents() {
     if (event.target.classList.contains('copy-manual-message')) {
       const text = card.querySelector('textarea')?.value || '';
       await navigator.clipboard.writeText(text);
-      toast('Đã copy nội dung tin nhắn.');
+          toast('Đã copy nội dung tin nhắn.');
     }
 
     if (event.target.classList.contains('mark-manual-sent')) {
@@ -2241,10 +2241,10 @@ function initEvents() {
     btn.textContent = 'Đang xử lý...';
     try {
       await api(`/api/absences/${id}/zalo`, { method: 'POST', body: '{}' });
-      toast('Đã đưa vào tiến trình gửi Zalo.');
+          toast('Đã đưa vào tiến trình gửi Zalo.');
     } catch (err) {
       console.error(err);
-      toast('Lỗi khi gửi lại Zalo: ' + err.message);
+          toast('Lỗi khi gửi lại Zalo: ' + err.message);
     }
     await loadAbsences();
   });

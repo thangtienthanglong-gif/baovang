@@ -224,7 +224,7 @@ async function getBranchDb(req) {
       if (log.absenceId) {
         const absence = rootDb.branches[branchId].absences.find(a => a.id === log.absenceId);
         if (absence && absence.noticeStatus === 'Chờ gửi thủ công') {
-          absence.noticeStatus = 'Chưa kết bạn - Cần gọi';
+      absence.noticeStatus = 'Chưa kết bạn - Cần gọi';
         }
       }
     });
@@ -1882,7 +1882,7 @@ async function sendZaloNotice(db, absenceId, reason = 'auto') {
     const sender = [config.personalName, config.personalPhone].filter(Boolean).join(' - ') || 'Zalo cá nhân';
     return finish('Chạy thử', `Chạy thử ${sender}: đã ghi log nội dung tin nhắn, chưa gửi thật.`, {
       dryRun: true,
-      channel: 'Zalo cá nhân',
+        channel: 'Zalo cá nhân',
       sender
     });
   }
@@ -1900,14 +1900,14 @@ async function sendZaloNotice(db, absenceId, reason = 'auto') {
         }
         await runWindowsZaloPaste(message, link, imageBase64);
         return finish('Đã gửi', 'Đã tự động điều khiển Zalo cá nhân (AI gửi).', { 
-          channel: 'Zalo cá nhân', 
+        channel: 'Zalo cá nhân',
           sender, 
           phone, 
           link 
         });
       } catch (err) {
         return finish('Lỗi gửi', err.message || 'Lỗi khi mở Zalo cá nhân.', { 
-          channel: 'Zalo cá nhân', 
+        channel: 'Zalo cá nhân',
           sender, 
           phone, 
           link 
@@ -1917,7 +1917,7 @@ async function sendZaloNotice(db, absenceId, reason = 'auto') {
 
     return finish('Chờ gửi thủ công', `Đã tạo tin nhắn cho ${sender}. Mở Zalo cá nhân, gửi nội dung rồi đánh dấu đã gửi.`, {
       manual: true,
-      channel: 'Zalo cá nhân',
+        channel: 'Zalo cá nhân',
       sender,
       phone,
       link,
@@ -2342,7 +2342,7 @@ app.post('/api/evaluations', async (req, res, next) => {
     let warningTriggered = null;
     if (studentEvals.length >= 3) {
       const last3 = studentEvals.slice(0, 3);
-      const badStatuses = ['Sai hẳn', 'Kém (K)', 'Chép bài'];
+             const badStatuses = ['Sai hẳn', 'Kém (K)', 'Chép bài'];
       const isBad = last3.every(e => badStatuses.includes(e.status));
       const goodStatuses = ['Đúng', 'Tốt (T)'];
       const isGood = last3.every(e => goodStatuses.includes(e.status));
@@ -3190,7 +3190,7 @@ app.get('/api/absences/export-excused', async (req, res, next) => {
       'STT': index + 1,
       'Tên Học Sinh': row.studentName,
       'SĐT': row.phone1 || row.phone2,
-      'Lớp': row.className,
+        'Lớp': row.className,
       'Trạng thái': normalizeAbsenceStatus(row.absenceStatus),
       'Lý do vắng': row.initialReason || row.note || ''
     }));
@@ -4110,7 +4110,7 @@ if (require.main === module) {
 
 setInterval(() => {
   processDueNotices().catch(error => {
-    console.error('Không xử lý được hàng chờ Zalo:', error.message);
+  console.error('Không xử lý được hàng chờ Zalo:', error.message);
   });
 }, 30000);
 
