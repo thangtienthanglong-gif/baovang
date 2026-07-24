@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="vi">
 <head>
   <meta charset="utf-8">
@@ -53,9 +53,36 @@
       color: #0f172a !important;
       box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06) !important;
     }
+
+    /* Slide-out History Panel (Image 4) */
+    .panel-overlay {
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(0,0,0,0.4); z-index: 9999; display: none; opacity: 0; transition: 0.3s;
+    }
+    .panel-overlay.active { display: block; opacity: 1; }
+    
+    .history-panel {
+        position: fixed; top: 0; right: -440px; width: 400px; max-width: 92vw; height: 100vh;
+        background: white; z-index: 10000; box-shadow: -4px 0 20px rgba(0,0,0,0.18);
+        transition: 0.3s; display: flex; flex-direction: column;
+    }
+    .history-panel.active { right: 0; }
+    .panel-header { padding: 18px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;}
+    .panel-content { padding: 20px; overflow-y: auto; flex: 1; }
   </style>
   </head>
 <body>
+
+  <div class="panel-overlay" id="panelOverlay" onclick="closeHistoryPanel()"></div>
+  <div class="history-panel" id="historyPanel">
+      <div class="panel-header">
+          <h3 style="margin:0; font-size:18px; color:#1e293b;" id="panelTitle">Thông tin Học sinh</h3>
+          <button onclick="closeHistoryPanel()" style="background:none; border:none; font-size:24px; cursor:pointer; color:#64748b;">&times;</button>
+      </div>
+      <div class="panel-content" id="panelContent">
+          Đang tải dữ liệu...
+      </div>
+  </div>
 
   <div class="sidebar-backdrop" onclick="document.querySelector('.sidebar').classList.remove('open'); this.classList.remove('show');"></div>
   <div class="app-shell">
@@ -171,6 +198,15 @@
         </aside>
 
         <section class="roster-panel">
+          <div style="margin-bottom: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 14px 16px; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.02);">
+              <label style="display:block; font-weight:bold; color:#065f46; margin-bottom:8px; font-size:14px;">
+                  <i class="fa-solid fa-magnifying-glass" style="color:#10b981;"></i> Tra cứu học sinh & Báo phụ huynh nhanh:
+              </label>
+              <div style="position:relative;">
+                  <input type="text" id="quickStudentSearchMain" placeholder="Nhập tên, mã học sinh hoặc tên lớp để mở hồ sơ & báo PH..." oninput="onQuickSearchStudentMain(this.value)" style="width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; background:#fff;">
+                  <div id="quickSearchResultsMain" style="display:none; position:absolute; top:105%; left:0; width:100%; background:white; border:1px solid #cbd5e1; border-radius:8px; max-height:240px; overflow-y:auto; z-index:1000; box-shadow:0 10px 25px rgba(0,0,0,0.15);"></div>
+              </div>
+          </div>
           <section class="card roster-card">
             <div class="section-title inline-title">
               <div>
@@ -717,7 +753,8 @@
     <h2 id="drawerStudentName" style="margin: 0; line-height: 1.2; padding-right: 20px;">Tên học sinh</h2>
     <button class="drawer-close" id="closeStudentDrawer" type="button" aria-label="Đóng" style="margin-left: 0; margin-top: -5px;">&times;</button>
       </div>
-      <div style="display: flex; gap: 8px; align-items: center;">
+      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+      <button id="openNotifyParentBtn" type="button" style="padding: 6px 12px; font-size: 13px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;"><i class="fa-solid fa-phone-volume"></i> Đã báo PH</button>
       <button id="openMakeupBtn" type="button" style="padding: 6px 12px; font-size: 13px; background: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;"><i class="fa-solid fa-repeat"></i> Kẹt & Bù</button>
       <button id="openTransferClassBtn" type="button" style="padding: 6px 12px; font-size: 13px; background: #0d9488; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;"><i class="fa-solid fa-right-left"></i> Chuyển lớp</button>
       <button id="openEditStudentBtn" type="button" style="padding: 6px 12px; font-size: 13px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;"><i class="fa-solid fa-pen"></i> Sửa</button>
@@ -732,7 +769,14 @@
       </div>
 
       <div class="drawer-section">
-        <h3>Lịch sử gần đây</h3>
+        <h3>Lịch sử chuyển lớp</h3>
+        <div id="drawerTransferHistory" class="drawer-history-list">
+          <div class="empty muted">Chưa có lịch sử chuyển lớp.</div>
+        </div>
+      </div>
+
+      <div class="drawer-section">
+        <h3>Lịch sử vắng gần đây</h3>
         <div id="drawerAbsenceHistory" class="drawer-history-list">
           <div class="empty muted">Chưa tải lịch sử...</div>
         </div>
@@ -968,7 +1012,7 @@
     <h3 style="margin-top:0;">Chuyển lớp</h3>
     <form id="transferClassForm">
       <input type="hidden" id="transferStudentId">
-      <div style="margin-bottom: 15px;">Há»c sinh: <strong id="transferStudentName"></strong></div>
+      <div style="margin-bottom: 15px;">Học sinh: <strong id="transferStudentName"></strong></div>
       <div style="margin-bottom: 15px;">Lớp hiện tại: <strong id="transferCurrentClass"></strong></div>
       <div class="form-group" style="margin-bottom: 15px;">
         <label>Chuyển sang lớp</label>

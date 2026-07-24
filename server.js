@@ -2223,12 +2223,13 @@ app.post('/api/teaching-sessions', async (req, res, next) => {
       });
 
       if (existingSession) {
-        if (req.body.takeOver) {
+        const sameTeacher = (existingSession.teacherName || '').trim().toLowerCase() === newTeacherName.trim().toLowerCase();
+        if (sameTeacher || req.body.takeOver) {
           existingSession.teacherName = newTeacherName;
           existingSession.shift = req.body.shift || existingSession.shift;
           await writeDb(db);
           sessionLocks.delete(lockKey);
-          return res.json({ session: existingSession });
+          return res.json({ ok: true, session: existingSession });
         }
         sessionLocks.delete(lockKey);
         return res.status(400).json({ 

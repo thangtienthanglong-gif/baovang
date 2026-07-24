@@ -256,10 +256,80 @@
         return await res.json();
     }
 
+    function showCustomConfirm(message) {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('customConfirmModal');
+            const messageEl = document.getElementById('customConfirmMessage');
+            const btnOk = document.getElementById('customConfirmOk');
+            const btnCancel = document.getElementById('customConfirmCancel');
+
+            messageEl.textContent = message;
+            modal.style.display = 'flex';
+
+            const handleOk = () => {
+                cleanup();
+                resolve(true);
+            };
+
+            const handleCancel = () => {
+                cleanup();
+                resolve(false);
+            };
+
+            const cleanup = () => {
+                modal.style.display = 'none';
+                btnOk.removeEventListener('click', handleOk);
+                btnCancel.removeEventListener('click', handleCancel);
+            };
+
+            btnOk.addEventListener('click', handleOk);
+            btnCancel.addEventListener('click', handleCancel);
+        });
+    }
+
+    function showTeacherPromptModal() {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('teacherPromptModal');
+            const input = document.getElementById('teacherPromptInput');
+            const btnConfirm = document.getElementById('teacherPromptConfirm');
+            const btnCancel = document.getElementById('teacherPromptCancel');
+
+            input.value = localStorage.getItem('savedTransferTeacher') || '';
+            modal.style.display = 'flex';
+            setTimeout(() => input.focus(), 100);
+
+            const handleConfirm = () => {
+                const val = input.value.trim();
+                if (!val) {
+                    alert('Vui lòng nhập tên giáo viên!');
+                    return;
+                }
+                localStorage.setItem('savedTransferTeacher', val);
+                cleanup();
+                resolve(val);
+            };
+
+            const handleCancel = () => {
+                cleanup();
+                resolve(null);
+            };
+
+            const cleanup = () => {
+                modal.style.display = 'none';
+                btnConfirm.removeEventListener('click', handleConfirm);
+                btnCancel.removeEventListener('click', handleCancel);
+            };
+
+            btnConfirm.addEventListener('click', handleConfirm);
+            btnCancel.addEventListener('click', handleCancel);
+        });
+    }
+
     async function loadClasses() {
         try {
             const res = await apiRequest('/api/students');
-            const classNames = [...new Set(res.filter(s => s.status !== 'Nghỉ học').map(s => s.className).filter(c => c))].sort();
+            window.allStudentsList = res.filter(s => s.status !== 'Nghỉ học');
+            const classNames = [...new Set(window.allStudentsList.map(s => s.className).filter(c => c))].sort();
             const select = document.getElementById('className');
             if (classNames.length === 0) {
                 select.innerHTML = '<option value="">-- Chưa có lớp nào --</option>';
@@ -277,6 +347,35 @@
         } catch(e) {}
     }
     loadClasses();
+
+    function onQuickSearchStudent(query) {
+        const resultsContainer = document.getElementById('quickSearchResults');
+        const q = (query || '').trim().toLowerCase();
+        if (!q) {
+            resultsContainer.style.display = 'none';
+            return;
+        }
+        const matches = (window.allStudentsList || []).filter(s => 
+            (s.fullName || s.name || '').toLowerCase().includes(q) || 
+            (s.code || '').toLowerCase().includes(q) || 
+            (s.className || '').toLowerCase().includes(q)
+        ).slice(0, 10);
+
+        if (matches.length === 0) {
+            resultsContainer.innerHTML = '<div style="padding:10px; color:#94a3b8; font-style:italic; font-size:13px;">Không tìm thấy học sinh.</div>';
+        } else {
+            resultsContainer.innerHTML = matches.map(s => `
+                <div onclick="openHistoryPanel('${s.id}'); document.getElementById('quickSearchResults').style.display='none';" style="padding:10px 12px; border-bottom:1px solid #f1f5f9; cursor:pointer; font-size:13px; display:flex; justify-content:space-between; align-items:center;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+                    <div>
+                        <strong style="color:#1e293b;">${s.fullName || s.name}</strong> 
+                        <span style="color:#64748b; font-size:12px;">(${s.code || 'N/A'})</span>
+                    </div>
+                    <span style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:4px; font-weight:bold; font-size:11px;">Lớp ${s.className || 'N/A'}</span>
+                </div>
+            `).join('');
+        }
+        resultsContainer.style.display = 'block';
+    }
 
     async function startShift() {
         currentShift = document.getElementById('shiftName').value; // Ca 1
@@ -755,20 +854,26 @@
         document.getElementById('panelContent').innerHTML = '<div style="text-align:center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải...</div>';
         
         try {
-            const res = await apiRequest(`/api/ketbu/students/${studentId}/history`);
+            const [res, transfers] = await Promise.all([
+                apiRequest(`/api/ketbu/students/${studentId}/history`),
+                apiRequest(`/api/students/${studentId}/transfer`).catch(() => [])
+            ]);
             const st = res.student || {};
             const cachedSt = studentData.find(s => s.id === studentId) || {};
             
-            
-            // Lọc ra các đánh giá từ mốc "Đã báo phụ huynh" gần nhất
-            let relevantHistory = res.history || [];
-            const checkPartsForHistory = ['H1', 'H2'].includes(currentPart) ? ['H1', 'H2'] : [currentPart];
-            const partHistory = relevantHistory.filter(h => checkPartsForHistory.includes(h.part));
-            const lastNotifiedIdx = partHistory.findIndex(h => h.status === 'Đã báo phụ huynh');
+            // Lọc ra các đánh giá từ mốc "Đã báo phụ huynh" gần nhất (Nếu mốc <= 30 ngày)
+            let allHistory = res.history || [];
+            const lastNotifiedIdx = allHistory.findIndex(h => h.status === 'Đã báo phụ huynh');
+            let relevantHistory = allHistory;
             if (lastNotifiedIdx !== -1) {
-                relevantHistory = partHistory.slice(0, lastNotifiedIdx);
-            } else {
-                relevantHistory = partHistory;
+                const notifDate = new Date(allHistory[lastNotifiedIdx].date);
+                const now = new Date();
+                const daysDiff = (now - notifDate) / (1000 * 60 * 60 * 24);
+                // Nếu mốc báo phụ huynh dưới 30 ngày (1 tháng), chỉ tính các đánh giá sau mốc đó!
+                // Nếu đã quá 30 ngày (1 tháng), hệ thống tự động reset mốc để tính cảnh báo mới!
+                if (daysDiff <= 30) {
+                    relevantHistory = allHistory.slice(0, lastNotifiedIdx);
+                }
             }
 
             let warningBanner = '';
@@ -805,8 +910,7 @@
                         }
                     }
                 }
-                const btnHtml = `<button onclick="markAsNotified('${studentId}')" style="margin-top:8px; background:#ef4444; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer;"><i class="fa-solid fa-check"></i> Đã báo phụ huynh</button>`;
-                warningBanner = `<div style="background:#fef2f2; border-left:4px solid #ef4444; padding:10px; margin-bottom:15px; border-radius:4px;"><strong style="color:#b91c1c;">${title}:</strong> <br><span style="font-size:13px; color:#7f1d1d;">${reason}. ${suggestion}</span><br>${btnHtml}</div>`;
+                warningBanner = `<div style="background:#fef2f2; border-left:4px solid #ef4444; padding:12px; margin-top:15px; margin-bottom:15px; border-radius:6px;"><strong style="color:#b91c1c;">${title}:</strong> <br><span style="font-size:13px; color:#7f1d1d;">${reason}. ${suggestion}</span></div>`;
             } else if (cachedSt.trend_status === 'up') {
                 const checkParts = ['H1', 'H2'].includes(currentPart) ? ['H1', 'H2'] : [currentPart];
                 const goodEvals = relevantHistory.filter(h => checkParts.includes(h.part) && ['Đúng', 'Tốt (T)'].includes(h.status)).slice(0,3);
@@ -829,16 +933,74 @@
                     const locText = topLoc ? `ở [${topLoc}] ` : '';
                     reason = `Học sinh liên tục đạt ${topStatus} ${locText}nhiều lần`;
                 }
-                warningBanner = `<div style="background:#f0fdf4; border-left:4px solid #10b981; padding:10px; margin-bottom:15px; border-radius:4px;"><strong style="color:#047857;">🏆 KHEN THƯỞNG THĂNG LỚP (Phần ${checkParts.join(' & ')}):</strong> <br><span style="font-size:13px; color:#065f46;">${reason}. Đề nghị quản lý xem xét thăng lớp.</span></div>`;
+                warningBanner = `<div style="background:#f0fdf4; border-left:4px solid #10b981; padding:12px; margin-top:15px; margin-bottom:15px; border-radius:6px;"><strong style="color:#047857;">🏆 KHEN THƯỞNG THĂNG LỚP (Phần ${checkParts.join(' & ')}):</strong> <br><span style="font-size:13px; color:#065f46;">${reason}. Đề nghị quản lý xem xét thăng lớp.</span></div>`;
             }
             
+            // Find "Đã báo phụ huynh" milestone
+            const notifiedObj = (res.history || []).find(h => h.status === 'Đã báo phụ huynh');
+            let notifiedDate = null;
+            let notifiedDateStr = '';
+            let notifiedTeacher = '';
+            if (notifiedObj) {
+                if (notifiedObj.date) {
+                    notifiedDate = new Date(notifiedObj.date);
+                    notifiedDateStr = notifiedDate.toLocaleDateString('vi-VN');
+                }
+                if (notifiedObj.lessonName && notifiedObj.lessonName.trim()) {
+                    notifiedTeacher = notifiedObj.lessonName.trim();
+                } else if (notifiedObj.teacher && notifiedObj.teacher.trim()) {
+                    notifiedTeacher = 'GV: ' + notifiedObj.teacher.trim();
+                } else {
+                    const savedTeacher = localStorage.getItem('savedTransferTeacher') || localStorage.getItem('savedTeacherName');
+                    if (savedTeacher) notifiedTeacher = 'GV: ' + savedTeacher.trim();
+                }
+            }
+
+            // Split transfers into active and collapsed
+            let activeTransfers = transfers || [];
+            let collapsedTransfers = [];
+            if (notifiedDate) {
+                activeTransfers = (transfers || []).filter(t => new Date(t.date) > notifiedDate);
+                collapsedTransfers = (transfers || []).filter(t => new Date(t.date) <= notifiedDate);
+            }
+
+            let transferHtml = '';
+            if (activeTransfers.length > 0) {
+                transferHtml = `
+                    <div style="margin-top: 15px; margin-bottom: 15px;">
+                        <div style="font-size:12px; color:#0d9488; font-weight:bold; margin-bottom:8px; text-transform:uppercase;"><i class="fa-solid fa-right-left"></i> LỊCH SỬ CHUYỂN LỚP</div>
+                        ${activeTransfers.map(h => `
+                            <div style="margin-bottom: 8px; padding: 10px; background: #f0fdf4; border-radius: 8px; border-left: 4px solid #0d9488;">
+                                <div style="font-size: 14px; font-weight: bold; color: #1e293b;">
+                                    Từ <strong>${h.fromClass}</strong> ➔ <strong>${h.toClass}</strong>
+                                </div>
+                                <div style="font-size: 12px; color: #64748b; margin-top: 4px;">
+                                    Ngày ${h.date} - GV: ${h.teacher || 'Không rõ'}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
             let html = `
                 <div style="margin-bottom: 20px;">
-                    <h4 style="margin:0 0 5px 0; font-size:22px; color:#1e293b;">${st.name || st.fullName || 'Chưa rõ tên'}</h4>
-                    <div style="font-size:13px; color:#64748b; margin-bottom: 15px;">
-                        Mã HS: <b>${st.code || 'N/A'}</b> | Lớp: <b>${st.className || 'N/A'}</b>
+                    <div style="margin-bottom:12px;">
+                        <h4 style="margin:0 0 5px 0; font-size:22px; color:#1e293b;">${st.name || st.fullName || 'Chưa rõ tên'}</h4>
+                        <div style="font-size:13px; color:#64748b;">
+                            Mã HS: <b>${st.code || 'N/A'}</b> | Lớp: <b>${st.className || 'N/A'}</b>
+                        </div>
                     </div>
                     
+                    <div style="font-size:12px; color:#94a3b8; font-weight:bold; margin-bottom:8px; text-transform:uppercase;">THÔNG TIN CHUNG</div>
+                    <div style="display:flex; justify-content:space-between; font-size:14px; margin-bottom:6px;">
+                        <span style="color:#64748b;">Số điện thoại:</span>
+                        <span style="font-weight:bold; color:#1e293b;">${st.phone1 || 'Chưa có'}</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:14px; margin-bottom:15px;">
+                        <span style="color:#64748b;">Trường chính:</span>
+                        <span style="font-weight:bold; color:#1e293b;">${st.parentName || 'Chưa có'}</span>
+                    </div>
 
                     ${(function(){
                         if (!res.exams || res.exams.length === 0) return '';
@@ -861,22 +1023,39 @@
                     })()}
 
                     ${warningBanner}
-                    
-                    <div style="font-size:12px; color:#94a3b8; font-weight:bold; margin-bottom:8px; text-transform:uppercase;">THÔNG TIN CHUNG</div>
-                    <div style="display:flex; justify-content:space-between; font-size:14px; margin-bottom:6px;">
-                        <span style="color:#64748b;">Số điện thoại:</span>
-                        <span style="font-weight:bold; color:#1e293b;">${st.phone1 || 'Chưa có'}</span>
+
+                    <div style="margin-top: 15px; margin-bottom: 15px;">
+                        <button onclick="markAsNotified('${studentId}')" style="width:100%; background:#10b981; color:white; border:none; padding:10px 14px; border-radius:8px; font-size:13px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow: 0 2px 6px rgba(16,185,129,0.25);">
+                            <i class="fa-solid fa-phone-volume"></i> Ghi nhận Đã báo / Trao đổi với Phụ huynh
+                        </button>
                     </div>
-                    <div style="display:flex; justify-content:space-between; font-size:14px; margin-bottom:6px;">
-                        <span style="color:#64748b;">Trường chính:</span>
-                        <span style="font-weight:bold; color:#1e293b;">${st.parentName || 'Chưa có'}</span>
-                    </div>
+
+                    ${transferHtml}
                 </div>
             `;
             
-            if (res.absences && res.absences.length > 0) {
+            // Split absences into active and collapsed
+            let activeAbsences = res.absences || [];
+            let collapsedAbsences = [];
+            if (notifiedDate) {
+                activeAbsences = (res.absences || []).filter(a => new Date(a.date) > notifiedDate);
+                collapsedAbsences = (res.absences || []).filter(a => new Date(a.date) <= notifiedDate);
+            }
+
+            // Split history into active and collapsed
+            let activeHistory = res.history || [];
+            let collapsedHistory = [];
+            if (notifiedObj) {
+                const notifiedIndex = res.history.findIndex(h => h.status === 'Đã báo phụ huynh');
+                if (notifiedIndex !== -1) {
+                    activeHistory = res.history.slice(0, notifiedIndex);
+                    collapsedHistory = res.history.slice(notifiedIndex);
+                }
+            }
+
+            if (activeAbsences.length > 0) {
                 html += `<h4 style="margin-bottom:10px; color:#ef4444; font-size:14px;"><i class="fa-solid fa-triangle-exclamation"></i> Lịch sử gần đây (Chuyên cần)</h4>`;
-                html += res.absences.slice(0,5).map(a => {
+                html += activeAbsences.slice(0,5).map(a => {
                     const evLink = a.evidenceUrl ? `<a href="${a.evidenceUrl}" target="_blank" style="margin-left:8px; font-size:12px; color:#3b82f6; text-decoration: none;"><i class="fa-solid fa-image"></i> Ảnh</a>` : '';
                     return `
                     <div class="history-item" style="padding: 10px; margin-bottom: 8px; border: 1px solid #fee2e2; border-radius: 6px; background: #fef2f2;">
@@ -890,24 +1069,17 @@
                 `}).join('');
             }
             
-            
-            html += `<h4 style="margin: 20px 0 10px 0; color:#3b82f6; font-size:15px;"><i class="fa-solid fa-clock-rotate-left"></i> Lịch sử đánh giá</h4>`;
-            
-            if (!res.history || res.history.length === 0) {
-                html += `<div style="font-size:13px; color:#94a3b8; font-style:italic;">Chưa có dữ liệu đánh giá.</div>`;
-            } else {
-                // Group history by date
+            function renderHistoryGroup(items) {
                 const grouped = {};
-                res.history.forEach(h => {
+                items.forEach(h => {
                     const d = h.date || 'Không rõ ngày';
                     if (!grouped[d]) grouped[d] = [];
                     grouped[d].push(h);
                 });
-                
+                let gHtml = '';
                 for (const dateKey in grouped) {
                     const dateStr = dateKey !== 'Không rõ ngày' ? new Date(dateKey).toLocaleDateString('vi-VN', {day:'2-digit', month:'2-digit', year:'numeric'}) : dateKey;
-                    
-                    html += `<div style="margin-top: 15px; margin-bottom: 10px; font-weight:bold; font-size: 15px; color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px;">Ngày ${dateStr}</div>`;
+                    gHtml += `<div style="margin-top: 12px; margin-bottom: 8px; font-weight:bold; font-size: 14px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">Ngày ${dateStr}</div>`;
                     
                     const deduplicated = {};
                     grouped[dateKey].forEach(h => {
@@ -915,28 +1087,102 @@
                         if(!deduplicated[key]) deduplicated[key] = {...h, count: 1};
                         else deduplicated[key].count++;
                     });
-                    
-                    html += Object.values(deduplicated).map(h => {
+
+                    gHtml += Object.values(deduplicated).map(h => {
                         let displayStatus = h.status;
                         if (h.location === 'Khảo Bài') {
                             if (displayStatus === 'Kém (K)') displayStatus = 'Không thuộc';
                             if (displayStatus === 'Tốt (T)') displayStatus = 'Thuộc';
                         }
                         let statusHtml = displayStatus;
-                        if(h.status.includes('Sai') || h.status.includes('Kém') || h.status.includes('Chép')) statusHtml = `<span style="color:#ef4444; font-weight:bold;">${displayStatus}</span>`;
-                        if(h.status.includes('Đúng') || h.status.includes('Tốt')) statusHtml = `<span style="color:#10b981; font-weight:bold;">${displayStatus}</span>`;
+                        if (h.status === 'Đã báo phụ huynh') {
+                            const tStr = h.lessonName || h.teacher || localStorage.getItem('savedTransferTeacher') || '';
+                            const teacherStr = tStr ? ` - ${tStr.startsWith('GV:') ? tStr : 'GV: ' + tStr}` : '';
+                            statusHtml = `<span style="background:#10b981; color:white; padding:2px 8px; border-radius:4px; font-weight:bold; font-size:12px;"><i class="fa-solid fa-check-double"></i> Đã báo phụ huynh (${dateStr}${teacherStr})</span>`;
+                        } else if (h.status.includes('Sai') || h.status.includes('Kém') || h.status.includes('Chép')) {
+                            statusHtml = `<span style="color:#ef4444; font-weight:bold;">${displayStatus}</span>`;
+                        } else if (h.status.includes('Đúng') || h.status.includes('Tốt')) {
+                            statusHtml = `<span style="color:#10b981; font-weight:bold;">${displayStatus}</span>`;
+                        }
                         
                         const countText = h.count > 1 ? ` <span style="color:#ef4444; font-weight:bold;">(x${h.count})</span>` : '';
-                        const lessonName = h.lessonName ? ` <span style="color:#94a3b8; font-weight:normal;">(${h.lessonName})</span>` : '';
+                        const lessonName = h.lessonName && h.status !== 'Đã báo phụ huynh' ? ` <span style="color:#94a3b8; font-weight:normal;">(${h.lessonName})</span>` : '';
                         const locText = h.location ? `[${h.location}] ` : '';
                         const evLink = h.evidenceUrl ? `<a href="${h.evidenceUrl}" target="_blank" style="margin-left:8px; font-size:12px; color:#3b82f6; text-decoration: none;"><i class="fa-solid fa-image"></i> Ảnh</a>` : '';
                         
                         return `
-                        <div class="history-item" style="padding: 12px; margin-bottom: 8px; border: 1px solid #e2e8f0; border-radius: 6px; background: white; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                            <div class="history-title" style="font-size: 14px; color: #1e293b;">${locText}<b>${h.part}</b>: ${statusHtml}${countText}${lessonName}${evLink}</div>
+                        <div class="history-item" style="padding: 10px 12px; margin-bottom: 6px; border: 1px solid #e2e8f0; border-radius: 6px; background: white; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+                            <div class="history-title" style="font-size: 13px; color: #1e293b;">${locText}<b>${h.part}</b>: ${statusHtml}${countText}${lessonName}${evLink}</div>
                         </div>`;
                     }).join('');
                 }
+                return gHtml;
+            }
+
+            html += `<h4 style="margin: 20px 0 10px 0; color:#3b82f6; font-size:15px;"><i class="fa-solid fa-clock-rotate-left"></i> Lịch sử đánh giá</h4>`;
+            
+            if (activeHistory.length > 0) {
+                html += renderHistoryGroup(activeHistory);
+            } else if (collapsedHistory.length > 0 || collapsedAbsences.length > 0 || collapsedTransfers.length > 0) {
+                html += `<div style="font-size:13px; color:#10b981; font-style:italic; margin-bottom:10px;"><i class="fa-solid fa-circle-check"></i> Học sinh chưa có diễn biến mới từ sau mốc báo phụ huynh (${notifiedDateStr}).</div>`;
+            } else {
+                html += `<div style="font-size:13px; color:#94a3b8; font-style:italic;">Chưa có dữ liệu đánh giá.</div>`;
+            }
+
+            const totalCollapsedCount = collapsedTransfers.length + collapsedAbsences.length + collapsedHistory.length;
+            if (totalCollapsedCount > 0) {
+                const collapsedId = 'collapsedHistory_' + Date.now();
+                let collapsedContentHtml = '';
+                
+                if (collapsedTransfers.length > 0) {
+                    collapsedContentHtml += `<div style="font-size:13px; font-weight:bold; color:#0d9488; margin-bottom:6px;"><i class="fa-solid fa-right-left"></i> Chuyển lớp cũ (${collapsedTransfers.length})</div>`;
+                    collapsedContentHtml += collapsedTransfers.map(h => `
+                        <div style="margin-bottom: 6px; padding: 8px 10px; background: #f0fdf4; border-radius: 6px; border-left: 3px solid #0d9488;">
+                            <div style="font-size: 13px; font-weight: bold; color: #1e293b;">
+                                Từ <strong>${h.fromClass}</strong> ➔ <strong>${h.toClass}</strong>
+                            </div>
+                            <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
+                                Ngày ${h.date} - GV: ${h.teacher || 'Không rõ'}
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                if (collapsedAbsences.length > 0) {
+                    collapsedContentHtml += `<div style="font-size:13px; font-weight:bold; color:#ef4444; margin-top:12px; margin-bottom:6px;"><i class="fa-solid fa-triangle-exclamation"></i> Chuyên cần cũ (${collapsedAbsences.length})</div>`;
+                    collapsedContentHtml += collapsedAbsences.map(a => {
+                        const evLink = a.evidenceUrl ? `<a href="${a.evidenceUrl}" target="_blank" style="margin-left:8px; font-size:12px; color:#3b82f6; text-decoration: none;"><i class="fa-solid fa-image"></i> Ảnh</a>` : '';
+                        return `
+                        <div class="history-item" style="padding: 8px 10px; margin-bottom: 6px; border: 1px solid #fee2e2; border-radius: 6px; background: #fef2f2;">
+                            <div class="history-date" style="color: #991b1b; font-weight:bold; font-size:12px;">${new Date(a.date).toLocaleDateString('vi-VN')}</div>
+                            <div class="history-title" style="color: #991b1b; font-size:12px;">Trạng thái: ${
+                                ((a.absenceStatus === 'Về sớm' || a.absenceStatus === 'Đi trễ') && a.initialReason && (a.initialReason.startsWith('Về sớm lúc') || a.initialReason.startsWith('Đi trễ lúc'))) 
+                                ? `<b>${a.initialReason}</b>` 
+                                : `<b>${a.absenceStatus || 'Không rõ'}</b>${(a.initialReason && a.initialReason !== a.absenceStatus) ? ' (' + a.initialReason + ')' : ''}`
+                            }${evLink}</div>
+                        </div>`;
+                    }).join('');
+                }
+                
+                if (collapsedHistory.length > 0) {
+                    collapsedContentHtml += `<div style="font-size:13px; font-weight:bold; color:#3b82f6; margin-top:12px; margin-bottom:6px;"><i class="fa-solid fa-clock-rotate-left"></i> Đánh giá học tập cũ (${collapsedHistory.length})</div>`;
+                    collapsedContentHtml += renderHistoryGroup(collapsedHistory);
+                }
+
+                let notifiedTeacherInfo = notifiedTeacher ? ` - ${notifiedTeacher}` : '';
+                const accordionTitle = `Đã báo phụ huynh (${notifiedDateStr || 'Đã lưu'}${notifiedTeacherInfo}) - Thu gọn ${totalCollapsedCount} mục`;
+
+                html += `
+                    <div style="margin-top: 20px; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; background: #f8fafc;">
+                        <button type="button" onclick="const el=document.getElementById('${collapsedId}'); const icon=document.getElementById('${collapsedId}_icon'); if(el.style.display==='none'){el.style.display='block'; icon.className='fa-solid fa-chevron-up';}else{el.style.display='none'; icon.className='fa-solid fa-chevron-down';}" style="width:100%; text-align:left; padding: 10px 14px; background: #e2e8f0; border:none; cursor:pointer; font-weight:bold; font-size:13px; color:#334155; display:flex; justify-content:space-between; align-items:center;">
+                            <span><i class="fa-solid fa-box-archive" style="color:#0d9488; margin-right:6px;"></i> ${accordionTitle}</span>
+                            <i id="${collapsedId}_icon" class="fa-solid fa-chevron-down"></i>
+                        </button>
+                        <div id="${collapsedId}" style="display:none; padding: 12px; background: #fff;">
+                            ${collapsedContentHtml}
+                        </div>
+                    </div>
+                `;
             }
             
             document.getElementById('panelContent').innerHTML = html;
@@ -947,7 +1193,8 @@
 
     
     async function markAsNotified(studentId) {
-        if (!confirm('Đánh dấu là đã báo phụ huynh? Hành động này sẽ tạo một mốc lịch sử và xóa cảnh báo hiện tại.')) return;
+        const teacherName = await showTeacherPromptModal();
+        if (!teacherName) return;
         try {
             const evUrl = window.studentEvidenceUrls ? window.studentEvidenceUrls[studentId] : '';
             await apiRequest('/api/evaluations', 'POST', {
@@ -956,14 +1203,14 @@
                 location: 'Hệ thống',
                 status: 'Đã báo phụ huynh',
                 part: 'Thông báo',
+                lessonName: 'GV: ' + teacherName,
                 evidenceUrl: evUrl || ''
             });
-            showToast('Đã lưu mốc lịch sử thành công!');
-            // Reload the history panel
-            setTimeout(() => openHistoryPanel(studentId), 500);
+            showToast('Đã lưu mốc báo phụ huynh (GV: ' + teacherName + ') & thu gọn lịch sử!', 'success');
+            setTimeout(() => openHistoryPanel(studentId), 300);
         } catch(e) {
             console.error(e);
-            showToast('Lỗi: ' + e.message);
+            showToast('Lỗi: ' + e.message, 'error');
         }
     }
 
@@ -982,7 +1229,8 @@
         }
         
         await updateLessonInfo();
-        if(confirm("Bạn có chắc chắn muốn kết thúc ca dạy này?")) {
+        const confirmOk = await showCustomConfirm("Bạn có chắc chắn muốn kết thúc ca dạy này?");
+        if(confirmOk) {
             location.reload();
         }
     }
@@ -995,7 +1243,9 @@
         if (!container) return;
         const toast = document.createElement('div');
         toast.className = 'toast ' + type;
-        toast.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="color:#ef4444; font-size:24px;"></i> <span>${message}</span>`;
+        const iconClass = type === 'success' ? 'fa-circle-check' : 'fa-triangle-exclamation';
+        const iconColor = type === 'success' ? '#10b981' : '#ef4444';
+        toast.innerHTML = `<i class="fa-solid ${iconClass}" style="color:${iconColor}; font-size:24px;"></i> <span>${message}</span>`;
         container.appendChild(toast);
         setTimeout(() => toast.classList.add('show'), 10);
         setTimeout(() => {
@@ -1016,38 +1266,35 @@
     </div>
 </div>
 
-<script>
-function showCustomConfirm(message) {
-    return new Promise((resolve) => {
-        const modal = document.getElementById('customConfirmModal');
-        const messageEl = document.getElementById('customConfirmMessage');
-        const btnOk = document.getElementById('customConfirmOk');
-        const btnCancel = document.getElementById('customConfirmCancel');
+<div id="teacherPromptModal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; justify-content:center; align-items:center;">
+    <div style="background:#fff; padding:24px; border-radius:12px; width:400px; max-width:90%; box-shadow: 0 10px 25px rgba(0,0,0,0.2); font-family: sans-serif; color:#0f172a;">
+        <h3 style="margin-top:0; font-size:18px; color:#1e293b; display:flex; align-items:center; gap:8px;">
+            <i class="fa-solid fa-phone-volume" style="color:#10b981;"></i> Đã trao đổi với Phụ huynh
+        </h3>
+        <p style="margin-bottom:15px; font-size:13px; color:#64748b; line-height:1.5;">
+            Hệ thống sẽ ghi nhận mốc hôm nay, xóa cảnh báo hiện tại và thu gọn toàn bộ lịch sử cũ.
+        </p>
+        <div style="margin-bottom:20px;">
+            <label style="display:block; font-size:13px; font-weight:bold; color:#334155; margin-bottom:6px;">Tên giáo viên thực hiện báo (Sẽ lưu hệ thống):</label>
+            <input type="text" id="teacherPromptInput" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px;" placeholder="VD: Thầy Vũ / Cô Trang">
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+            <button id="teacherPromptCancel" class="btn" style="background:#f1f5f9; color:#475569; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:600;">Hủy</button>
+            <button id="teacherPromptConfirm" class="btn" style="background:#10b981; color:#fff; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:600;">Xác nhận</button>
+        </div>
+    </div>
+</div>
 
-        messageEl.textContent = message;
-        modal.style.display = 'flex';
-
-        const handleOk = () => {
-            cleanup();
-            resolve(true);
-        };
-
-        const handleCancel = () => {
-            cleanup();
-            resolve(false);
-        };
-
-        const cleanup = () => {
-            modal.style.display = 'none';
-            btnOk.removeEventListener('click', handleOk);
-            btnCancel.removeEventListener('click', handleCancel);
-        };
-
-        btnOk.addEventListener('click', handleOk);
-        btnCancel.addEventListener('click', handleCancel);
-    });
-}
-</script>
+<div id="customConfirmModal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; justify-content:center; align-items:center;">
+    <div style="background:#fff; padding:24px; border-radius:12px; width:400px; max-width:90%; box-shadow: 0 10px 25px rgba(0,0,0,0.2); font-family: sans-serif; color:#0f172a;">
+        <h3 style="margin-top:0; font-size:18px; color:#1e293b;">Thông báo từ hệ thống</h3>
+        <p id="customConfirmMessage" style="margin-bottom:24px; font-size:15px; line-height:1.5; white-space: pre-wrap;"></p>
+        <div style="display:flex; justify-content:flex-end; gap:12px;">
+            <button id="customConfirmCancel" class="btn" style="background:#f1f5f9; color:#475569; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-weight:600; font-size: 14px;">Hủy</button>
+            <button id="customConfirmOk" class="btn" style="background:#3b82f6; color:#fff; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-weight:600; font-size: 14px;">OK</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
 
