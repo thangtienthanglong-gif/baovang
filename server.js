@@ -2019,27 +2019,39 @@ function parseContactsWorkbook(buffer) {
   const rows = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName], { defval: '', raw: false });
 
   return rows.flatMap((row, index) => {
-    const notesColumn = String(getCell(row, ['Notes', 'Ghi chú', 'Labels', 'Custom Field 1 - Value']) || '');
-    const rawClassName = String(getCell(row, ['Lop', 'Lớp', 'Class', 'Class Name', 'Name Prefix']) || '');
+    const notesColumn = String(getCell(row, ['Notes', 'Ghi chú', 'Labels', 'Custom Field 1 - Value', 'Custom Field 2 - Value', 'Nhóm', 'Group', 'Categories', 'Tag', 'Tags', 'GhiChu']) || '');
+    const rawClassName = String(getCell(row, ['Lop', 'Lớp', 'Class', 'Class Name', 'Name Prefix', 'Mã lớp', 'MaLop', 'Lớp học', 'LopHoc', 'Lớp ĐK', 'Lớp đăng ký', 'Môn', 'Môn học', 'Lớp HP', 'LopHP', 'Phòng', 'Phong']) || '');
     
-    let classes = notesColumn.split(',').map(c => cleanText(c.replace(/\*/g, ''))).filter(Boolean);
-    if (!classes.length && rawClassName) {
-      classes = rawClassName.split(',').map(c => cleanText(c.replace(/\*/g, ''))).filter(Boolean);
+    const cleanClass = (str) => cleanText(String(str || '').replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').replace(/\*/g, ''));
+    const parseStr = (str) => !str ? [] : String(str).split(/[,;\n\/&+]|\bva\b|\bvà\b/i).map(cleanClass).filter(Boolean);
+
+    let classes = parseStr(notesColumn);
+    if (!classes.length) {
+      classes = parseStr(rawClassName);
+    } else if (rawClassName) {
+      classes = [...new Set([...classes, ...parseStr(rawClassName)])];
     }
     if (!classes.length) classes.push('');
 
     const first = cleanText(getCell(row, ['First Name', 'Tên', 'Ten']));
     const middle = cleanText(getCell(row, ['Middle Name', 'Tên đệm', 'Ten dem']));
     const last = cleanText(getCell(row, ['Last Name', 'Họ', 'Ho']));
-    const display = cleanText(getCell(row, ['HoTen', 'Họ tên', 'Full Name', 'Name', 'File As']));
+    const display = cleanText(getCell(row, ['HoTen', 'Họ tên', 'Full Name', 'Name', 'File As', 'Tên học sinh', 'TenHocSinh', 'Họ và tên', 'Học sinh']));
     const fullName = display || [first, middle, last].filter(Boolean).join(' ');
-    const phones = extractPhones(
-      getCell(row, ['SDT', 'SĐT', 'DienThoai', 'Điện thoại', 'Phone', 'Phone 1 - Value', 'Phone 1 - Label']),
-      getCell(row, ['Phone 2 - Value', 'Phone 2 - Label', 'SDT2', 'SĐT2']),
-      getCell(row, ['Phone 3 - Value', 'Phone 3 - Label'])
+    let phones = extractPhones(
+      getCell(row, ['SDT', 'SĐT', 'DienThoai', 'Điện thoại', 'Phone', 'Phone 1 - Value', 'Phone 1 - Label', 'Phone 1', 'Phone1', 'Mobile', 'Cell', 'Số điện thoại', 'Số ĐT', 'SoDT', 'SDT PH', 'SĐT PH', 'SDT Phụ Huynh', 'SĐT Phụ huynh', 'Tel']),
+      getCell(row, ['Phone 2 - Value', 'Phone 2 - Label', 'SDT2', 'SĐT2', 'Phone 2']),
+      getCell(row, ['Phone 3 - Value', 'Phone 3 - Label', 'SDT3', 'SĐT3', 'Phone 3'])
     );
+    if (!phones.length) {
+      Object.values(row).forEach(val => {
+        const found = extractPhones(val);
+        found.forEach(p => { if (!phones.includes(p)) phones.push(p); });
+      });
+    }
+
     const parentName = cleanText(getCell(row, ['PhuHuynh', 'Phụ huynh', 'Parent', 'Parent Name', 'Name Suffix'])) || 'Phụ huynh';
-    const sourceTags = cleanText(getCell(row, ['Notes', 'Ghi chú', 'Labels', 'Custom Field 1 - Value']));
+    const sourceTags = cleanText(getCell(row, ['Notes', 'Ghi chú', 'Labels', 'Custom Field 1 - Value', 'Custom Field 2 - Value']));
     const explicitCode = cleanText(getCell(row, ['MaHS', 'Mã HS', 'Code', 'Student Code']));
     const zaloUserId = cleanText(getCell(row, ['Zalo UID', 'Zalo User ID', 'zaloUserId', 'user_id']));
     const birthday = cleanText(getCell(row, ['NgaySinh', 'Ngày sinh', 'DOB', 'Birthday', 'SinhNhat']));
@@ -2065,7 +2077,7 @@ function parseContactsWorkbook(buffer) {
         tuitionDebt
       });
     });
-  }).filter(student => student.fullName && student.className && student.phone1);
+  }).filter(student => student.fullName && student.className);
 }
 
 function upsertImportedStudents(db, importedStudents) {
@@ -2077,7 +2089,7 @@ function upsertImportedStudents(db, importedStudents) {
   if (!db.students) db.students = [];
 
   importedStudents.forEach(student => {
-    if (!student.fullName || !student.className || !student.phone1) {
+    if (!student.fullName || !student.className) {
       skipped += 1;
       return;
     }
@@ -2086,7 +2098,7 @@ function upsertImportedStudents(db, importedStudents) {
       || (
         row.fullName.toLowerCase() === student.fullName.toLowerCase()
         && row.className.toLowerCase() === student.className.toLowerCase()
-        && normalizePhone(row.phone1) === normalizePhone(student.phone1)
+        && (!student.phone1 || !row.phone1 || normalizePhone(row.phone1) === normalizePhone(student.phone1))
       )
     );
 
@@ -3007,6 +3019,58 @@ app.delete('/api/students/:id', async (req, res, next) => {
     db.students = db.students.filter(student => student.id !== req.params.id);
     await saveBranchDb(req, db);
     res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/classes/:className', async (req, res, next) => {
+  try {
+    const targetClass = String(req.params.className || '').trim().toLowerCase();
+    const rootDb = await readDb();
+    let deletedCount = 0;
+    
+    if (rootDb.branches) {
+      for (const bId in rootDb.branches) {
+        if (rootDb.branches[bId] && Array.isArray(rootDb.branches[bId].students)) {
+          const before = rootDb.branches[bId].students.length;
+          rootDb.branches[bId].students = rootDb.branches[bId].students.filter(student => String(student.className || '').trim().toLowerCase() !== targetClass);
+          deletedCount += (before - rootDb.branches[bId].students.length);
+        }
+      }
+    }
+    
+    await writeDb(rootDb);
+    res.json({ success: true, deletedCount, message: `Đã xóa lớp ${req.params.className} (${deletedCount} học sinh).` });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/classes/bulk-delete', async (req, res, next) => {
+  try {
+    const { classNames } = req.body;
+    if (!Array.isArray(classNames) || !classNames.length) {
+      const err = new Error('Vui lòng chọn ít nhất một lớp để xóa.');
+      err.status = 400;
+      throw err;
+    }
+    const classSet = new Set(classNames.map(c => String(c || '').trim().toLowerCase()));
+    const rootDb = await readDb();
+    let deletedCount = 0;
+
+    if (rootDb.branches) {
+      for (const bId in rootDb.branches) {
+        if (rootDb.branches[bId] && Array.isArray(rootDb.branches[bId].students)) {
+          const before = rootDb.branches[bId].students.length;
+          rootDb.branches[bId].students = rootDb.branches[bId].students.filter(student => !classSet.has(String(student.className || '').trim().toLowerCase()));
+          deletedCount += (before - rootDb.branches[bId].students.length);
+        }
+      }
+    }
+
+    await writeDb(rootDb);
+    res.json({ success: true, deletedClasses: classNames.length, deletedStudents: deletedCount, message: `Đã xóa ${classNames.length} lớp (${deletedCount} học sinh).` });
   } catch (error) {
     next(error);
   }

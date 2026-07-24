@@ -44,6 +44,9 @@
             if(localStorage.getItem('savedPartName')) document.getElementById('partName').value = localStorage.getItem('savedPartName');
             if(localStorage.getItem('savedClassName') && classNames.includes(localStorage.getItem('savedClassName'))) {
                 document.getElementById('className').value = localStorage.getItem('savedClassName');
+            } else {
+                localStorage.removeItem('savedClassName');
+                if (classNames.length > 0) document.getElementById('className').value = classNames[0];
             }
         } catch(e) {}
     }
@@ -282,7 +285,8 @@
         const row = document.getElementById(`row-${id}`);
         
         if (isAttendanceSubmitted && row.classList.contains('is-absent')) {
-            if(confirm("Học sinh đi trễ? Xác nhận đính chính.")) {
+            const confirmLate = await showCustomConfirm("Học sinh đi trễ? Xác nhận đính chính.");
+            if(confirmLate) {
                 try {
                     const timeStr = new Date().toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'});
                     const evUrl = window.studentEvidenceUrls[id] || '';
@@ -356,7 +360,6 @@
         } catch(e) {
             if (e.message && e.message.includes('đã được ghi vắng')) {
                 showToast("Học sinh này đã được đánh dấu vắng/về sớm trước đó!");
-                // Vô hiệu hóa nút đánh giá luôn vì đã vắng/về sớm
                 const evalBtns = row.querySelector('.eval-buttons');
                 if (evalBtns) {
                     evalBtns.style.opacity = '0.2';
@@ -371,7 +374,8 @@
     }
 
     async function submitAttendance() {
-        if(!confirm("Chốt điểm danh? Hệ thống tự gửi Zalo báo vắng.")) return;
+        const confirmSubmit = await showCustomConfirm("Chốt điểm danh? Hệ thống tự gửi Zalo báo vắng.");
+        if(!confirmSubmit) return;
         try {
             await apiRequest(`/api/teaching-sessions/${currentSession.id}/submit-attendance`, 'PUT');
             isAttendanceSubmitted = true;
@@ -391,7 +395,7 @@
                    evidenceUrl: evUrl
                }).catch(e=>{});
             }
-            showToast("Đã chốt sổ!");
+            showToast("Đã chốt sổ điểm danh thành công!");
         } catch(e) { showToast("Lỗi chốt điểm danh: " + e.message); }
     }
 
@@ -717,7 +721,8 @@ html += `<h4 style="margin: 20px 0 10px 0; color:#3b82f6; font-size:15px;"><i cl
 
     
     async function markAsNotified(studentId) {
-        if (!confirm('Đánh dấu là đã báo phụ huynh? Hành động này sẽ tạo một mốc lịch sử và xóa cảnh báo hiện tại.')) return;
+        const confirmNotified = await showCustomConfirm('Đánh dấu là đã báo phụ huynh? Hành động này sẽ tạo một mốc lịch sử và xóa cảnh báo hiện tại.');
+        if (!confirmNotified) return;
         try {
             const evUrl = window.studentEvidenceUrls ? window.studentEvidenceUrls[studentId] : '';
             await apiRequest('/api/evaluations', 'POST', {
@@ -729,7 +734,6 @@ html += `<h4 style="margin: 20px 0 10px 0; color:#3b82f6; font-size:15px;"><i cl
                 evidenceUrl: evUrl || ''
             });
             showToast('Đã lưu mốc lịch sử thành công!');
-            // Reload the history panel
             setTimeout(() => openHistoryPanel(studentId), 500);
         } catch(e) {
             console.error(e);
@@ -752,7 +756,8 @@ html += `<h4 style="margin: 20px 0 10px 0; color:#3b82f6; font-size:15px;"><i cl
         }
         
         await updateLessonInfo();
-        if(confirm("Bạn có chắc chắn muốn kết thúc ca dạy này?")) {
+        const confirmEnd = await showCustomConfirm("Bạn có chắc chắn muốn kết thúc ca dạy này?");
+        if(confirmEnd) {
             location.reload();
         }
     }

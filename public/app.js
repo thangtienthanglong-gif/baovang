@@ -135,6 +135,9 @@ function toast(message, type = 'success') {
   }, 3200);
 }
 
+window.toast = toast;
+window.showToast = toast;
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     headers: { 'Content-Type': 'application/json', 'X-Branch-Id': getActiveBranch(), 'Authorization': 'Bearer ' + getToken() },
@@ -154,6 +157,8 @@ async function api(path, options = {}) {
   if (!response.ok) throw new Error(data.error || 'Có lỗi xảy ra.');
   return data;
 }
+
+window.apiJson = api;
 
 async function apiForm(path, formData) {
   const response = await fetch(path, {
@@ -283,18 +288,26 @@ function getClassScheduleInfo(className, dateString, forcedDay = 'ALL') {
   let sessionName = 'Khác';
   let daysStr = '';
   
-  const str = String(className || '').toUpperCase();
+  const str = String(className || '').toUpperCase().trim();
   
-  const ctMatch = str.match(/\d+CT.*?\(([\d-]+)\)/);
-  if (ctMatch) {
+  if (/^9?CT1\b/i.test(str)) {
     sessionName = 'Tối';
-    daysStr = ctMatch[1].replace(/-/g, '');
+    daysStr = '357';
+  } else if (/^9?CT2\b/i.test(str)) {
+    sessionName = 'Tối';
+    daysStr = '246';
   } else {
-    const stdMatch = str.match(/^\d+([SCT])(\d+)/);
-    if (stdMatch) {
-      const sessionCode = stdMatch[1];
-      sessionName = sessionCode === 'S' ? 'Sáng' : sessionCode === 'C' ? 'Chiều' : 'Tối';
-      daysStr = stdMatch[2];
+    const ctMatch = str.match(/\d+CT.*?\(([\d-]+)\)/);
+    if (ctMatch) {
+      sessionName = 'Tối';
+      daysStr = ctMatch[1].replace(/-/g, '');
+    } else {
+      const stdMatch = str.match(/^\d+([SCT])(\d+)/);
+      if (stdMatch) {
+        const sessionCode = stdMatch[1];
+        sessionName = sessionCode === 'S' ? 'Sáng' : sessionCode === 'C' ? 'Chiều' : 'Tối';
+        daysStr = stdMatch[2];
+      }
     }
   }
 
@@ -304,7 +317,7 @@ function getClassScheduleInfo(className, dateString, forcedDay = 'ALL') {
   
   let dayNumberStr;
   if (forcedDay && forcedDay !== 'ALL') {
-    dayNumberStr = forcedDay;
+    dayNumberStr = String(forcedDay);
   } else {
     const date = new Date(dateString);
     const day = date.getDay();
@@ -3633,3 +3646,144 @@ function openTransferClassModal(studentId) {
     modal.style.display = 'flex';
   }
 }
+
+// --- Class Management Functions ---
+window.openManageClassesModal = function() {
+  const modal = document.getElementById('manageClassesModal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  document.getElementById('searchClassInput').value = '';
+  document.getElementById('selectAllClassesCheckbox').checked = false;
+  renderManageClassList();
+};
+
+window.closeManageClassesModal = function() {
+  const modal = document.getElementById('manageClassesModal');
+  if (modal) modal.style.display = 'none';
+};
+
+window.renderManageClassList = function() {
+  const container = document.getElementById('manageClassList');
+  if (!container) return;
+  const filter = (document.getElementById('searchClassInput')?.value || '').toLowerCase().trim();
+  
+  const classCounts = {};
+  (state.students || []).forEach(s => {
+    if (s.className) {
+      classCounts[s.className] = (classCounts[s.className] || 0) + 1;
+    }
+  });
+
+  const classNames = (state.classes || []).filter(c => c.toLowerCase().includes(filter));
+
+  if (!classNames.length) {
+    container.innerHTML = `<div style="text-align:center; padding:30px; color:#94a3b8; font-size:14px;">Không tìm thấy lớp học nào.</div>`;
+    updateSelectedClassCount();
+    return;
+  }
+
+  container.innerHTML = classNames.map(className => {
+    const count = classCounts[className] || 0;
+    return `
+      <div style="background:white; border:1px solid #e2e8f0; border-radius:10px; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+        <label style="display:flex; align-items:center; gap:12px; font-weight:600; color:#1e293b; font-size:14px; margin:0; cursor:pointer; flex:1;">
+          <input type="checkbox" class="manage-class-checkbox" value="${escapeHtml(className)}" onchange="updateSelectedClassCount()" style="width:18px; height:18px; cursor:pointer;">
+          <span>Lớp <span style="color:#2563eb;">${escapeHtml(className)}</span></span>
+          <span style="font-weight:normal; font-size:12px; background:#f1f5f9; color:#64748b; padding:2px 8px; border-radius:12px;">${count} học sinh</span>
+        </label>
+        <button type="button" onclick="deleteSingleClass('${escapeHtml(className)}')" style="border:none; background:#fee2e2; color:#ef4444; padding:6px 12px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">
+          <i class="fa-solid fa-trash-can"></i> Xóa
+        </button>
+      </div>
+    `;
+  }).join('');
+
+  updateSelectedClassCount();
+};
+
+window.toggleSelectAllClasses = function(checked) {
+  const checkboxes = document.querySelectorAll('.manage-class-checkbox');
+  checkboxes.forEach(cb => cb.checked = checked);
+  updateSelectedClassCount();
+};
+
+function updateSelectedClassCount() {
+  const selected = document.querySelectorAll('.manage-class-checkbox:checked');
+  const textEl = document.getElementById('selectedClassCountText');
+  if (textEl) textEl.textContent = `Đã chọn: ${selected.length} lớp`;
+}
+
+window.openDeleteClassConfirmModal = function(title, message, onConfirm) {
+  const modal = document.getElementById('deleteClassConfirmModal');
+  if (!modal) return;
+  document.getElementById('deleteClassConfirmTitle').textContent = title;
+  document.getElementById('deleteClassConfirmMessage').innerHTML = message;
+  
+  const confirmBtn = document.getElementById('deleteClassConfirmBtn');
+  confirmBtn.onclick = async function() {
+    closeDeleteClassConfirmModal();
+    if (onConfirm) await onConfirm();
+  };
+  
+  modal.style.display = 'flex';
+};
+
+window.closeDeleteClassConfirmModal = function() {
+  const modal = document.getElementById('deleteClassConfirmModal');
+  if (modal) modal.style.display = 'none';
+};
+
+window.showDeleteClassSuccessModal = function(detailMessage) {
+  const modal = document.getElementById('deleteClassSuccessModal');
+  if (!modal) return;
+  document.getElementById('deleteClassSuccessDetail').innerHTML = detailMessage;
+  modal.style.display = 'flex';
+};
+
+window.closeDeleteClassSuccessModal = function() {
+  const modal = document.getElementById('deleteClassSuccessModal');
+  if (modal) modal.style.display = 'none';
+};
+
+window.deleteSingleClass = function(className) {
+  openDeleteClassConfirmModal(
+    'Xác nhận xóa lớp học',
+    `Bạn có chắc chắn muốn XÓA lớp <b style="color:#ef4444;">${escapeHtml(className)}</b> không?<br>Thao tác này sẽ xóa toàn bộ học sinh thuộc lớp này khỏi hệ thống.`,
+    async () => {
+      try {
+        const res = await api(`/api/classes/${encodeURIComponent(className)}`, { method: 'DELETE' });
+        await loadBootstrap();
+        renderManageClassList();
+        showDeleteClassSuccessModal(res.message || `Đã xóa thành công lớp <b>${escapeHtml(className)}</b>.`);
+      } catch (err) {
+        showToast(err.message || 'Xóa lớp thất bại', 'error');
+      }
+    }
+  );
+};
+
+window.deleteSelectedClasses = function() {
+  const selected = Array.from(document.querySelectorAll('.manage-class-checkbox:checked')).map(cb => cb.value);
+  if (!selected.length) {
+    showToast('Vui lòng tích chọn ít nhất một lớp để xóa.', 'warning');
+    return;
+  }
+
+  openDeleteClassConfirmModal(
+    'Xác nhận xóa hàng loạt lớp',
+    `Bạn có chắc chắn muốn xóa hàng loạt <b style="color:#ef4444;">${selected.length} lớp</b> đã chọn không?<br>Thao tác này sẽ xóa toàn bộ học sinh trong ${selected.length} lớp này khỏi hệ thống.`,
+    async () => {
+      try {
+        const res = await api('/api/classes/bulk-delete', {
+          method: 'POST',
+          body: JSON.stringify({ classNames: selected })
+        });
+        await loadBootstrap();
+        closeManageClassesModal();
+        showDeleteClassSuccessModal(res.message || `Đã xóa thành công ${selected.length} lớp đã chọn.`);
+      } catch (err) {
+        showToast(err.message || 'Xóa lớp thất bại', 'error');
+      }
+    }
+  );
+};
