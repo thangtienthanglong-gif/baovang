@@ -3043,15 +3043,15 @@ window.openHistoryPanel = async function(studentId) {
         let activeTransfers = transfers || [];
         let collapsedTransfers = [];
         if (notifiedDate) {
-            activeTransfers = (transfers || []).filter(t => parseViDate(t.date) > notifiedDate);
-            collapsedTransfers = (transfers || []).filter(t => parseViDate(t.date) <= notifiedDate);
+            activeTransfers = (transfers || []).filter(t => parseViDate(t.date) >= notifiedDate);
+            collapsedTransfers = (transfers || []).filter(t => parseViDate(t.date) < notifiedDate);
         }
 
         let activeAbsences = res.absences || [];
         let collapsedAbsences = [];
         if (notifiedDate) {
-            activeAbsences = (res.absences || []).filter(a => parseViDate(a.date) > notifiedDate);
-            collapsedAbsences = (res.absences || []).filter(a => parseViDate(a.date) <= notifiedDate);
+            activeAbsences = (res.absences || []).filter(a => parseViDate(a.date) >= notifiedDate);
+            collapsedAbsences = (res.absences || []).filter(a => parseViDate(a.date) < notifiedDate);
         }
 
         let transferHtml = '';
@@ -3146,8 +3146,8 @@ window.openHistoryPanel = async function(studentId) {
         if (notifiedObj) {
             const notifiedIndex = res.history.findIndex(h => h.status === 'Đã báo phụ huynh');
             if (notifiedIndex !== -1) {
-                activeHistory = res.history.slice(0, notifiedIndex);
-                collapsedHistory = res.history.slice(notifiedIndex);
+                activeHistory = res.history.slice(0, notifiedIndex + 1);
+                collapsedHistory = res.history.slice(notifiedIndex + 1);
             }
         }
 
