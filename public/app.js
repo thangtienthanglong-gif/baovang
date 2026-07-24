@@ -89,7 +89,8 @@ function activeStudents() {
 }
 
 function normalizeAbsenceStatus(value) {
-  const status = String(value || '').trim();
+  let status = String(value || '').trim();
+  status = status.replace(/\s*\(Cả ngày\)/gi, '');
   const aliases = {
     'Vắng chưa rõ lý do': 'Vắng',
     'Vắng không phép': 'Vắng',
@@ -309,7 +310,7 @@ function getClassScheduleInfo(className, dateString, forcedDay = 'ALL') {
   }
 
   const matchesDate = daysStr.includes(dayNumberStr);
-  return { sessionName, matchesDate };
+  return { sessionName, matchesDate, daysStr };
 }
 
 function renderFilters() {
@@ -347,7 +348,7 @@ function renderFilters() {
   if ($('#filterAbsenceStatus')) {
     $('#filterAbsenceStatus').innerHTML = [
       '<option value="ALL">Tất cả trạng thái vắng</option>',
-      ...state.absenceStatuses.map(status => `<option value="${escapeHtml(status)}">${escapeHtml(status)}</option>`)
+      ...state.absenceStatuses.filter(s => s !== 'Cả ngày').map(status => `<option value="${escapeHtml(status)}">${escapeHtml(status.replace(/\s*\(Cả ngày\)/gi, ''))}</option>`)
     ].join('');
     $('#filterAbsenceStatus').value = state.absenceStatuses.includes(currentAbsenceStatus) ? currentAbsenceStatus : 'ALL';
   }
@@ -369,7 +370,7 @@ function renderFilters() {
   $('#filterNoticeStatus').value = state.noticeStatuses.includes(currentNotice) ? currentNotice : 'ALL';
 
   if ($('#absenceStatus')) {
-    $('#absenceStatus').innerHTML = state.absenceStatuses.map(status => `<option>${escapeHtml(status)}</option>`).join('');
+    $('#absenceStatus').innerHTML = state.absenceStatuses.filter(s => s !== 'Cả ngày').map(status => `<option>${escapeHtml(status)}</option>`).join('');
   }
 }
 
@@ -833,7 +834,6 @@ function renderRosterStudent(student) {
     ['Có phép', 'Có phép'],
     ['Đi trễ', 'Đi trễ'],
     ['Về sớm', 'Về sớm'],
-    ['Cả ngày', 'Cả ngày'],
     ['Nghỉ học', 'Nghỉ học'],
     ['Học phí', 'Trễ học phí']
   ];
@@ -858,7 +858,6 @@ function renderRosterStudent(student) {
         <select id="status-${escapeHtml(student.id)}" class="roster-status-select" data-student-id="${escapeHtml(student.id)}" data-absence-id="${escapeHtml(absence?.id || '')}">
           ${statusOptions.map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === currentStatus ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}
         </select>
-        <button type="button" class="btn small" onclick="openMakeupModal('${escapeHtml(student.id)}', '${escapeHtml(student.fullName)}', '${escapeHtml(student.className)}')">Kẹt & Bù</button>
       </div>
     </article>
   `;
@@ -2781,7 +2780,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ==================== STUDENT PROFILE DRAWER ====================
-function openStudentProfile(studentId) {
+async function openStudentProfile(studentId) {
   const student = state.students.find(s => s.id === studentId);
   if (!student) return;
 
@@ -2795,10 +2794,37 @@ function openStudentProfile(studentId) {
   const phone = student.phone1 || student.phone2 || 'Chưa có SĐT';
   document.getElementById('drawerStudentPhone').textContent = phone;
   document.getElementById('drawerStudentParent').textContent = student.parentName || 'Chưa cập nhật';
+
+  // Bind edit buttons in header
+  const openEditStudentBtn = document.getElementById('openEditStudentBtn');
+  if (openEditStudentBtn) openEditStudentBtn.onclick = () => openEditStudentModal(studentId);
+  const openTransferClassBtn = document.getElementById('openTransferClassBtn');
+  if (openTransferClassBtn) openTransferClassBtn.onclick = () => openTransferClassModal(studentId);
+  const openMakeupBtn = document.getElementById('openMakeupBtn');
+  if (openMakeupBtn) openMakeupBtn.onclick = () => openMakeupModal(student.id, student.fullName || student.name, student.className);
+
   
 
 
   // Populate history (recent absences)
+  
+  // Populate transfer history
+  const transferHistoryList = document.getElementById('drawerTransferHistory');
+  if (transferHistoryList) {
+    transferHistoryList.innerHTML = '<div class="empty muted">Đang tải...</div>';
+    try {
+      const hist = await api('/api/students/' + student.id + '/transfer');
+      if (!hist || hist.length === 0) {
+        transferHistoryList.innerHTML = '<div class="empty muted">Chưa có lịch sử chuyển lớp.</div>';
+      } else {
+        transferHistoryList.innerHTML = hist.map(h => '<div style="font-size: 13px; color: #475569; margin-bottom: 4px;">Từ <strong>' + escapeHtml(h.fromClass) + '</strong> sang <strong>' + escapeHtml(h.toClass) + '</strong> (Ngày ' + escapeHtml(h.date) + ') - GV: <strong>' + escapeHtml(h.teacher || 'Không rõ') + '</strong></div>').join('');
+      }
+    } catch(e) {
+      console.error(e);
+      transferHistoryList.innerHTML = '<div class="empty muted">Lỗi tải dữ liệu</div>';
+    }
+  }
+
   const historyList = document.getElementById('drawerAbsenceHistory');
   const allAbsences = state.absences
     .filter(a => a.studentId === student.id && a.absenceStatus !== 'Học phí')
@@ -2816,6 +2842,41 @@ function openStudentProfile(studentId) {
   }
 
   // Open drawer
+  
+  // Populate exam history
+  const examHistoryList = document.getElementById('drawerExamHistory');
+  if (examHistoryList) {
+    examHistoryList.innerHTML = '<div class="empty muted">Đang tải...</div>';
+    try {
+      const exams = await api('/api/exams?className=' + encodeURIComponent(student.className));
+      const studentExams = [];
+      const seenExams = new Set();
+      // Reverse first to get the latest duplicate, then deduplicate
+      [...exams].reverse().forEach(ex => {
+        const scoreObj = (ex.scores || []).find(s => s.studentId === student.id);
+        if (scoreObj && !seenExams.has(ex.examName)) {
+          seenExams.add(ex.examName);
+          studentExams.push({ examName: ex.examName, score: scoreObj.score, comment: scoreObj.comment, date: ex.date });
+        }
+      });
+      // Reverse back for display order if needed, but the original code mapped over studentExams.reverse()
+      studentExams.reverse();
+      if (studentExams.length === 0) {
+        examHistoryList.innerHTML = '<div class="empty muted">Chưa có dữ liệu điểm thi.</div>';
+      } else {
+        examHistoryList.innerHTML = studentExams.reverse().map(e => `
+          <div class="drawer-history-item" style="border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; margin-bottom: 8px;">
+            <strong style="color: #3b82f6;">${escapeHtml(e.examName)}</strong>: <span style="font-weight:bold; color:#0f172a;">${escapeHtml(String(e.score))}</span>
+            <div style="font-size: 12px; color: #475569; margin-top: 4px; font-style: italic;">${escapeHtml(e.comment || '')}</div>
+          </div>
+        `).join('');
+      }
+    } catch(e) {
+      console.error(e);
+      examHistoryList.innerHTML = '<div class="empty muted">Lỗi tải dữ liệu.</div>';
+    }
+  }
+
   backdrop.classList.add('show');
   setTimeout(() => drawer.classList.add('open'), 10);
 }
@@ -2838,7 +2899,24 @@ async function openMakeupModal(studentId, studentName, originalClass) {
   document.getElementById('makeupModalOriginalClass').value = originalClass;
   document.getElementById('makeupModalStudentName').textContent = studentName + ' (' + originalClass + ')';
   
-  const classNames = [...new Set(activeStudents().map(s => s.className).filter(c => c))].sort();
+  const sched = getClassScheduleInfo(originalClass, state.today);
+  const stuckDayEl = document.getElementById('makeupModalStuckDay');
+  if (stuckDayEl) {
+    if (sched.daysStr) {
+      const daysArr = sched.daysStr.split('');
+      stuckDayEl.innerHTML = daysArr.map(d => `<option value="${d}">${d === 'C' ? 'Chủ Nhật' : 'Thứ ' + d}</option>`).join('');
+    } else {
+      stuckDayEl.innerHTML = `<option value="2">Thứ 2</option>
+      <option value="3">Thứ 3</option>
+      <option value="4">Thứ 4</option>
+      <option value="5">Thứ 5</option>
+      <option value="6">Thứ 6</option>
+      <option value="7">Thứ 7</option>
+      <option value="C">Chủ Nhật</option>`;
+    }
+  }
+  
+  const classNames = [...new Set(activeStudents().map(s => s.className).filter(c => c && c !== originalClass))].sort();
   document.getElementById('makeupModalTargetClass').innerHTML = classNames.map(c => `<option value="${c}">${c}</option>`).join('');
   
   await reloadMakeupList(studentId);
@@ -2994,4 +3072,103 @@ $('#runCompareBtn')?.addEventListener('click', async () => {
     } catch (e) {
         tbody.innerHTML = `<tr><td colspan="${selected.length + 1}" style="color: red; padding: 20px; text-align: center;">Lỗi: ${e.message}</td></tr>`;
     }
-});
+});
+
+// --- Modal Logic: Edit & Transfer ---
+function openEditStudentModal(studentId) {
+  const student = state.students.find(s => s.id === studentId);
+  if (!student) return;
+  document.getElementById('editStudentId').value = student.id;
+  document.getElementById('editStudentCode').value = student.code;
+  document.getElementById('editStudentName').value = student.fullName || student.name;
+  document.getElementById('editStudentClass').value = student.className;
+  document.getElementById('editStudentParent').value = student.parentName || '';
+  document.getElementById('editStudentPhone').value = student.phone1 || '';
+  
+  document.getElementById('editStudentModal').style.display = 'flex';
+}
+
+document.getElementById('editStudentForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = document.getElementById('editStudentId').value;
+  const payload = {
+    code: document.getElementById('editStudentCode').value,
+    fullName: document.getElementById('editStudentName').value,
+    className: document.getElementById('editStudentClass').value,
+    parentName: document.getElementById('editStudentParent').value,
+    phone1: document.getElementById('editStudentPhone').value
+  };
+  
+  try {
+    const res = await api('/api/students/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const idx = state.students.findIndex(s => s.id === id);
+    if (idx !== -1) state.students[idx] = res;
+    
+    document.getElementById('editStudentModal').style.display = 'none';
+    toast('Cập nhật thành công!', 'success');
+    renderRoster();
+    openStudentProfile(id);
+  } catch(err) {
+    console.error(err);
+    toast(err.message || 'Lỗi cập nhật', 'error');
+  }
+});
+
+function openTransferClassModal(studentId) {
+  const student = state.students.find(s => s.id === studentId);
+  if (!student) return;
+  document.getElementById('transferStudentId').value = student.id;
+  document.getElementById('transferStudentName').textContent = student.fullName || student.name;
+  document.getElementById('transferCurrentClass').textContent = student.className;
+  
+  const classNames = state.classes.filter(c => c !== student.className);
+  document.getElementById('transferTargetClass').innerHTML = classNames.map(c => '<option value="' + c + '">' + c + '</option>').join('');
+  
+  if (localStorage.getItem('savedTransferTeacher')) {
+    document.getElementById('transferTeacherName').value = localStorage.getItem('savedTransferTeacher');
+  }
+  
+  document.getElementById('transferClassModal').style.display = 'flex';
+}
+
+document.getElementById('transferClassForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = document.getElementById('transferStudentId').value;
+  const student = state.students.find(s => s.id === id);
+  const newClass = document.getElementById('transferTargetClass').value;
+  const teacherInput = document.getElementById('transferTeacherName');
+  const teacherName = teacherInput ? teacherInput.value.trim() : '';
+  localStorage.setItem('savedTransferTeacher', teacherName);
+  
+  const payload = { ...student, className: newClass };
+  
+  try {
+    const res = await api('/api/students/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    
+    await api('/api/students/' + id + '/transfer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fromClass: student.className, toClass: newClass, date: state.today, teacher: teacherName })
+    }).catch(err => console.warn(err));
+    
+    const idx = state.students.findIndex(s => s.id === id);
+    if (idx !== -1) state.students[idx] = res;
+    
+    document.getElementById('transferClassModal').style.display = 'none';
+    document.getElementById('studentProfileDrawer').classList.remove('open');
+    document.getElementById('studentDrawerBackdrop').classList.remove('show');
+    toast('Chuyển lớp thành công!', 'success');
+    renderRoster();
+  } catch(err) {
+    console.error(err);
+    toast(err.message || 'Lỗi chuyển lớp', 'error');
+  }
+});

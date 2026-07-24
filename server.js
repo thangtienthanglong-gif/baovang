@@ -369,7 +369,7 @@ function extractPhones(...values) {
 }
 
 function sanitizeStudent(input) {
-  return {
+  const result = {
     code: cleanText(input.code),
     fullName: cleanText(input.fullName),
     className: cleanText(input.className),
@@ -383,6 +383,11 @@ function sanitizeStudent(input) {
     birthday: cleanText(input.birthday || ''),
     tuitionDebt: cleanText(input.tuitionDebt || '')
   };
+  
+  if (Array.isArray(input.transferHistory)) {
+    result.transferHistory = input.transferHistory;
+  }
+  return result;
 }
 
 function studentByIdMap(students) {
@@ -2166,8 +2171,26 @@ app.get('/api/teaching-sessions', async (req, res, next) => {
   try {
     const branchId = getBranchId(req);
     const db = await readDb();
-    const sessions = db.branches[branchId]?.teaching_sessions || [];
-    res.json(sessions);
+    if (!db.branches[branchId]) db.branches[branchId] = { teaching_sessions: [] };
+    if (!db.branches[branchId].teaching_sessions) db.branches[branchId].teaching_sessions = [];
+    
+    const sessions = db.branches[branchId].teaching_sessions;
+    const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+    
+    // Auto-cleanup empty abandoned sessions older than 4 hours
+    const originalCount = sessions.length;
+    db.branches[branchId].teaching_sessions = sessions.filter(s => {
+      if (s.startTime <= fourHoursAgo && s.attendanceSubmitted === false && !s.lessonName && !s.exercises) {
+        return false;
+      }
+      return true;
+    });
+
+    if (db.branches[branchId].teaching_sessions.length !== originalCount) {
+      await writeDb(db);
+    }
+
+    res.json(db.branches[branchId].teaching_sessions);
   } catch(e) { next(e); }
 });
 
@@ -2200,7 +2223,18 @@ app.post('/api/teaching-sessions', async (req, res, next) => {
       });
 
       if (existingSession) {
-        return res.status(400).json({ error: `Lớp này đang được giáo viên ${existingSession.teacherName} dạy (Bắt đầu lúc ${new Date(existingSession.startTime).toLocaleTimeString('vi-VN')}). Vui lòng kiểm tra lại!` });
+        if (req.body.takeOver) {
+          existingSession.teacherName = newTeacherName;
+          existingSession.shift = req.body.shift || existingSession.shift;
+          await writeDb(db);
+          sessionLocks.delete(lockKey);
+          return res.json({ session: existingSession });
+        }
+        sessionLocks.delete(lockKey);
+        return res.status(400).json({ 
+          error: `Lớp này đang được giáo viên ${existingSession.teacherName} dạy\nBạn có chắc chắn mình vào đúng lớp không?`,
+          canTakeOver: true
+        });
       }
 
       const session = {
@@ -2223,6 +2257,26 @@ app.post('/api/teaching-sessions', async (req, res, next) => {
   } catch(e) { 
     next(e); 
   }
+});
+
+app.delete('/api/teaching-sessions/:id', async (req, res, next) => {
+  try {
+    const branchId = getBranchId(req);
+    const db = await readDb();
+    const sessionId = req.params.id;
+    if (!db.branches[branchId] || !db.branches[branchId].teaching_sessions) {
+      return res.status(404).json({ error: 'Sessions not found' });
+    }
+    
+    const sessions = db.branches[branchId].teaching_sessions;
+    const initialLen = sessions.length;
+    db.branches[branchId].teaching_sessions = sessions.filter(s => s.id !== sessionId);
+    
+    if (db.branches[branchId].teaching_sessions.length < initialLen) {
+      await writeDb(db);
+    }
+    res.json({ ok: true });
+  } catch(e) { next(e); }
 });
 
 app.put('/api/teaching-sessions/:id/submit-attendance', async (req, res, next) => {
@@ -2364,6 +2418,19 @@ app.get('/api/ketbu/students/:id/history', async (req, res, next) => {
     const absences = (db.branches[branchId]?.absences || []).filter(a => a.studentId === studentId);
     const evaluations = (db.branches[branchId]?.evaluations || []).filter(e => e.studentId === studentId);
     const sessions = db.branches[branchId]?.teaching_sessions || [];
+    const studentExams = [];
+    (db.branches[branchId]?.exams || []).forEach(ex => {
+      const scoreObj = (ex.scores || []).find(s => s.studentId === studentId);
+      if (scoreObj) {
+        studentExams.push({
+          examName: ex.examName,
+          score: scoreObj.score,
+          comment: scoreObj.comment,
+          date: ex.date
+        });
+      }
+    });
+
     
     const history = evaluations.map(ev => {
        const session = sessions.find(s => s.id === ev.sessionId);
@@ -2378,7 +2445,7 @@ app.get('/api/ketbu/students/:id/history', async (req, res, next) => {
     });
     history.sort((a,b) => new Date(b.date) - new Date(a.date));
     
-    res.json({ student, history, absences });
+    res.json({ student, history, absences, exams: studentExams });
   } catch(e) { next(e); }
 });
 
@@ -2391,7 +2458,19 @@ app.get('/api/ketbu/students', async (req, res, next) => {
     const warnings = db.branches[branchId]?.warnings || [];
     const part = req.query.part;
     const className = req.query.className;
-    const scheduleExceptions = db.branches[branchId]?.scheduleExceptions || [];
+
+    function getValidExceptions(list) {
+      if (!list) return [];
+      const now = new Date();
+      return list.filter(e => {
+        if (e.type === 'bu_tam' && e.createdAt) {
+          const created = new Date(e.createdAt);
+          return (now - created) / (1000 * 60 * 60 * 24) <= 6;
+        }
+        return true;
+      });
+    }
+    const scheduleExceptions = getValidExceptions(db.branches[branchId]?.scheduleExceptions);
     const vnDate = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Ho_Chi_Minh"}));
     let currentDayOfWeek = vnDate.getDay() + 1;
     if (currentDayOfWeek === 1) currentDayOfWeek = 8;
@@ -2402,11 +2481,13 @@ app.get('/api/ketbu/students', async (req, res, next) => {
       let baseStudents = allBranchStudents.filter(s => s.className === className);
       
       baseStudents = baseStudents.map(s => {
-        const exception = scheduleExceptions.find(e => e.studentId === s.id && e.originalClass === className && e.stuckDay === currentDayStr);
+        const allExceptions = scheduleExceptions.filter(e => e.studentId === s.id && e.originalClass === className);
+        const exception = allExceptions.find(e => e.stuckDay === currentDayStr);
+        let sData = { ...s, allExceptions };
         if (exception) {
-          return { ...s, isStuckToday: true, stuckType: exception.type || 'hoc_bu', stuckDay: exception.stuckDay, makeupDay: exception.makeupDay, makeupClass: exception.makeupClass };
+          sData = { ...sData, isStuckToday: true, stuckType: exception.type || 'hoc_bu', stuckDay: exception.stuckDay, makeupDay: exception.makeupDay, makeupClass: exception.makeupClass };
         }
-        return s;
+        return sData;
       });
 
       const makeupExceptions = scheduleExceptions.filter(e => e.makeupClass === className && e.makeupDay === currentDayStr);
@@ -2845,9 +2926,61 @@ app.put('/api/students/:id', async (req, res, next) => {
       throw err;
     }
 
-    db.students[index] = { ...db.students[index], ...student };
+    const oldStudent = db.students[index];
+    db.students[index] = { ...oldStudent, ...student };
+    
+    if (student.className && oldStudent.className !== student.className) {
+      if (db.scheduleExceptions) {
+        db.scheduleExceptions = db.scheduleExceptions.filter(e => e.studentId !== req.params.id);
+      }
+    }
+
     await saveBranchDb(req, db);
     res.json(db.students[index]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+app.post('/api/students/:id/transfer', async (req, res, next) => {
+  try {
+    const db = await getBranchDb(req);
+    
+    // Update student class directly to avoid race conditions with PUT
+    const index = (db.students || []).findIndex(s => s.id === req.params.id);
+    let updatedStudent = null;
+    if (index !== -1) {
+      const oldClass = db.students[index].className;
+      db.students[index].className = req.body.toClass;
+      updatedStudent = db.students[index];
+      
+      if (oldClass !== req.body.toClass && db.scheduleExceptions) {
+        db.scheduleExceptions = db.scheduleExceptions.filter(e => e.studentId !== req.params.id);
+      }
+    }
+    
+    if (!db.transferHistory) db.transferHistory = [];
+    db.transferHistory.push({
+      studentId: req.params.id,
+      fromClass: req.body.fromClass,
+      toClass: req.body.toClass,
+      date: req.body.date,
+      teacher: req.body.teacher,
+      timestamp: Date.now()
+    });
+    await saveBranchDb(req, db);
+    res.json(updatedStudent || { success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/students/:id/transfer', async (req, res, next) => {
+  try {
+    const db = await getBranchDb(req);
+    const history = (db.transferHistory || []).filter(t => t.studentId === req.params.id);
+    res.json(history);
   } catch (error) {
     next(error);
   }
@@ -2916,7 +3049,20 @@ app.post('/api/import/students', upload.array('contacts', 50), async (req, res, 
 app.get('/api/schedule-exceptions', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
-    res.json(db.scheduleExceptions || []);
+    
+    function getValidExceptions(list) {
+      if (!list) return [];
+      const now = new Date();
+      return list.filter(e => {
+        if (e.type === 'bu_tam' && e.createdAt) {
+          const created = new Date(e.createdAt);
+          return (now - created) / (1000 * 60 * 60 * 24) <= 6;
+        }
+        return true;
+      });
+    }
+    
+    res.json(getValidExceptions(db.scheduleExceptions));
   } catch (error) {
     next(error);
   }
@@ -2954,6 +3100,70 @@ app.delete('/api/schedule-exceptions/:id', async (req, res, next) => {
     const idx = db.scheduleExceptions.findIndex(e => e.id === req.params.id);
     if (idx !== -1) {
       db.scheduleExceptions.splice(idx, 1);
+      await saveBranchDb(req, db);
+    }
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ==================== EXAMS & SCORES ====================
+app.get('/api/exams', async (req, res, next) => {
+  try {
+    const db = await getBranchDb(req);
+    if (!db.exams) db.exams = [];
+    
+    let exams = db.exams;
+    if (req.query.className) {
+      exams = exams.filter(e => e.className === req.query.className);
+    }
+    res.json(exams);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/exams', async (req, res, next) => {
+  try {
+    const db = await getBranchDb(req);
+    if (!db.exams) db.exams = [];
+    
+    const { id, className, examName, date, scores } = req.body;
+    let exam = db.exams.find(e => e.id === id);
+    
+    if (exam) {
+      exam.className = className;
+      exam.examName = examName;
+      exam.date = date;
+      exam.scores = scores;
+    } else {
+      exam = {
+        id: id || Date.now().toString() + Math.random().toString(36).substr(2, 5),
+        className,
+        examName,
+        date,
+        scores: scores || [],
+        createdAt: new Date().toISOString()
+      };
+      db.exams.push(exam);
+    }
+    
+    await saveBranchDb(req, db);
+    res.json(exam);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/exams/:id', async (req, res, next) => {
+  try {
+    const db = await getBranchDb(req);
+    if (!db.exams) db.exams = [];
+    
+    const idx = db.exams.findIndex(e => e.id === req.params.id);
+    if (idx !== -1) {
+      db.exams.splice(idx, 1);
       await saveBranchDb(req, db);
     }
     res.json({ success: true });

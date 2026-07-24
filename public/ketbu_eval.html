@@ -29,6 +29,8 @@
         .btn-success:hover { background: #059669; }
         .btn-danger { width: 100%; padding: 12px; background: #ef4444; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; margin-top: 10px; }
         .btn-danger:hover { background: #dc2626; }
+        .btn-secondary { width: 100%; padding: 12px; background: #64748b; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-secondary:hover { background: #475569; }
         .btn-disabled { opacity: 0.5; cursor: not-allowed; }
 
         /* Screens */
@@ -152,7 +154,7 @@
     </div>
 
     <div id="screen-1">
-        <h2>Bước 1: Khai báo Ca Dạy</h2>
+        <h2 style="text-align: center;">Thông tin ca dạy</h2>
         
         <div class="flex-row">
             <div class="form-group">
@@ -169,8 +171,11 @@
                     <option value="H1">H1</option>
                     <option value="H2">H2</option>
                     <option value="H3">H3</option>
+                    <option value="H4">H4</option>
+                    <option value="Đ1">Đ1</option>
                     <option value="Đ2">Đ2</option>
                     <option value="Đ3">Đ3</option>
+                    <option value="Đ4">Đ4</option>
                     <option value="TH">TH</option>
                 </select>
             </div>
@@ -215,7 +220,10 @@
             <div style="text-align:center; padding: 20px; color:#64748b;">Đang tải danh sách học sinh...</div>
         </div>
 
-        <button class="btn-danger" onclick="endShift()">Kết thúc ca dạy</button>
+        <div style="display: flex; justify-content: space-between; margin-top: 20px; gap: 15px;">
+            <button class="btn-secondary" onclick="cancelCurrentSession()">Hủy ca dạy này</button>
+            <button class="btn-danger" style="margin-top: 0;" onclick="endShift()">Kết thúc ca dạy</button>
+        </div>
     </div>
 </div>
 
@@ -236,11 +244,14 @@
         const res = await fetch(endpoint, options);
         if (!res.ok) {
             let errMsg = 'API Error';
+            let errData = {};
             try {
-                const errData = await res.json();
+                errData = await res.json();
                 if (errData.error) errMsg = errData.error;
             } catch(e) {}
-            throw new Error(errMsg);
+            const err = new Error(errMsg);
+            err.data = errData;
+            throw err;
         }
         return await res.json();
     }
@@ -265,7 +276,7 @@
             }
         } catch(e) {}
     }
-    window.onload = loadClasses;
+    loadClasses();
 
     async function startShift() {
         currentShift = document.getElementById('shiftName').value; // Ca 1
@@ -287,10 +298,28 @@
         document.getElementById('startBtn').disabled = true;
 
         try {
-            const res = await apiRequest('/api/teaching-sessions', 'POST', {
+            const payload = {
                 teacherName: `${teacherName} (${currentShift})`, 
                 className, shift: currentPart, lessonName: "", exercises: ""
-            });
+            };
+            
+            let res;
+            try {
+                res = await apiRequest('/api/teaching-sessions', 'POST', payload);
+            } catch (e) {
+                if (e.data && e.data.canTakeOver) {
+                    const takeOverConfirmed = await showCustomConfirm(e.message);
+                    if (takeOverConfirmed) {
+                        payload.takeOver = true;
+                        res = await apiRequest('/api/teaching-sessions', 'POST', payload);
+                    } else {
+                        throw new Error("Đã hủy vào lớp.");
+                    }
+                } else {
+                    throw e;
+                }
+            }
+            
             currentSession = res.session;
 
             document.getElementById('screen-1').style.display = 'none';
@@ -314,6 +343,28 @@
             showToast(e.message);
             document.getElementById('startBtn').textContent = "Bắt đầu vào lớp";
             document.getElementById('startBtn').disabled = false;
+        }
+    }
+
+    async function cancelCurrentSession() {
+        if (!currentSession || !currentSession.id) return;
+        
+        const confirmCancel = await showCustomConfirm("Bạn có chắc chắn muốn hủy ca dạy này không? Thao tác này sẽ xóa ca dạy khỏi hệ thống (Dùng khi vào nhầm lớp).");
+        if (!confirmCancel) return;
+        
+        try {
+            await apiRequest(`/api/teaching-sessions/${currentSession.id}`, 'DELETE');
+            showToast("Đã hủy ca dạy thành công!");
+            // Reset UI to start
+            document.getElementById('screen-2').style.display = 'none';
+            document.getElementById('screen-1').style.display = 'block';
+            currentSession = null;
+            document.getElementById('className').value = '';
+            document.getElementById('teacherName').value = '';
+            document.getElementById('startBtn').textContent = "Bắt đầu vào lớp";
+            document.getElementById('startBtn').disabled = false;
+        } catch(e) {
+            showToast("Lỗi khi hủy ca dạy: " + e.message);
         }
     }
 
@@ -371,12 +422,19 @@
             if (st.isMakeupToday) rowClasses += ' is-makeup';
             if (st.isStuckToday) rowClasses += ' is-stuck';
             
-            let statusBadgeHtml = `<span class="status-badge" style="display:${(isAbsent || isEarly) ? 'inline-block' : 'none'}; background:${isEarly ? '#10b981' : '#ef4444'}">${isEarly ? 'VỀ SỚM' : 'VẮNG'}</span>`;
+            let statusBadgeHtml = '';
+            if (st.isStuckToday) {
+                statusBadgeHtml = `<span class="status-badge" style="display:inline-block; background:#f59e0b;">KẸT LỊCH</span>`;
+            } else {
+                statusBadgeHtml = `<span class="status-badge" style="display:${(isAbsent || isEarly) ? 'inline-block' : 'none'}; background:${isEarly ? '#10b981' : '#ef4444'}">${isEarly ? 'VỀ SỚM' : 'VẮNG'}</span>`;
+            }
             let makeupBadgeHtml = st.isMakeupToday ? `<span class="makeup-badge">${st.makeupType === 'bu_tam' ? 'BÙ TẠM' : 'HỌC BÙ'}</span>` : '';
             let stuckSubText = '';
-            if (st.isStuckToday) {
-                const typeText = st.stuckType === 'bu_tam' ? 'Bù tạm' : 'Bù';
-                stuckSubText = `<div style="font-size:12px; color:#3b82f6; font-weight:bold; margin-top:2px;">Kẹt ${st.stuckDay || ''} ➔ ${typeText} ${st.makeupDay || ''} (${st.makeupClass || ''})</div>`;
+            if (st.allExceptions && st.allExceptions.length > 0) {
+                stuckSubText = st.allExceptions.map(e => {
+                    const typeText = e.type === 'bu_tam' ? 'Bù tạm' : 'Bù';
+                    return `<div style="font-size:12px; color:#3b82f6; font-weight:bold; margin-top:2px;">Kẹt T${e.stuckDay || ''} ➔ ${typeText} T${e.makeupDay || ''} (${e.makeupClass || ''})</div>`;
+                }).join('');
             }
 
             return `
@@ -701,10 +759,22 @@
             const st = res.student || {};
             const cachedSt = studentData.find(s => s.id === studentId) || {};
             
+            
+            // Lọc ra các đánh giá từ mốc "Đã báo phụ huynh" gần nhất
+            let relevantHistory = res.history || [];
+            const checkPartsForHistory = ['H1', 'H2'].includes(currentPart) ? ['H1', 'H2'] : [currentPart];
+            const partHistory = relevantHistory.filter(h => checkPartsForHistory.includes(h.part));
+            const lastNotifiedIdx = partHistory.findIndex(h => h.status === 'Đã báo phụ huynh');
+            if (lastNotifiedIdx !== -1) {
+                relevantHistory = partHistory.slice(0, lastNotifiedIdx);
+            } else {
+                relevantHistory = partHistory;
+            }
+
             let warningBanner = '';
             if (cachedSt.trend_status === 'down') {
                 const checkParts = ['H1', 'H2'].includes(currentPart) ? ['H1', 'H2'] : [currentPart];
-                const badEvals = res.history ? res.history.filter(h => checkParts.includes(h.part) && ['Sai hẳn', 'Kém (K)', 'Chép bài'].includes(h.status)).slice(0,3) : [];
+                const badEvals = relevantHistory.filter(h => checkParts.includes(h.part) && ['Sai hẳn', 'Kém (K)', 'Chép bài'].includes(h.status)).slice(0,3);
                 let reason = 'Học sinh liên tục đạt kết quả yếu';
                 let suggestion = 'Đề nghị quản lý xem xét chuyển lớp.';
                 let title = `⚠️ CẢNH BÁO CHUYỂN XUỐNG LỚP (Phần ${checkParts.join(' & ')})`;
@@ -735,10 +805,11 @@
                         }
                     }
                 }
-                warningBanner = `<div style="background:#fef2f2; border-left:4px solid #ef4444; padding:10px; margin-bottom:15px; border-radius:4px;"><strong style="color:#b91c1c;">${title}:</strong> <br><span style="font-size:13px; color:#7f1d1d;">${reason}. ${suggestion}</span></div>`;
+                const btnHtml = `<button onclick="markAsNotified('${studentId}')" style="margin-top:8px; background:#ef4444; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:12px; cursor:pointer;"><i class="fa-solid fa-check"></i> Đã báo phụ huynh</button>`;
+                warningBanner = `<div style="background:#fef2f2; border-left:4px solid #ef4444; padding:10px; margin-bottom:15px; border-radius:4px;"><strong style="color:#b91c1c;">${title}:</strong> <br><span style="font-size:13px; color:#7f1d1d;">${reason}. ${suggestion}</span><br>${btnHtml}</div>`;
             } else if (cachedSt.trend_status === 'up') {
                 const checkParts = ['H1', 'H2'].includes(currentPart) ? ['H1', 'H2'] : [currentPart];
-                const goodEvals = res.history ? res.history.filter(h => checkParts.includes(h.part) && ['Đúng', 'Tốt (T)'].includes(h.status)).slice(0,3) : [];
+                const goodEvals = relevantHistory.filter(h => checkParts.includes(h.part) && ['Đúng', 'Tốt (T)'].includes(h.status)).slice(0,3);
                 let reason = 'Học sinh liên tục đạt kết quả Tốt';
                 if (goodEvals.length > 0) {
                     const statusCount = {};
@@ -768,6 +839,27 @@
                         Mã HS: <b>${st.code || 'N/A'}</b> | Lớp: <b>${st.className || 'N/A'}</b>
                     </div>
                     
+
+                    ${(function(){
+                        if (!res.exams || res.exams.length === 0) return '';
+                        const seen = new Set();
+                        const unique = [];
+                        [...res.exams].reverse().forEach(e => {
+                            if(!seen.has(e.examName)) {
+                                seen.add(e.examName);
+                                unique.push(e);
+                            }
+                        });
+                        let examHtml = `<h4 style="margin: 20px 0 10px 0; color:#8b5cf6; font-size:15px;"><i class="fa-solid fa-star"></i> Lịch sử điểm thi</h4>`;
+                        examHtml += unique.map(e => `
+                          <div style="border-bottom: 1px dashed #e2e8f0; padding-bottom: 8px; margin-bottom: 8px;">
+                            <strong style="color: #3b82f6;">${e.examName}</strong>: <span style="font-weight:bold; color:#0f172a;">${e.score}</span>
+                            <div style="font-size: 12px; color: #475569; margin-top: 4px; font-style: italic;">${e.comment || ''}</div>
+                          </div>
+                        `).join('');
+                        return examHtml;
+                    })()}
+
                     ${warningBanner}
                     
                     <div style="font-size:12px; color:#94a3b8; font-weight:bold; margin-bottom:8px; text-transform:uppercase;">THÔNG TIN CHUNG</div>
@@ -798,7 +890,8 @@
                 `}).join('');
             }
             
-            html += `<h4 style="margin: 20px 0 10px 0; color:#3b82f6; font-size:15px;"><i class="fa-solid fa-clock-rotate-left"></i> Lịch sử đánh giá</h4>`;
+            
+html += `<h4 style="margin: 20px 0 10px 0; color:#3b82f6; font-size:15px;"><i class="fa-solid fa-clock-rotate-left"></i> Lịch sử đánh giá</h4>`;
             
             if (!res.history || res.history.length === 0) {
                 html += `<div style="font-size:13px; color:#94a3b8; font-style:italic;">Chưa có dữ liệu đánh giá.</div>`;
@@ -852,6 +945,28 @@
         }
     }
 
+    
+    async function markAsNotified(studentId) {
+        if (!confirm('Đánh dấu là đã báo phụ huynh? Hành động này sẽ tạo một mốc lịch sử và xóa cảnh báo hiện tại.')) return;
+        try {
+            const evUrl = window.studentEvidenceUrls ? window.studentEvidenceUrls[studentId] : '';
+            await apiRequest('/api/evaluations', 'POST', {
+                sessionId: currentSession ? currentSession.id : null,
+                studentId,
+                location: 'Hệ thống',
+                status: 'Đã báo phụ huynh',
+                part: 'Thông báo',
+                evidenceUrl: evUrl || ''
+            });
+            showToast('Đã lưu mốc lịch sử thành công!');
+            // Reload the history panel
+            setTimeout(() => openHistoryPanel(studentId), 500);
+        } catch(e) {
+            console.error(e);
+            showToast('Lỗi: ' + e.message);
+        }
+    }
+
     function closeHistoryPanel() {
         document.getElementById('panelOverlay').classList.remove('active');
         document.getElementById('historyPanel').classList.remove('active');
@@ -888,6 +1003,50 @@
             setTimeout(() => toast.remove(), 300);
         }, 3000);
     }
+</script>
+
+<div id="customConfirmModal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; justify-content:center; align-items:center;">
+    <div style="background:#fff; padding:24px; border-radius:12px; width:400px; max-width:90%; box-shadow: 0 10px 25px rgba(0,0,0,0.2); font-family: sans-serif; color:#0f172a;">
+        <h3 style="margin-top:0; font-size:18px; color:#1e293b;">Thông báo từ hệ thống</h3>
+        <p id="customConfirmMessage" style="margin-bottom:24px; font-size:15px; line-height:1.5; white-space: pre-wrap;"></p>
+        <div style="display:flex; justify-content:flex-end; gap:12px;">
+            <button id="customConfirmCancel" class="btn" style="background:#f1f5f9; color:#475569; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-weight:600; font-size: 14px;">Hủy</button>
+            <button id="customConfirmOk" class="btn" style="background:#3b82f6; color:#fff; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-weight:600; font-size: 14px;">OK</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function showCustomConfirm(message) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('customConfirmModal');
+        const messageEl = document.getElementById('customConfirmMessage');
+        const btnOk = document.getElementById('customConfirmOk');
+        const btnCancel = document.getElementById('customConfirmCancel');
+
+        messageEl.textContent = message;
+        modal.style.display = 'flex';
+
+        const handleOk = () => {
+            cleanup();
+            resolve(true);
+        };
+
+        const handleCancel = () => {
+            cleanup();
+            resolve(false);
+        };
+
+        const cleanup = () => {
+            modal.style.display = 'none';
+            btnOk.removeEventListener('click', handleOk);
+            btnCancel.removeEventListener('click', handleCancel);
+        };
+
+        btnOk.addEventListener('click', handleOk);
+        btnCancel.addEventListener('click', handleCancel);
+    });
+}
 </script>
 </body>
 </html>
