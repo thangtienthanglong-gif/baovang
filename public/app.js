@@ -2887,11 +2887,64 @@ function showTeacherPromptModal() {
     });
 }
 
-window.markAsNotifiedMain = async function(studentId) {
-    const finalTeacher = await showTeacherPromptModal();
-    if (!finalTeacher) return;
+function showDuplicateNotifyModal(teacherName, dateStr) {
+    return new Promise((resolve) => {
+        let modal = document.getElementById('duplicateNotifyModal');
+        let teacherEl = document.getElementById('dupNotifyTeacher');
+        let dateEl = document.getElementById('dupNotifyDate');
+        let btnConfirm = document.getElementById('dupNotifyConfirm');
+        let btnCancel = document.getElementById('dupNotifyCancel');
 
+        if (!modal) return resolve(confirm(`Hôm nay học sinh này đã được ${teacherName} báo phụ huynh. Bạn có muốn tiếp tục ghi nhận không?`));
+
+        if (modal.parentNode !== document.body) {
+            document.body.appendChild(modal);
+        }
+        modal.style.zIndex = '999999';
+
+        if (teacherEl) teacherEl.textContent = teacherName || 'Giáo viên khác';
+        if (dateEl) dateEl.textContent = dateStr || 'hôm nay';
+        modal.style.display = 'flex';
+
+        const handleConfirm = () => {
+            cleanup();
+            resolve(true);
+        };
+
+        const handleCancel = () => {
+            cleanup();
+            resolve(false);
+        };
+
+        const cleanup = () => {
+            modal.style.display = 'none';
+            btnConfirm.removeEventListener('click', handleConfirm);
+            btnCancel.removeEventListener('click', handleCancel);
+        };
+
+        btnConfirm.addEventListener('click', handleConfirm);
+        btnCancel.addEventListener('click', handleCancel);
+    });
+}
+
+window.markAsNotifiedMain = async function(studentId) {
     try {
+        const histData = await api(`/api/ketbu/students/${studentId}/history`).catch(() => null);
+        const history = histData?.history || [];
+        const todayStr = state.today || new Date().toISOString().slice(0, 10);
+        
+        const todayStart = new Date(todayStr + 'T00:00:00').getTime();
+        const existingToday = history.find(h => h.status === 'Đã báo phụ huynh' && parseViDate(h.date) >= todayStart);
+        if (existingToday) {
+            const teacherStr = existingToday.teacher || (existingToday.lessonName ? existingToday.lessonName.replace(/^GV:\s*/, '') : 'Giáo viên khác');
+            const dateDisplay = existingToday.date ? new Date(parseViDate(existingToday.date)).toLocaleDateString('vi-VN') : 'hôm nay';
+            const proceed = await showDuplicateNotifyModal(teacherStr, dateDisplay);
+            if (!proceed) return;
+        }
+
+        const finalTeacher = await showTeacherPromptModal();
+        if (!finalTeacher) return;
+
         await api('/api/evaluations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
