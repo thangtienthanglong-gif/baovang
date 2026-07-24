@@ -754,7 +754,7 @@ function renderClassDropdown() {
   });
 
   dropdown.innerHTML = optionsHtml.join('');
-  dropdown.value = validClasses.includes(activeClass) ? activeClass : 'ALL';
+  dropdown.value = classNames.includes(activeClass) ? activeClass : 'ALL';
 
   const selectedStudents = dropdown.value === 'ALL' ? validStudents : (groups[dropdown.value] || []);
   const selectedAbsences = dropdown.value === 'ALL'
@@ -2342,6 +2342,7 @@ function initEvents() {
   });
 
   $('#classDropdown')?.addEventListener('change', async event => {
+    if ($('#quickStudentSearchMain')) $('#quickStudentSearchMain').value = '';
     $('#filterClass').value = event.target.value;
     await loadAttendanceAbsences();
   });
@@ -2996,6 +2997,9 @@ window.openHistoryPanel = async function(studentId) {
         let html = `
             <div style="margin-bottom: 20px;">
                 <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:15px;">
+                    <button onclick="openExamSelectForStudent('${studentId}', '${st.className || ''}')" style="background:#6366f1; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                        <i class="fa-solid fa-star"></i> Nhập điểm thi
+                    </button>
                     <button onclick="openMakeupModal('${studentId}', '${(st.fullName||st.name||'').replace(/'/g, "\\'")}', '${st.className}')" style="background:#8b5cf6; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:4px;">
                         <i class="fa-solid fa-repeat"></i> Kẹt & Bù
                     </button>

@@ -222,7 +222,31 @@ async function openExamInput(className, examName) {
   
   examInputList.innerHTML = html;
   document.getElementById('examInputModal').style.display = 'flex';
+
+  if (window.currentTargetStudentId) {
+    const targetInput = document.querySelector(`.exam-score-input[data-studentid="${window.currentTargetStudentId}"]`);
+    if (targetInput) {
+      setTimeout(() => {
+        targetInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targetInput.focus();
+        targetInput.style.border = '2px solid #6366f1';
+        targetInput.style.boxShadow = '0 0 8px rgba(99,102,241,0.5)';
+        window.currentTargetStudentId = null;
+      }, 200);
+    }
+  }
 }
+
+window.openExamSelectForStudent = function(studentId, className) {
+  const cls = className || 'ALL';
+  if (!cls || cls === 'ALL') {
+    toast('Học sinh chưa có thông tin lớp.', 'warning');
+    return;
+  }
+  window.currentTargetStudentId = studentId;
+  document.getElementById('examSelectClass').value = cls;
+  document.getElementById('examSelectModal').style.display = 'flex';
+};
 
 async function saveExamScores() {
   const scores = [];
