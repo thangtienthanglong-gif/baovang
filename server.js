@@ -2319,7 +2319,7 @@ app.post('/api/evaluations', async (req, res, next) => {
     if (!db.branches[branchId].evaluations) db.branches[branchId].evaluations = [];
     if (!db.branches[branchId].warnings) db.branches[branchId].warnings = [];
     
-    const { sessionId, studentId, location, status, note, part, evidenceUrl } = req.body;
+    const { sessionId, studentId, location, status, note, part, evidenceUrl, lessonName, teacher } = req.body;
     
     const evalObj = {
       id: id('eval'),
@@ -2328,6 +2328,8 @@ app.post('/api/evaluations', async (req, res, next) => {
       location,
       status,
       part,
+      lessonName: lessonName || (teacher ? 'GV: ' + teacher : ''),
+      teacher: teacher || (lessonName ? lessonName.replace(/^GV:\s*/, '') : ''),
       note: note || '',
       evidenceUrl: evidenceUrl || '',
       timestamp: nowISO()

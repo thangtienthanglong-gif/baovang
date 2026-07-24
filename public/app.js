@@ -2831,15 +2831,15 @@ window.closeHistoryPanel = function() {
 };
 
 function parseViDate(d) {
-    if (!d) return new Date(0);
-    if (d instanceof Date) return d;
+    if (!d) return 0;
+    if (d instanceof Date) return d.getTime();
     const str = String(d).trim();
     if (str.includes('/')) {
         const p = str.split('/');
-        if (p.length === 3) return new Date(`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}T23:59:59`);
+        if (p.length === 3) return new Date(`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}T23:59:59`).getTime();
     }
-    const parsed = new Date(str);
-    return isNaN(parsed) ? new Date(0) : parsed;
+    const parsed = new Date(str.length === 10 ? str + 'T23:59:59' : str);
+    return isNaN(parsed.getTime()) ? 0 : parsed.getTime();
 }
 
 function showTeacherPromptModal() {
@@ -2900,11 +2900,12 @@ window.markAsNotifiedMain = async function(studentId) {
                 location: 'Hệ thống',
                 status: 'Đã báo phụ huynh',
                 part: 'Thông báo',
-                lessonName: 'GV: ' + finalTeacher
+                lessonName: 'GV: ' + finalTeacher,
+                teacher: finalTeacher
             })
         });
         toast('Đã ghi nhận mốc báo phụ huynh (GV: ' + finalTeacher + ')!', 'success');
-        openHistoryPanel(studentId);
+        await openHistoryPanel(studentId);
     } catch(e) { console.error(e); }
 };
 
@@ -2930,7 +2931,7 @@ window.openHistoryPanel = async function(studentId) {
         let relevantHistory = allHistory;
         if (lastNotifiedIdx !== -1) {
             const notifDate = parseViDate(allHistory[lastNotifiedIdx].date);
-            const daysDiff = (new Date() - notifDate) / (1000 * 60 * 60 * 24);
+            const daysDiff = (Date.now() - notifDate) / (1000 * 60 * 60 * 24);
             if (daysDiff <= 30) {
                 relevantHistory = allHistory.slice(0, lastNotifiedIdx);
             }
@@ -2977,13 +2978,12 @@ window.openHistoryPanel = async function(studentId) {
                 notifiedDate = parseViDate(notifiedObj.date);
                 notifiedDateStr = new Date(notifiedDate).toLocaleDateString('vi-VN');
             }
-            if (notifiedObj.lessonName && notifiedObj.lessonName.trim()) {
-                notifiedTeacher = notifiedObj.lessonName.trim();
-            } else if (notifiedObj.teacher && notifiedObj.teacher.trim()) {
+            if (notifiedObj.teacher && notifiedObj.teacher.trim()) {
                 notifiedTeacher = 'GV: ' + notifiedObj.teacher.trim();
+            } else if (notifiedObj.lessonName && notifiedObj.lessonName.trim()) {
+                notifiedTeacher = notifiedObj.lessonName.trim().startsWith('GV:') ? notifiedObj.lessonName.trim() : 'GV: ' + notifiedObj.lessonName.trim();
             } else {
-                const savedTeacher = localStorage.getItem('savedTransferTeacher') || localStorage.getItem('savedTeacherName');
-                if (savedTeacher) notifiedTeacher = 'GV: ' + savedTeacher.trim();
+                notifiedTeacher = '';
             }
         }
 
@@ -3517,12 +3517,15 @@ document.addEventListener('submit', async (e) => {
       if (idx !== -1) state.students[idx] = res || payload;
       
       document.getElementById('transferClassModal').style.display = 'none';
-      document.getElementById('studentProfileDrawer').classList.remove('open');
-      document.getElementById('studentDrawerBackdrop').classList.remove('show');
+      document.getElementById('studentProfileDrawer')?.classList.remove('open');
+      document.getElementById('studentDrawerBackdrop')?.classList.remove('show');
       toast('Chuyển lớp thành công!', 'success');
       renderClassDropdown();
       renderFilters();
       renderRoster();
+      if (document.getElementById('historyPanel')?.classList.contains('active')) {
+        openHistoryPanel(id);
+      }
     } catch(err) {
       console.error(err);
       toast(err.message || 'Lỗi chuyển lớp', 'error');
@@ -3544,5 +3547,10 @@ function openTransferClassModal(studentId) {
     document.getElementById('transferTeacherName').value = localStorage.getItem('savedTransferTeacher');
   }
   
-  document.getElementById('transferClassModal').style.display = 'flex';
+  const modal = document.getElementById('transferClassModal');
+  if (modal) {
+    if (modal.parentNode !== document.body) document.body.appendChild(modal);
+    modal.style.zIndex = '999999';
+    modal.style.display = 'flex';
+  }
 }
