@@ -777,8 +777,17 @@ function renderRoster() {
   const dateStr = selectedDate();
   const activeSession = selectedSession();
   const activeDay = selectedDay();
+  const searchQuery = ($('#quickStudentSearchMain')?.value || '').trim().toLowerCase();
   
   const filtered = activeStudents().filter(student => {
+    if (searchQuery) {
+      const matchSearch = (student.fullName || student.name || '').toLowerCase().includes(searchQuery) ||
+                          (student.code || '').toLowerCase().includes(searchQuery) ||
+                          (student.className || '').toLowerCase().includes(searchQuery) ||
+                          (student.phone1 || student.phone2 || '').toLowerCase().includes(searchQuery);
+      if (!matchSearch) return false;
+      return true;
+    }
     const studentClass = student.className || 'Chưa có lớp';
     const info = getClassScheduleInfo(studentClass, dateStr, activeDay);
     
@@ -2781,6 +2790,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // ==================== QUICK STUDENT SEARCH & NOTIFY ====================
 window.onQuickSearchStudentMain = function(query) {
+  renderRoster();
   const resultsContainer = document.getElementById('quickSearchResultsMain');
   if (!resultsContainer) return;
   const q = (query || '').trim().toLowerCase();
@@ -2948,6 +2958,21 @@ window.openHistoryPanel = async function(studentId) {
 
         let html = `
             <div style="margin-bottom: 20px;">
+                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:15px;">
+                    <button onclick="markAsNotifiedMain('${studentId}')" style="background:#10b981; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                        <i class="fa-solid fa-phone-volume"></i> Đã báo PH
+                    </button>
+                    <button onclick="openMakeupModal('${studentId}', '${(st.fullName||st.name||'').replace(/'/g, "\\'")}', '${st.className}')" style="background:#8b5cf6; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                        <i class="fa-solid fa-repeat"></i> Kẹt & Bù
+                    </button>
+                    <button onclick="openTransferClassModal('${studentId}')" style="background:#0d9488; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                        <i class="fa-solid fa-right-left"></i> Chuyển lớp
+                    </button>
+                    <button onclick="openEditStudentModal('${studentId}')" style="background:#3b82f6; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                        <i class="fa-solid fa-pen"></i> Sửa
+                    </button>
+                </div>
+
                 <div style="margin-bottom:12px;">
                     <h4 style="margin:0 0 5px 0; font-size:22px; color:#1e293b;">${st.name || st.fullName || 'Chưa rõ tên'}</h4>
                     <div style="font-size:13px; color:#64748b;">
