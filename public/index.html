@@ -1029,6 +1029,30 @@
     </form>
   </div>
 </div>
+<!-- Custom Floating Teacher Prompt Modal -->
+<div id="teacherPromptModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); z-index:20000; justify-content:center; align-items:center;">
+    <div style="background:white; border-radius:16px; padding:24px 28px; width:380px; max-width:90vw; box-shadow:0 20px 40px rgba(0,0,0,0.25); text-align:left;">
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:14px;">
+            <div style="width:40px; height:40px; border-radius:50%; background:#e6f4ea; color:#10b981; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                <i class="fa-solid fa-phone-volume"></i>
+            </div>
+            <div>
+                <h3 style="margin:0; font-size:17px; color:#1e293b;">Báo phụ huynh</h3>
+                <span style="font-size:12px; color:#64748b;">Ghi nhận mốc trao đổi tình hình học tập</span>
+            </div>
+        </div>
+        
+        <div style="margin-bottom:20px;">
+            <label style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:6px;">Tên giáo viên thực hiện:</label>
+            <input type="text" id="teacherPromptInput" placeholder="Nhập tên GV (VD: Thầy Vũ, Cô Trang...)" style="width:100%; padding:10px 14px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; outline:none; box-sizing:border-box;" onkeypress="if(event.key==='Enter') document.getElementById('teacherPromptConfirm').click();">
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+            <button type="button" id="teacherPromptCancel" style="padding:9px 18px; border:none; background:#f1f5f9; color:#475569; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer;">Hủy</button>
+            <button type="button" id="teacherPromptConfirm" style="padding:9px 20px; border:none; background:#10b981; color:white; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer; box-shadow:0 2px 6px rgba(16,185,129,0.3);">Xác nhận</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
 

@@ -2827,12 +2827,49 @@ window.closeHistoryPanel = function() {
     if (panel) panel.classList.remove('active');
 };
 
+function showTeacherPromptModal() {
+    return new Promise((resolve) => {
+        let modal = document.getElementById('teacherPromptModal');
+        let input = document.getElementById('teacherPromptInput');
+        let btnConfirm = document.getElementById('teacherPromptConfirm');
+        let btnCancel = document.getElementById('teacherPromptCancel');
+
+        if (!modal) return resolve(localStorage.getItem('savedTransferTeacher') || 'Giáo viên');
+
+        input.value = localStorage.getItem('savedTransferTeacher') || localStorage.getItem('savedTeacherName') || '';
+        modal.style.display = 'flex';
+        setTimeout(() => input.focus(), 100);
+
+        const handleConfirm = () => {
+            const val = input.value.trim();
+            if (!val) {
+                alert('Vui lòng nhập tên giáo viên!');
+                return;
+            }
+            localStorage.setItem('savedTransferTeacher', val);
+            cleanup();
+            resolve(val);
+        };
+
+        const handleCancel = () => {
+            cleanup();
+            resolve(null);
+        };
+
+        const cleanup = () => {
+            modal.style.display = 'none';
+            btnConfirm.removeEventListener('click', handleConfirm);
+            btnCancel.removeEventListener('click', handleCancel);
+        };
+
+        btnConfirm.addEventListener('click', handleConfirm);
+        btnCancel.addEventListener('click', handleCancel);
+    });
+}
+
 window.markAsNotifiedMain = async function(studentId) {
-    const savedTeacher = localStorage.getItem('savedTransferTeacher') || localStorage.getItem('savedTeacherName') || '';
-    const teacherName = prompt('Nhập tên giáo viên thực hiện báo phụ huynh:', savedTeacher);
-    if (teacherName === null) return;
-    const finalTeacher = teacherName.trim() || 'Giáo viên';
-    localStorage.setItem('savedTransferTeacher', finalTeacher);
+    const finalTeacher = await showTeacherPromptModal();
+    if (!finalTeacher) return;
 
     try {
         await api('/api/evaluations', {
@@ -2959,9 +2996,6 @@ window.openHistoryPanel = async function(studentId) {
         let html = `
             <div style="margin-bottom: 20px;">
                 <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:15px;">
-                    <button onclick="markAsNotifiedMain('${studentId}')" style="background:#10b981; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:4px;">
-                        <i class="fa-solid fa-phone-volume"></i> Đã báo PH
-                    </button>
                     <button onclick="openMakeupModal('${studentId}', '${(st.fullName||st.name||'').replace(/'/g, "\\'")}', '${st.className}')" style="background:#8b5cf6; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:4px;">
                         <i class="fa-solid fa-repeat"></i> Kẹt & Bù
                     </button>
