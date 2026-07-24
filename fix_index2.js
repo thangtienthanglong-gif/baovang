@@ -2,14 +2,7 @@
 let content = fs.readFileSync('public/index.html', 'utf8');
 
 // 1. Drawer Header
-const oldHeader = `<header class="drawer-header" style="display: flex; align-items: center; justify-content: space-between;">
-      <h2 id="drawerStudentName" style="margin: 0;">Tên học sinh</h2>
-      <div style="display: flex; gap: 8px; align-items: center;">
-        <button id="openTransferClassBtn" class="btn secondary" type="button" style="padding: 4px 10px; font-size: 13px; background: #e2e8f0; color: #475569; border: none; border-radius: 4px; cursor: pointer;"><i class="fa-solid fa-right-left"></i> Chuyển lớp</button>
-        <button id="openEditStudentBtn" class="btn primary" type="button" style="padding: 4px 10px; font-size: 13px;"><i class="fa-solid fa-pen"></i> Sửa</button>
-        <button class="drawer-close" id="closeStudentDrawer" type="button" aria-label="Đóng" style="margin-left: 0;">&times;</button>
-      </div>
-    </header>`;
+const oldHeader = /<header class="drawer-header">\s*<h2 id="drawerStudentName">Tên học sinh<\/h2>\s*<button class="drawer-close" id="closeStudentDrawer" type="button" aria-label="Đóng">&times;<\/button>\s*<\/header>/;
 const newHeader = `<header class="drawer-header" style="display: flex; flex-direction: column; gap: 12px; position: relative;">
       <div style="display: flex; justify-content: space-between; align-items: flex-start;">
         <h2 id="drawerStudentName" style="margin: 0; line-height: 1.2; padding-right: 20px;">Tên học sinh</h2>
@@ -24,21 +17,14 @@ const newHeader = `<header class="drawer-header" style="display: flex; flex-dire
 content = content.replace(oldHeader, newHeader);
 
 // 2. Buttons in Roster Header
-const oldExport = `<button class="btn ghost export-btn" type="button">Xuất danh sách</button>`;
+const oldExport = /<button class="btn ghost export-btn" type="button">Xuất danh sách<\/button>/;
 const newExport = `<button class="btn primary btn-exam" id="openExamSelectBtn" type="button" style="margin-right: 8px;"><i class="fa-solid fa-star"></i> Nhập điểm thi</button>
               <button class="btn secondary" id="exportExamBtn" type="button" style="margin-right: 8px; background: #e2e8f0; color: #475569; border: none; padding: 6px 12px; border-radius: 4px;"><i class="fa-solid fa-file-excel"></i> Xuất Điểm</button>
               <button class="btn ghost export-btn" type="button">Xuất danh sách</button>`;
 content = content.replace(oldExport, newExport);
 
 // 3. Drawer history
-const oldDrawerHistory = `<div class="drawer-section">
-        <h3>Lịch sử chuyển lớp</h3>
-        <div id="drawerTransferHistory" class="drawer-history-list">
-          <div class="empty muted">Chưa có lịch sử chuyển lớp.</div>
-        </div>
-      </div>
-    </div>
-  </aside>`;
+const oldDrawerHistory = /<div class="drawer-section">\s*<h3>Lịch sử chuyển lớp<\/h3>\s*<div id="drawerTransferHistory" class="drawer-history-list">\s*<div class="empty muted">Chưa có lịch sử chuyển lớp.<\/div>\s*<\/div>\s*<\/div>\s*<\/div>\s*<\/aside>/;
 const newDrawerHistory = `<div class="drawer-section">
         <h3>Lịch sử chuyển lớp</h3>
         <div id="drawerTransferHistory" class="drawer-history-list">
@@ -107,9 +93,11 @@ const modals = `
   </div>
 </div>
 </body>`;
-content = content.replace('</body>', modals);
+if (!content.includes('examSelectModal')) {
+    content = content.replace('</body>', modals);
+}
 
 content = content.replace(/<script src="\/app\.js\?v=[0-9-]+"><\/script>/, '<script src="/app.js?v=20260724-1"></script>\n  <script src="/exams.js"></script>');
 
 fs.writeFileSync('public/index.html', content, 'utf8');
-console.log('Fixed index.html encoding and applied features.');
+console.log('index.html updated successfully.');

@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Chỉ Báo Xu Hướng (Trend Indicators)</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f6; padding: 20px; display: flex; justify-content: center; margin: 0; }
+        .app-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 700px; display: flex; flex-direction: column; gap: 20px; }
+        
+        /* Typography & Forms */
+        h2 { margin: 0 0 10px 0; color: #1e293b; }
+        p.subtitle { color: #64748b; margin: 0 0 20px 0; font-size: 14px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 500; color: #475569; }
+        select, input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 16px; outline: none; box-sizing: border-box;}
+        select:focus, input:focus { border-color: #3b82f6; }
+        .btn-primary { width: 100%; padding: 12px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-success { width: 100%; padding: 12px; background: #10b981; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-success:hover { background: #059669; }
+        .btn-danger { width: 100%; padding: 12px; background: #ef4444; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; margin-top: 10px; }
+        .btn-danger:hover { background: #dc2626; }
+
+        /* Screens */
+        #screen-2 { display: none; }
+
+        /* Banner */
+        .info-banner { background: #eff6ff; border: 1px solid #bfdbfe; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 14px; color: #1e3a8a;}
+        
+        /* Student Row */
+        .student-row { display: flex; align-items: center; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid #eee; transition: opacity 0.3s; flex-wrap: wrap;}
+        .student-row.is-absent { opacity: 0.6; background-color: #f8fafc; border-radius: 8px; padding: 15px 10px; }
+        .student-row.is-late { background-color: #fffbeb; border-radius: 8px; padding: 15px 10px; }
+        
+        .student-info { display: flex; align-items: center; gap: 15px; flex: 1; min-width: 250px;}
+        .avatar { width: 40px; height: 40px; background: #e0e7ff; color: #4f46e5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;}
+        .student-row.is-absent .avatar { background: #fee2e2; color: #ef4444; }
+        .student-row.is-late .avatar { background: #fef3c7; color: #d97706; }
+        
+        .name { font-weight: 500; font-size: 16px; display: flex; align-items: center; flex-wrap: wrap; gap: 5px;}
+        
+        /* Status Badges */
+        .status-badge { display: none; font-size: 11px; font-weight: bold; color: white; padding: 2px 6px; border-radius: 4px; }
+        .student-row.is-absent .status-badge { display: inline-block; background: #ef4444; }
+        .student-row.is-late .status-badge { display: inline-block; background: #f59e0b; }
+        
+        /* Trend Badges (Chỉ báo xu hướng) */
+        .trend-badge-down { font-size: 11px; font-weight: bold; background: #fee2e2; color: #b91c1c; padding: 2px 6px; border-radius: 4px; border: 1px solid #fca5a5; display: inline-flex; align-items: center; gap: 2px;}
+        .trend-badge-up { font-size: 11px; font-weight: bold; background: #dcfce7; color: #047857; padding: 2px 6px; border-radius: 4px; border: 1px solid #86efac; display: inline-flex; align-items: center; gap: 2px;}
+        .trend-badge-warning { font-size: 11px; font-weight: bold; background: #fef3c7; color: #b45309; padding: 2px 6px; border-radius: 4px; border: 1px solid #fcd34d; display: inline-flex; align-items: center; gap: 2px;}
+        
+        .note-preview { font-size: 12px; color: #d97706; margin-top: 4px; display: none; font-style: italic;}
+        
+        /* Actions & Popup */
+        .actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; width: 100%; justify-content: flex-end;}
+        
+        .icon-btn { padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: white; color: #475569; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 13px;}
+        .icon-btn:hover { background: #f1f5f9; }
+        .absent-toggle.active { background: #ef4444; color: white; border-color: #ef4444; }
+        .absent-toggle.late { background: #f59e0b; color: white; border-color: #f59e0b; }
+        .note-btn.has-note { background: #fef3c7; border-color: #f59e0b; color: #d97706; }
+        
+        .eval-buttons { display: flex; gap: 8px; }
+        .action-btn { 
+            position: relative; width: 50px; height: 50px; border-radius: 10px; border: 2px dashed #cbd5e1; 
+            background: #f8fafc; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .action-btn:hover { border-color: #94a3b8; background: #f1f5f9; }
+        .action-btn.has-value { border-style: solid; border-color: #3b82f6; background: #eff6ff; }
+        .action-btn.disabled { opacity: 0.3; pointer-events: none; border-color: #cbd5e1; background: #e2e8f0; }
+        
+        .popup-menu {
+            position: absolute; top: -100px; right: 0; transform: scale(0.9);
+            background: white; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            padding: 8px; display: flex; gap: 8px; opacity: 0; pointer-events: none; transition: all 0.2s;
+            z-index: 10;
+        }
+        .popup-menu.active { opacity: 1; pointer-events: auto; transform: scale(1); top: -85px; right: -50px;}
+        
+        .menu-item {
+            width: 45px; height: 45px; border-radius: 6px; border: 1px solid #e2e8f0; background: #f8fafc;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+        .menu-item:hover { background: #e2e8f0; }
+
+        /* SVG Styles */
+        svg { width: 36px; height: 36px; }
+        .text { font-family: monospace; font-size: 18px; font-weight: bold; fill: #1e293b; }
+        .text-kb { font-family: sans-serif; font-size: 22px; font-weight: bold; fill: #1e293b; }
+        .stroke-red { stroke: #ef4444; stroke-width: 2; fill: none; }
+        .stroke-orange { stroke: #f59e0b; stroke-width: 2; fill: none; }
+        
+        /* Modal Overlay */
+        .modal-overlay { display: none; position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
+        .modal { background: white; padding: 20px; border-radius: 12px; max-width: 300px; text-align: center;}
+        .modal h3 { margin-top: 0; color: #d97706;}
+
+        /* Smart Alert Toast - Đỏ (Hạ cấp) */
+        #smartAlertDown {
+            display: none; position: fixed; top: 20px; right: 20px; background: #fef2f2; border-left: 5px solid #ef4444; 
+            padding: 15px 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); border-radius: 6px; z-index: 999; max-width: 350px;
+            animation: slideIn 0.5s ease-out;
+        }
+        
+        /* Smart Alert Toast - Xanh (Thăng cấp) */
+        #smartAlertUp {
+            display: none; position: fixed; top: 20px; right: 20px; background: #f0fdf4; border-left: 5px solid #10b981; 
+            padding: 15px 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); border-radius: 6px; z-index: 999; max-width: 350px;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+        /* Logger Terminal */
+        .logger { background: #0f172a; color: #10b981; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 12px; height: 180px; overflow-y: auto; margin-top: 20px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
+        .log-entry { margin-bottom: 5px; border-bottom: 1px dashed #334155; padding-bottom: 5px;}
+        .log-time { color: #94a3b8; }
+        .log-alert { color: #ef4444; font-weight: bold; }
+        .log-warn { color: #f59e0b; font-weight: bold; }
+        .log-info { color: #3b82f6; font-weight: bold; }
+        .log-good { color: #10b981; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<!-- Smart Alert Down (Hạ cấp) -->
+<div id="smartAlertDown">
+    <h4 style="margin:0 0 5px 0; color: #b91c1c;">⚠️ CẢNH BÁO: CHUYỂN XUỐNG LỚP</h4>
+    <p style="margin:0; font-size: 13px; color: #7f1d1d;" id="smartAlertDownText">Học sinh bị Kém/Sai/Chép bài 3 lần!</p>
+    <button style="margin-top: 10px; background: #ef4444; color: white; border:none; padding: 5px 10px; border-radius: 4px; cursor: pointer;" onclick="document.getElementById('smartAlertDown').style.display='none'">Đã nhận</button>
+</div>
+
+<!-- Smart Alert Up (Thăng cấp) -->
+<div id="smartAlertUp">
+    <h4 style="margin:0 0 5px 0; color: #047857;">🏆 KHEN THƯỞNG: CHUYỂN LÊN LỚP</h4>
+    <p style="margin:0; font-size: 13px; color: #065f46;" id="smartAlertUpText">Học sinh đạt Tốt/Đúng 3 lần liên tiếp!</p>
+    <button style="margin-top: 10px; background: #10b981; color: white; border:none; padding: 5px 10px; border-radius: 4px; cursor: pointer;" onclick="document.getElementById('smartAlertUp').style.display='none'">Đã nhận</button>
+</div>
+
+<div class="app-container">
+    
+    <div id="screen-1">
+        <h2>Bước 1: Nhận Ca & Nội dung dạy</h2>
+        <div class="form-group" style="display:flex; gap: 15px;">
+            <div style="flex:1;"><label>Giáo viên</label><select id="teacherSelect"><option>Cô Lan</option><option>Thầy Hùng</option></select></div>
+            <div style="flex:1;"><label>Phần dạy</label><select id="shiftSelect"><option value="Đ2">Đ2</option><option value="H1">H1</option><option value="H2">H2</option></select></div>
+        </div>
+        <div class="form-group"><label>Tên bài dạy hôm nay</label><input type="text" id="lessonName" value="Căn Bậc Hai"></div>
+        <div class="form-group"><label>Bài tập làm tại lớp</label><input type="text" id="exercises" value="Bài 1, 2 SGK"></div>
+        <button class="btn-primary" onclick="startShift()">Bắt đầu vào lớp</button>
+    </div>
+
+    <div id="screen-2">
+        <div style="border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 10px;">
+            <h2 id="header-title">Lớp 10A - Đang dạy...</h2>
+            <div class="info-banner" id="banner-content"></div>
+            <p class="subtitle" style="color: #64748b; margin-bottom: 5px; font-style: italic;">👉 Giáo viên dễ dàng nhìn thấy <b>Chỉ báo xu hướng</b> bên cạnh tên học sinh ngay từ lúc vừa vào lớp để biết tình trạng của em đó ở phần Đ2.</p>
+        </div>
+
+        <!-- Học sinh 1: An (Đang có nguy cơ hỏng kiến thức Đ2) -->
+        <div class="student-row" id="row-AN">
+            <div class="student-info">
+                <div class="avatar">AN</div>
+                <div>
+                    <div class="name">
+                        Nguyễn Văn An 
+                        <span class="status-badge" id="badge-AN"></span>
+                        <span class="trend-badge-warning" title="Đã sai 2 lần liên tiếp ở phần Đ2">⚠️ Đang yếu Đ2</span>
+                    </div>
+                    <div class="note-preview" id="note-preview-AN"></div>
+                </div>
+            </div>
+            <div class="actions">
+                <div class="eval-buttons" id="eval-btns-AN">
+                    <!-- KHẢO BÀI -->
+                    <div class="action-btn" onclick="event.stopPropagation(); toggleMenu(this, 'Khảo Bài')">
+                        <span style="color: #94a3b8; font-size: 11px; text-align:center;">Khảo<br>Bài</span>
+                        <div class="popup-menu" onclick="event.stopPropagation()">
+                            <div class="menu-item" onclick="selectValue(this, 'Tốt (T)', 'AN')"><svg viewBox="0 0 40 40"><text x="20" y="27" text-anchor="middle" class="text-kb" style="fill:#10b981;">T</text></svg></div>
+                            <div class="menu-item" onclick="selectValue(this, 'Kém (K)', 'AN')"><svg viewBox="0 0 40 40"><text x="20" y="27" text-anchor="middle" class="text-kb" style="fill:#ef4444;">K</text></svg></div>
+                        </div>
+                    </div>
+                    <!-- BẢNG -->
+                    <div class="action-btn" onclick="event.stopPropagation(); toggleMenu(this, 'Bảng')">
+                        <span style="color: #94a3b8; font-size: 11px;">Bảng</span>
+                        <div class="popup-menu" onclick="event.stopPropagation()">
+                            <div class="menu-item" onclick="selectValue(this, 'Đúng', 'AN')"><svg viewBox="0 0 40 40"><text x="20" y="25" text-anchor="middle" class="text current-shift-label-upper">Đ2</text></svg></div>
+                            <div class="menu-item" onclick="selectValue(this, 'Sai nhẹ', 'AN')"><svg viewBox="0 0 40 40"><text x="20" y="25" text-anchor="middle" class="text current-shift-label-upper">Đ2</text><path d="M 12 10 Q 20 2 28 10" class="stroke-orange"/></svg></div>
+                            <div class="menu-item" onclick="selectValue(this, 'Sai hẳn', 'AN')"><svg viewBox="0 0 40 40"><text x="20" y="25" text-anchor="middle" class="text current-shift-label-upper">Đ2</text><circle cx="20" cy="20" r="16" class="stroke-red"/></svg></div>
+                            <div class="menu-item" onclick="selectValue(this, 'Chép bài', 'AN')"><svg viewBox="0 0 40 40"><text x="20" y="25" text-anchor="middle" class="text current-shift-label-upper">Đ2</text><circle cx="20" cy="20" r="16" class="stroke-red"/><line x1="8" y1="8" x2="32" y2="32" class="stroke-red"/></svg></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Học sinh 2: Bình (Đã đủ điều kiện thăng cấp Đ2) -->
+        <div class="student-row" id="row-BINH">
+            <div class="student-info">
+                <div class="avatar" style="background:#dcfce7; color:#166534;">BI</div>
+                <div>
+                    <div class="name">
+                        Trần Thanh Bình 
+                        <span class="status-badge" id="badge-BINH"></span>
+                        <span class="trend-badge-up" title="Đã đủ điều kiện lên lớp">⬆️ Đề xuất Lên lớp</span>
+                    </div>
+                    <div class="note-preview" id="note-preview-BINH"></div>
+                </div>
+            </div>
+            <div class="actions">
+                <div class="eval-buttons" id="eval-btns-BINH">
+                    <!-- KHẢO BÀI -->
+                    <div class="action-btn" onclick="event.stopPropagation(); toggleMenu(this, 'Khảo Bài')">
+                        <span style="color: #94a3b8; font-size: 11px; text-align:center;">Khảo<br>Bài</span>
+                        <div class="popup-menu" onclick="event.stopPropagation()">
+                            <div class="menu-item" onclick="selectValue(this, 'Tốt (T)', 'BINH')"><svg viewBox="0 0 40 40"><text x="20" y="27" text-anchor="middle" class="text-kb" style="fill:#10b981;">T</text></svg></div>
+                            <div class="menu-item" onclick="selectValue(this, 'Kém (K)', 'BINH')"><svg viewBox="0 0 40 40"><text x="20" y="27" text-anchor="middle" class="text-kb" style="fill:#ef4444;">K</text></svg></div>
+                        </div>
+                    </div>
+                    <!-- BẢNG -->
+                    <div class="action-btn" onclick="event.stopPropagation(); toggleMenu(this, 'Bảng')">
+                        <span style="color: #94a3b8; font-size: 11px;">Bảng</span>
+                        <div class="popup-menu" onclick="event.stopPropagation()">
+                            <div class="menu-item" onclick="selectValue(this, 'Đúng', 'BINH')"><svg viewBox="0 0 40 40"><text x="20" y="25" text-anchor="middle" class="text current-shift-label-upper">Đ2</text></svg></div>
+                            <div class="menu-item" onclick="selectValue(this, 'Sai nhẹ', 'BINH')"><svg viewBox="0 0 40 40"><text x="20" y="25" text-anchor="middle" class="text current-shift-label-upper">Đ2</text><path d="M 12 10 Q 20 2 28 10" class="stroke-orange"/></svg></div>
+                            <div class="menu-item" onclick="selectValue(this, 'Sai hẳn', 'BINH')"><svg viewBox="0 0 40 40"><text x="20" y="25" text-anchor="middle" class="text current-shift-label-upper">Đ2</text><circle cx="20" cy="20" r="16" class="stroke-red"/></svg></div>
+                            <div class="menu-item" onclick="selectValue(this, 'Chép bài', 'BINH')"><svg viewBox="0 0 40 40"><text x="20" y="25" text-anchor="middle" class="text current-shift-label-upper">Đ2</text><circle cx="20" cy="20" r="16" class="stroke-red"/><line x1="8" y1="8" x2="32" y2="32" class="stroke-red"/></svg></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Học sinh 3: Châu (Đã bị hạ cấp) -->
+        <div class="student-row" id="row-CHAU">
+            <div class="student-info">
+                <div class="avatar" style="background:#fee2e2; color:#b91c1c;">CH</div>
+                <div>
+                    <div class="name">
+                        Lê Ngọc Châu 
+                        <span class="status-badge" id="badge-CHAU"></span>
+                        <span class="trend-badge-down" title="Đã có quyết định chuyển xuống lớp bổ trợ">⬇️ Đề xuất Xuống lớp</span>
+                    </div>
+                    <div class="note-preview" id="note-preview-CHAU"></div>
+                </div>
+            </div>
+            <div class="actions">
+                <div class="eval-buttons" id="eval-btns-CHAU">
+                    <!-- KHẢO BÀI -->
+                    <div class="action-btn" onclick="event.stopPropagation(); toggleMenu(this, 'Khảo Bài')">
+                        <span style="color: #94a3b8; font-size: 11px; text-align:center;">Khảo<br>Bài</span>
+                        <div class="popup-menu" onclick="event.stopPropagation()">
+                            <div class="menu-item" onclick="selectValue(this, 'Tốt (T)', 'CHAU')"><svg viewBox="0 0 40 40"><text x="20" y="27" text-anchor="middle" class="text-kb" style="fill:#10b981;">T</text></svg></div>
+                            <div class="menu-item" onclick="selectValue(this, 'Kém (K)', 'CHAU')"><svg viewBox="0 0 40 40"><text x="20" y="27" text-anchor="middle" class="text-kb" style="fill:#ef4444;">K</text></svg></div>
+                        </div>
+                    </div>
+                    <!-- BẢNG -->
+                    <div class="action-btn" onclick="event.stopPropagation(); toggleMenu(this, 'Bảng')">
+                        <span style="color: #94a3b8; font-size: 11px;">Bảng</span>
+                        <div class="popup-menu" onclick="event.stopPropagation()">
+                            <div class="menu-item" onclick="selectValue(this, 'Đúng', 'CHAU')"><svg viewBox="0 0 40 40"><text x="20" y="25" text-anchor="middle" class="text current-shift-label-upper">Đ2</text></svg></div>
+                            <div class="menu-item" onclick="selectValue(this, 'Sai nhẹ', 'CHAU')"><svg viewBox="0 0 40 40"><text x="20" y="25" text-anchor="middle" class="text current-shift-label-upper">Đ2</text><path d="M 12 10 Q 20 2 28 10" class="stroke-orange"/></svg></div>
+                            <div class="menu-item" onclick="selectValue(this, 'Sai hẳn', 'CHAU')"><svg viewBox="0 0 40 40"><text x="20" y="25" text-anchor="middle" class="text current-shift-label-upper">Đ2</text><circle cx="20" cy="20" r="16" class="stroke-red"/></svg></div>
+                            <div class="menu-item" onclick="selectValue(this, 'Chép bài', 'CHAU')"><svg viewBox="0 0 40 40"><text x="20" y="25" text-anchor="middle" class="text current-shift-label-upper">Đ2</text><circle cx="20" cy="20" r="16" class="stroke-red"/><line x1="8" y1="8" x2="32" y2="32" class="stroke-red"/></svg></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn-danger" onclick="endShift()">Đóng Ca & Nộp Toàn Bộ</button>
+    </div>
+
+    <!-- MÔ PHỎNG DB (Log Terminal) -->
+    <div class="logger" id="logger">
+        <div><span class="log-time">[System]</span> Hỗ trợ: Gắn mác (Badge) Tình trạng Học tập bên cạnh tên Học sinh...</div>
+    </div>
+</div>
+
+<script>
+    let currentSession = {};
+    
+    // Counters cho An (Để test cái nhảy số 3)
+    let failCount = { 'AN': 2, 'BINH': 3, 'CHAU': 3 }; // Giả lập dữ liệu có sẵn từ DB
+
+    function addLog(msg) {
+        const logger = document.getElementById('logger');
+        const time = new Date().toLocaleTimeString();
+        logger.innerHTML += `<div class="log-entry"><span class="log-time">[${time}]</span> ${msg}</div>`;
+        logger.scrollTop = logger.scrollHeight;
+    }
+
+    function startShift() {
+        const teacher = document.getElementById('teacherSelect').value;
+        const shift = document.getElementById('shiftSelect').value;
+        const lesson = document.getElementById('lessonName').value;
+        const exercises = document.getElementById('exercises').value;
+        
+        currentSession = { teacher, shift, sessionId: "SS_" + Math.floor(Math.random()*1000) };
+
+        document.querySelectorAll('.current-shift-label-upper').forEach(el => el.textContent = shift.toUpperCase());
+
+        document.getElementById('screen-1').style.display = 'none';
+        document.getElementById('screen-2').style.display = 'block';
+        
+        document.getElementById('header-title').textContent = `${teacher} đang dạy Lớp 10A (Phần ${shift})`;
+        document.getElementById('banner-content').innerHTML = `<b>Bài dạy:</b> ${lesson} <br><b>Bài tập:</b> ${exercises}`;
+        
+        addLog(`🟢 LƯU DB: <b>${teacher}</b> nhận ca <b>${shift}</b>.`);
+        addLog(`📡 API TẢI DỮ LIỆU: Đã tải thông tin Cảnh báo cũ của lớp từ Hệ thống...`);
+    }
+
+    function endShift() {
+        addLog(`🔴 LƯU DB: Đã kết thúc ca dạy. Tự tải lại trang sau 2s.`);
+        setTimeout(() => location.reload(), 2000);
+    }
+
+    // --- SVG Evaluation ---
+    document.addEventListener('click', () => {
+        document.querySelectorAll('.popup-menu').forEach(menu => menu.classList.remove('active'));
+    });
+
+    function toggleMenu(btn, location) {
+        if (btn.classList.contains('disabled')) return;
+        document.querySelectorAll('.popup-menu').forEach(menu => {
+            if (menu !== btn.querySelector('.popup-menu')) menu.classList.remove('active');
+        });
+        btn.querySelector('.popup-menu').classList.toggle('active');
+        btn.dataset.location = location; 
+    }
+
+    function selectValue(item, statusLabel, studentId) {
+        const actionBtn = item.closest('.action-btn');
+        const location = actionBtn.dataset.location;
+        const studentName = actionBtn.closest('.student-row').querySelector('.name').childNodes[0].nodeValue.trim();
+        
+        // Update UI
+        actionBtn.innerHTML = item.innerHTML + actionBtn.querySelector('.popup-menu').outerHTML;
+        actionBtn.classList.add('has-value');
+        actionBtn.querySelector('.popup-menu').classList.remove('active');
+
+        addLog(`💾 LƯU DB: ${studentName} - <b>${location}</b>: [${statusLabel}]`);
+
+        // SIMULATE DUAL RULE ENGINE (Test với bạn AN)
+        if (studentId === 'AN') {
+            if (statusLabel === 'Sai hẳn' || statusLabel === 'Kém (K)' || statusLabel === 'Chép bài') {
+                failCount[studentId]++;
+                addLog(`⚙️ Hệ thống ngầm: ${studentName} lỗi nặng/chép bài. Chuỗi Lỗi: <b>${failCount[studentId]}/3</b>.`);
+                if (failCount[studentId] >= 3) {
+                    document.getElementById('smartAlertDownText').innerHTML = `Học sinh <b>${studentName}</b> liên tục bị [Sai/Kém/Chép bài] (3 lần).<br><br>👉 Đề nghị chuyển xuống lớp bổ trợ.`;
+                    document.getElementById('smartAlertDown').style.display = 'block';
+                    addLog(`<span class="log-alert">🚨 CẢNH BÁO ĐỎ: Đề nghị HẠ CẤP học sinh ${studentName}!</span>`);
+                    
+                    // Cập nhật nhãn dán UI lập tức
+                    document.querySelector('#row-AN .trend-badge-warning').className = 'trend-badge-down';
+                    document.querySelector('#row-AN .trend-badge-down').innerHTML = '⬇️ Đề xuất Xuống lớp';
+                }
+            }
+        }
+    }
+</script>
+
+</body>
+</html>

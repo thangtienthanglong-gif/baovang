@@ -3142,6 +3142,14 @@ document.getElementById('transferClassForm')?.addEventListener('submit', async (
   const newClass = document.getElementById('transferTargetClass').value;
   const teacherInput = document.getElementById('transferTeacherName');
   const teacherName = teacherInput ? teacherInput.value.trim() : '';
+  
+  if (!newClass) {
+    return toast('Vui lòng chọn lớp đích!', 'error');
+  }
+  if (!teacherName) {
+    return toast('Vui lòng nhập tên giáo viên chuyển lớp!', 'error');
+  }
+  
   localStorage.setItem('savedTransferTeacher', teacherName);
   
   const payload = { ...student, className: newClass };
@@ -3159,6 +3167,7 @@ document.getElementById('transferClassForm')?.addEventListener('submit', async (
       body: JSON.stringify({ fromClass: student.className, toClass: newClass, date: state.today, teacher: teacherName })
     }).catch(err => console.warn(err));
     
+    if (!state.classes.includes(newClass)) state.classes.push(newClass);
     const idx = state.students.findIndex(s => s.id === id);
     if (idx !== -1) state.students[idx] = res;
     
@@ -3166,6 +3175,8 @@ document.getElementById('transferClassForm')?.addEventListener('submit', async (
     document.getElementById('studentProfileDrawer').classList.remove('open');
     document.getElementById('studentDrawerBackdrop').classList.remove('show');
     toast('Chuyển lớp thành công!', 'success');
+    renderClassDropdown();
+    renderFilters();
     renderRoster();
   } catch(err) {
     console.error(err);
