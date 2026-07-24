@@ -2830,6 +2830,18 @@ window.closeHistoryPanel = function() {
     if (panel) panel.classList.remove('active');
 };
 
+function parseViDate(d) {
+    if (!d) return new Date(0);
+    if (d instanceof Date) return d;
+    const str = String(d).trim();
+    if (str.includes('/')) {
+        const p = str.split('/');
+        if (p.length === 3) return new Date(`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}T23:59:59`);
+    }
+    const parsed = new Date(str);
+    return isNaN(parsed) ? new Date(0) : parsed;
+}
+
 function showTeacherPromptModal() {
     return new Promise((resolve) => {
         let modal = document.getElementById('teacherPromptModal');
@@ -2838,6 +2850,11 @@ function showTeacherPromptModal() {
         let btnCancel = document.getElementById('teacherPromptCancel');
 
         if (!modal) return resolve(localStorage.getItem('savedTransferTeacher') || 'Giáo viên');
+
+        if (modal.parentNode !== document.body) {
+            document.body.appendChild(modal);
+        }
+        modal.style.zIndex = '999999';
 
         input.value = localStorage.getItem('savedTransferTeacher') || localStorage.getItem('savedTeacherName') || '';
         modal.style.display = 'flex';
@@ -2912,7 +2929,7 @@ window.openHistoryPanel = async function(studentId) {
         const lastNotifiedIdx = allHistory.findIndex(h => h.status === 'Đã báo phụ huynh');
         let relevantHistory = allHistory;
         if (lastNotifiedIdx !== -1) {
-            const notifDate = new Date(allHistory[lastNotifiedIdx].date);
+            const notifDate = parseViDate(allHistory[lastNotifiedIdx].date);
             const daysDiff = (new Date() - notifDate) / (1000 * 60 * 60 * 24);
             if (daysDiff <= 30) {
                 relevantHistory = allHistory.slice(0, lastNotifiedIdx);
@@ -2957,8 +2974,8 @@ window.openHistoryPanel = async function(studentId) {
         let notifiedTeacher = '';
         if (notifiedObj) {
             if (notifiedObj.date) {
-                notifiedDate = new Date(notifiedObj.date);
-                notifiedDateStr = notifiedDate.toLocaleDateString('vi-VN');
+                notifiedDate = parseViDate(notifiedObj.date);
+                notifiedDateStr = new Date(notifiedDate).toLocaleDateString('vi-VN');
             }
             if (notifiedObj.lessonName && notifiedObj.lessonName.trim()) {
                 notifiedTeacher = notifiedObj.lessonName.trim();
@@ -2973,8 +2990,15 @@ window.openHistoryPanel = async function(studentId) {
         let activeTransfers = transfers || [];
         let collapsedTransfers = [];
         if (notifiedDate) {
-            activeTransfers = (transfers || []).filter(t => new Date(t.date) > notifiedDate);
-            collapsedTransfers = (transfers || []).filter(t => new Date(t.date) <= notifiedDate);
+            activeTransfers = (transfers || []).filter(t => parseViDate(t.date) > notifiedDate);
+            collapsedTransfers = (transfers || []).filter(t => parseViDate(t.date) <= notifiedDate);
+        }
+
+        let activeAbsences = res.absences || [];
+        let collapsedAbsences = [];
+        if (notifiedDate) {
+            activeAbsences = (res.absences || []).filter(a => parseViDate(a.date) > notifiedDate);
+            collapsedAbsences = (res.absences || []).filter(a => parseViDate(a.date) <= notifiedDate);
         }
 
         let transferHtml = '';
@@ -3059,11 +3083,9 @@ window.openHistoryPanel = async function(studentId) {
             </div>
         `;
 
-        let activeAbsences = res.absences || [];
-        let collapsedAbsences = [];
         if (notifiedDate) {
-            activeAbsences = (res.absences || []).filter(a => new Date(a.date) > notifiedDate);
-            collapsedAbsences = (res.absences || []).filter(a => new Date(a.date) <= notifiedDate);
+            activeAbsences = (res.absences || []).filter(a => parseViDate(a.date) > notifiedDate);
+            collapsedAbsences = (res.absences || []).filter(a => parseViDate(a.date) <= notifiedDate);
         }
 
         let activeHistory = res.history || [];
