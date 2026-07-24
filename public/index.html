@@ -178,7 +178,7 @@
                 <p id="rosterMeta">Chọn lớp ở cây bên trái để thao tác nhanh.</p>
               </div>
               <button class="btn primary btn-exam" id="openExamSelectBtn" type="button" style="margin-right: 8px;"><i class="fa-solid fa-star"></i> Nhập điểm thi</button>
-              <button class="btn secondary" id="exportExamBtn" type="button" style="margin-right: 8px; background: #e2e8f0; color: #475569; border: none; padding: 6px 12px; border-radius: 4px;"><i class="fa-solid fa-file-excel"></i> Xuáº¥t Äiá»ƒm</button>
+          <button class="btn secondary" id="exportExamBtn" type="button" style="margin-right: 8px; background: #e2e8f0; color: #475569; border: none; padding: 6px 12px; border-radius: 4px;"><i class="fa-solid fa-file-excel"></i> Xuất Điểm</button>
               
             </div>
             <div id="studentRoster" class="student-roster"></div>
@@ -714,13 +714,13 @@
   <aside id="studentProfileDrawer" class="drawer">
     <header class="drawer-header" style="display: flex; flex-direction: column; gap: 12px; position: relative;">
       <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-        <h2 id="drawerStudentName" style="margin: 0; line-height: 1.2; padding-right: 20px;">TÃªn há»c sinh</h2>
-        <button class="drawer-close" id="closeStudentDrawer" type="button" aria-label="ÄÃ³ng" style="margin-left: 0; margin-top: -5px;">&times;</button>
+    <h2 id="drawerStudentName" style="margin: 0; line-height: 1.2; padding-right: 20px;">Tên học sinh</h2>
+    <button class="drawer-close" id="closeStudentDrawer" type="button" aria-label="Đóng" style="margin-left: 0; margin-top: -5px;">&times;</button>
       </div>
       <div style="display: flex; gap: 8px; align-items: center;">
-        <button id="openMakeupBtn" type="button" style="padding: 6px 12px; font-size: 13px; background: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;"><i class="fa-solid fa-repeat"></i> Káº¹t & BÃ¹</button>
-        <button id="openTransferClassBtn" type="button" style="padding: 6px 12px; font-size: 13px; background: #0d9488; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;"><i class="fa-solid fa-right-left"></i> Chuyển lớp</button>
-        <button id="openEditStudentBtn" type="button" style="padding: 6px 12px; font-size: 13px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;"><i class="fa-solid fa-pen"></i> Sá»­a</button>
+      <button id="openMakeupBtn" type="button" style="padding: 6px 12px; font-size: 13px; background: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;"><i class="fa-solid fa-repeat"></i> Kẹt & Bù</button>
+      <button id="openTransferClassBtn" type="button" style="padding: 6px 12px; font-size: 13px; background: #0d9488; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;"><i class="fa-solid fa-right-left"></i> Chuyển lớp</button>
+      <button id="openEditStudentBtn" type="button" style="padding: 6px 12px; font-size: 13px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;"><i class="fa-solid fa-pen"></i> Sửa</button>
       </div>
     </header>
     <div class="drawer-body">
@@ -765,7 +765,7 @@
         <label>Loại xếp lịch</label>
         <select id="makeupModalType" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
           <option value="bu_tam">Bù tạm (1 buổi)</option>
-          <option value="hoc_bu" selected>Há»c bÃ¹ (Cá»‘ Ä‘á»‹nh)</option>
+          <option value="hoc_bu" selected>Học bù (Cố định)</option>
         </select>
       </div>
 
@@ -776,7 +776,7 @@
       </div>
 
       <div class="form-group" style="margin-bottom: 15px;">
-        <label>Buá»•i há»c bÃ¹</label>
+        <label>Buá»•i há»c bù</label>
         <select id="makeupModalTargetDay" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
           <option value="2">Thứ 2</option>
           <option value="3">Thứ 3</option>
@@ -790,7 +790,7 @@
 
       <div style="display:flex; justify-content:space-between;">
         <button type="button" class="btn primary" onclick="saveMakeupSchedule()">Lưu lịch bù</button>
-        <button type="button" class="btn ghost" onclick="document.getElementById('makeupModal').style.display='none'">ÄÃ³ng</button>
+        <button type="button" class="btn ghost" onclick="document.getElementById('makeupModal').style.display='none'">Đóng</button>
       </div>
       
       <div style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 10px;">
@@ -800,7 +800,7 @@
     </div>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="/app.js?v=20260724-7"></script>
+  <script src="/app.js?v=20260724-8"></script>
   <script src="/exams.js"></script>
   <nav class="bottom-nav">
     <button class="bottom-tab active" data-tab="absenceTab" type="button"><i class="fa-solid fa-clipboard-user"></i><span>Điểm danh</span></button>
@@ -885,7 +885,7 @@
     <form id="examSelectForm">
       <input type="hidden" id="examSelectClass">
       <div class="form-group" style="margin-bottom: 15px;">
-        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Chá»n hoáº·c nháº­p tÃªn ká»³ thi</label>
+        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Chọn hoặc nhập tên kỳ thi</label>
         <select id="examSelectDropdown" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-bottom: 10px;" onchange="if(this.value==='Khác...'){document.getElementById('examCustomNameContainer').style.display='block';}else{document.getElementById('examCustomNameContainer').style.display='none';}">
           <option value="Thi đầu vào">Thi đầu vào</option>
           <option value="Thi giữa kì 1">Thi giữa kì 1</option>
@@ -920,8 +920,8 @@
     <div style="padding: 15px 20px; border-top: 1px solid #e2e8f0; background:#fff; border-radius: 0 0 8px 8px; display: flex; gap: 10px; justify-content: space-between; align-items: center;">
       <button type="button" class="btn success" id="btnSendExamZalo"><i class="fa-solid fa-paper-plane"></i> Gửi Zalo toàn lớp</button>
       <div style="display:flex; gap:10px;">
-        <button type="button" class="btn" onclick="document.getElementById('examInputModal').style.display='none'" style="background:#e2e8f0; color:#475569;">ÄÃ³ng</button>
-        <button type="button" class="btn primary" id="btnSaveExam">LÆ°u Báº£ng Äiá»ƒm</button>
+        <button type="button" class="btn" onclick="document.getElementById('examInputModal').style.display='none'" style="background:#e2e8f0; color:#475569;">Đóng</button>
+        <button type="button" class="btn primary" id="btnSaveExam">Lưu Bảng Điểm</button>
       </div>
     </div>
   </div>
@@ -931,7 +931,7 @@
 <div id="editStudentModal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
   <div style="background:#fff; padding:20px; border-radius:8px; width:400px; max-width:90%; position: relative;">
     <button type="button" onclick="document.getElementById('editStudentModal').style.display='none'" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #94a3b8; line-height: 1;">&times;</button>
-    <h3 style="margin-top:0;">Sá»­a thÃ´ng tin há»c sinh</h3>
+    <h3 style="margin-top:0;">Sửa thông tin học sinh</h3>
     <form id="editStudentForm">
       <input type="hidden" id="editStudentId">
       <div class="form-group" style="margin-bottom: 10px; display: none;">
@@ -939,7 +939,7 @@
         <input type="text" id="editStudentCode" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
       </div>
       <div class="form-group" style="margin-bottom: 10px;">
-        <label>TÃªn há»c sinh</label>
+        <label>Tên học sinh</label>
         <input type="text" id="editStudentName" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
       </div>
       <div class="form-group" style="margin-bottom: 10px; display: none;">
@@ -947,7 +947,7 @@
         <input type="text" id="editStudentClass" readonly style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; background: #e2e8f0; color: #475569;">
       </div>
       <div class="form-group" style="margin-bottom: 10px;">
-        <label>TrÆ°á»ng chÃ­nh</label>
+        <label>Trường chính</label>
         <input type="text" id="editStudentParent" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
       </div>
       <div class="form-group" style="margin-bottom: 15px;">
@@ -955,7 +955,7 @@
         <input type="text" id="editStudentPhone" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
       </div>
       <div style="display: flex; justify-content: flex-end;">
-        <button type="submit" class="btn primary">LÆ°u Thay Äá»•i</button>
+        <button type="submit" class="btn primary">Lưu Thay Đổi</button>
       </div>
     </form>
   </div>
