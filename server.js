@@ -2320,6 +2320,7 @@ app.post('/api/evaluations', async (req, res, next) => {
     if (!db.branches[branchId].warnings) db.branches[branchId].warnings = [];
     
     const { sessionId, studentId, location, status, note, part, evidenceUrl, lessonName, teacher } = req.body;
+    const now = nowISO();
     
     const evalObj = {
       id: id('eval'),
@@ -2332,7 +2333,9 @@ app.post('/api/evaluations', async (req, res, next) => {
       teacher: teacher || (lessonName ? lessonName.replace(/^GV:\s*/, '') : ''),
       note: note || '',
       evidenceUrl: evidenceUrl || '',
-      timestamp: nowISO()
+      timestamp: now,
+      createdAt: now,
+      date: now.slice(0, 10)
     };
     
     db.branches[branchId].evaluations.push(evalObj);
@@ -2437,12 +2440,14 @@ app.get('/api/ketbu/students/:id/history', async (req, res, next) => {
     
     const history = evaluations.map(ev => {
        const session = sessions.find(s => s.id === ev.sessionId);
+       const rawDate = (session && session.startTime) ? session.startTime : (ev.timestamp || ev.createdAt || ev.date || new Date().toISOString());
        return {
-         date: (session && session.startTime) ? session.startTime.slice(0, 10) : (ev.createdAt ? ev.createdAt.slice(0, 10) : ''),
+         date: rawDate.slice(0, 10),
          part: ev.part || session?.shift || '',
          location: ev.location || '',
          status: ev.status,
-         lessonName: session ? session.lessonName : '',
+         lessonName: ev.lessonName || (session ? session.lessonName : ''),
+         teacher: ev.teacher || '',
          evidenceUrl: ev.evidenceUrl || ''
        };
     });
