@@ -672,50 +672,29 @@
                         <!-- VỞ -->
                         <div class="action-btn" onclick="event.stopPropagation(); toggleMenu(this, 'Vở', '${currentPart}')">
                             <span style="color:#94a3b8; font-size:13px; font-weight:bold;">Vở</span>
-            let isLate = st.todayAbsenceStatus === 'Đi trễ';
-
-            return `<div class="student-row ${isAbsent ? 'is-absent' : ''} ${isEarly ? 'is-early' : ''} ${isLate ? 'is-late' : ''}" id="row-${st.id}">
-                <div class="row-main">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div class="student-info">
-                            <span class="st-code">${st.code || 'N/A'}</span>
-                            <span class="st-name">${st.fullName || st.name}</span>
-                            ${trendHtml}
-                            <span class="status-badge" style="${isAbsent ? 'display:inline-block;' : 'display:none;'}">${isAbsent ? 'VẮNG' : ''}</span>
-                        </div>
-                        <div class="quick-actions">
-                            <button class="btn-action btn-late ${isLate ? 'active' : ''}" ${isLate ? 'disabled' : ''} onclick="toggleLate('${st.id}', this)" title="Báo đi trễ"><i class="fa-solid fa-user-clock"></i> Trễ</button>
-                            <button class="btn-action btn-early ${isEarly ? 'active' : ''}" ${isEarly ? 'disabled' : ''} onclick="toggleEarly('${st.id}', this)" title="Báo về sớm"><i class="fa-solid fa-user-minus"></i> Về sớm</button>
-                            <button class="btn-action btn-absent ${isAbsent ? 'active' : ''}" onclick="toggleAbsent('${st.id}', this)" title="Báo vắng"><i class="fa-solid fa-user-xmark"></i> Vắng</button>
-                        </div>
-                    </div>
-
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <div class="eval-buttons" style="${isAbsent ? 'opacity:0.2; pointer-events:none;' : ''}">
-                                <button class="btn-eval" id="btn-board-${st.id}" onclick="quickEval('${st.id}', '${textBoard}')">${getSvgIcon(textBoard)}</button>
-                                <button class="btn-eval" id="btn-notebook-${st.id}" onclick="quickEval('${st.id}', '${textNotebook}')">${getSvgIcon(textNotebook, 'text-blue')}</button>
+                            <div class="popup-menu" onclick="event.stopPropagation()">
+                                <div class="menu-item" onclick="submitEval(this, 'Đúng', '${st.id}', '${textNotebook}', 'none')">${getSvgIcon(textNotebook, 'text-blue')}</div>
+                                <div class="menu-item" onclick="submitEval(this, 'Sai nhẹ', '${st.id}', '${textNotebook}', 'arc')">${getSvgIcon(textNotebook, 'text-blue', 'arc')}</div>
+                                <div class="menu-item" onclick="submitEval(this, 'Sai hẳn', '${st.id}', '${textNotebook}', 'circle')">${getSvgIcon(textNotebook, 'text-blue', 'circle')}</div>
+                                <div class="menu-item" onclick="submitEval(this, 'Chép bài', '${st.id}', '${textNotebook}', 'cross')">${getSvgIcon(textNotebook, 'text-blue', 'cross')}</div>
+                                <div class="menu-item" style="color: #ef4444; font-size: 16px;" onclick="undoEval(this, '${st.id}')" title="Hoàn tác đánh giá (trong 3 phút)"><i class="fa-solid fa-rotate-left"></i></div>
                             </div>
-                            <div class="popup-container">
-                                <div class="more-btn" onclick="toggleMenu(this, '${st.id}', '${currentPart}')"><i class="fa-solid fa-ellipsis"></i></div>
-                                <div class="popup-menu" id="menu-${st.id}">
-                                    <div class="menu-item" onclick="openEvalModal('${st.id}', '${currentPart}', 'Kém (K)')">${getSvgIcon('K', 'text-red')} Kém (K)</div>
-                                    <div class="menu-item" onclick="openEvalModal('${st.id}', '${currentPart}', 'Tốt (T)')">${getSvgIcon('T', 'text-green')} Tốt (T)</div>
-                                    <div class="menu-item" onclick="openEvalModal('${st.id}', '${currentPart}', 'Chép bài')">${getSvgIcon(textNotebook, 'text-blue', 'arc')} Chép bài</div>
-                                    <div class="menu-item" onclick="openEvalModal('${st.id}', '${currentPart}', 'Thiếu BTVN')">${getSvgIcon(textNotebook, 'text-red', 'circle')} Thiếu BTVN</div>
-                                    <div class="menu-item" onclick="openEvalModal('${st.id}', '${currentPart}', 'Sai hẳn')">${getSvgIcon(textNotebook, 'text-red', 'cross')} Sai hẳn</div>
-                                    <div class="menu-item" style="color: #ef4444; font-size: 16px;" onclick="undoEval(this, '${st.id}')" title="Hoàn tác đánh giá (trong 3 phút)"><i class="fa-solid fa-rotate-left"></i></div>
-                                </div>
+                        </div>
+
+                        <!-- Ghi chú nhanh -->
+                        <div class="action-btn" onclick="event.stopPropagation(); toggleMenu(this, 'Ghi chú', '${currentPart}')">
+                            <span style="color:#94a3b8; font-size:13px; font-weight:bold;">Lưu ý</span>
+                            <div class="popup-menu" onclick="event.stopPropagation()">
+                                <input type="text" placeholder="Ghi chú..." class="note-input" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; margin-bottom:8px; font-size:14px;">
+                                <div class="menu-item" onclick="submitEval(this, 'Ghi chú', '${st.id}', this.previousElementSibling.value, 'none')" style="justify-content:center; background:#f8fafc; color:#3b82f6; font-weight:bold;">Lưu</div>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 4px; margin-left: 5px;">
-                                <input type="text" placeholder="Ghi chú..." class="note-input" style="width: 90px; padding: 6px 8px; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 12px; outline: none;" onchange="saveNote('${st.id}', this.value)" />
-                                <label style="cursor: pointer; color: #64748b; font-size: 16px; margin: 0; padding: 4px;" title="Đính kèm ảnh">
-                                    <i class="fa-solid fa-camera"></i>
-                                    <input type="file" accept="image/*" style="display: none;" onchange="uploadEvidence('${st.id}', this)" />
-                                </label>
-                                <div id="evidence-preview-${st.id}" style="display: none;">
-                                    <i class="fa-solid fa-circle-check" style="color: #10b981; font-size: 14px;" title="Đã đính kèm ảnh"></i>
-                                </div>
+                        </div>
+
+                        <!-- Evidence (Ảnh) -->
+                        <div class="action-btn evidence-btn" id="evidence-btn-${st.id}" onclick="triggerEvidenceUpload('${st.id}')" title="Đính kèm ảnh minh chứng">
+                            <i class="fa-solid fa-camera"></i>
+                            <div class="evidence-indicator" id="evidence-ind-${st.id}" style="display:none; position:absolute; top:-5px; right:-5px;">
+                                <i class="fa-solid fa-circle-check" style="color: #10b981; font-size:12px; background:#fff; border-radius:50%;"></i>
                             </div>
                         </div>
                     </div>

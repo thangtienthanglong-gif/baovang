@@ -218,6 +218,23 @@ async function getBranchDb(req) {
   if (!rootDb.branches[branchId].callLogs) rootDb.branches[branchId].callLogs = [];
   if (!rootDb.branches[branchId].notificationLogs) rootDb.branches[branchId].notificationLogs = [];
   
+  // Tự động khôi phục danh sách học sinh nếu chi nhánh hiện tại chưa có dữ liệu học sinh
+  if (rootDb.branches[branchId].students.length === 0) {
+    let sourceBranch = rootDb.branches['main'];
+    if (!sourceBranch || !sourceBranch.students || sourceBranch.students.length === 0) {
+      for (const bKey in rootDb.branches) {
+        if (rootDb.branches[bKey].students && rootDb.branches[bKey].students.length > 0) {
+          sourceBranch = rootDb.branches[bKey];
+          break;
+        }
+      }
+    }
+    if (sourceBranch && sourceBranch.students && sourceBranch.students.length > 0) {
+      rootDb.branches[branchId].students = JSON.parse(JSON.stringify(sourceBranch.students));
+      await writeDb(rootDb);
+    }
+  }
+  
   // Auto-fix existing absences stuck in "Chờ gửi thủ công" but have a call log
   if (rootDb.branches[branchId].callLogs && rootDb.branches[branchId].absences) {
     rootDb.branches[branchId].callLogs.forEach(log => {
