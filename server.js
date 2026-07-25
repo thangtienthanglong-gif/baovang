@@ -234,6 +234,23 @@ async function getBranchDb(req) {
       await writeDb(rootDb);
     }
   }
+
+  // Tự động khôi phục lịch học bù/đổi lớp (scheduleExceptions) cho chi nhánh nếu bị rỗng
+  if (!rootDb.branches[branchId].scheduleExceptions || rootDb.branches[branchId].scheduleExceptions.length === 0) {
+    let sourceEx = rootDb.branches['main']?.scheduleExceptions;
+    if (!sourceEx || sourceEx.length === 0) {
+      for (const bKey in rootDb.branches) {
+        if (rootDb.branches[bKey].scheduleExceptions && rootDb.branches[bKey].scheduleExceptions.length > 0) {
+          sourceEx = rootDb.branches[bKey].scheduleExceptions;
+          break;
+        }
+      }
+    }
+    if (sourceEx && sourceEx.length > 0) {
+      rootDb.branches[branchId].scheduleExceptions = JSON.parse(JSON.stringify(sourceEx));
+      await writeDb(rootDb);
+    }
+  }
   
   // Auto-fix existing absences stuck in "Chờ gửi thủ công" but have a call log
   if (rootDb.branches[branchId].callLogs && rootDb.branches[branchId].absences) {
