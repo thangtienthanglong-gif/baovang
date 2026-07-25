@@ -199,8 +199,11 @@
 
     <div id="screen-2">
         <div style="border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 10px;">
-            <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 15px;">
-                <h2 id="header-title" style="margin:0; font-size:24px; color:#1e293b;">Đang tải...</h2>
+            <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                <div style="display:flex; align-items:center; gap: 12px; flex-wrap: wrap;">
+                    <h2 id="header-title" style="margin:0; font-size:24px; color:#1e293b;">Đang tải...</h2>
+                    <div id="classHeaderStats" style="display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap;"></div>
+                </div>
                 <button class="btn-success" id="submitAttendanceBtn" style="width:auto; padding: 8px 15px; font-size:14px;" onclick="submitAttendance()">Chốt Điểm Danh</button>
             </div>
 
@@ -235,10 +238,24 @@
     let currentPart = ''; 
     let currentShift = '';
 
-    function getBranchId() { return localStorage.getItem('selectedBranchId') || 'main'; }
+    function getBranchId() {
+        return localStorage.getItem('activeBranch') || localStorage.getItem('selectedBranchId') || 'main';
+    }
+
+    function getToken() {
+        return localStorage.getItem('token') || '';
+    }
 
     async function apiRequest(endpoint, method = 'GET', body = null) {
-        const headers = { 'Content-Type': 'application/json', 'x-branch-id': getBranchId() };
+        const token = getToken();
+        const headers = {
+            'Content-Type': 'application/json',
+            'x-branch-id': getBranchId(),
+            'X-Branch-Id': getBranchId()
+        };
+        if (token) {
+            headers['Authorization'] = 'Bearer ' + token;
+        }
         const options = { method, headers };
         if (body) options.body = JSON.stringify(body);
         const res = await fetch(endpoint, options);
@@ -326,28 +343,34 @@
     }
 
     async function loadClasses() {
+        const select = document.getElementById('className');
         try {
             const res = await apiRequest('/api/students');
-            window.allStudentsList = res.filter(s => s.status !== 'Nghỉ học');
+            const rawList = Array.isArray(res) ? res : (res.students || []);
+            window.allStudentsList = rawList.filter(s => s.status !== 'Nghỉ học');
             const classNames = [...new Set(window.allStudentsList.map(s => s.className).filter(c => c))].sort();
-            const select = document.getElementById('className');
             if (classNames.length === 0) {
-                select.innerHTML = '<option value="">-- Chưa có lớp nào --</option>';
+                if (select) select.innerHTML = '<option value="">-- Chưa có lớp nào --</option>';
             } else {
-                select.innerHTML = classNames.map(c => `<option value="${c}">${c}</option>`).join('');
+                if (select) select.innerHTML = classNames.map(c => `<option value="${c}">${c}</option>`).join('');
             }
 
             // Restore from localStorage
-            if(localStorage.getItem('savedTeacherName')) document.getElementById('teacherName').value = localStorage.getItem('savedTeacherName');
-            if(localStorage.getItem('savedShiftName')) document.getElementById('shiftName').value = localStorage.getItem('savedShiftName');
-            if(localStorage.getItem('savedPartName')) document.getElementById('partName').value = localStorage.getItem('savedPartName');
-            if(localStorage.getItem('savedClassName') && classNames.includes(localStorage.getItem('savedClassName'))) {
-                document.getElementById('className').value = localStorage.getItem('savedClassName');
-            } else {
-                localStorage.removeItem('savedClassName');
-                if (classNames.length > 0) document.getElementById('className').value = classNames[0];
+            if(localStorage.getItem('savedTeacherName') && document.getElementById('teacherName')) document.getElementById('teacherName').value = localStorage.getItem('savedTeacherName');
+            if(localStorage.getItem('savedShiftName') && document.getElementById('shiftName')) document.getElementById('shiftName').value = localStorage.getItem('savedShiftName');
+            if(localStorage.getItem('savedPartName') && document.getElementById('partName')) document.getElementById('partName').value = localStorage.getItem('savedPartName');
+            if(select) {
+                if(localStorage.getItem('savedClassName') && classNames.includes(localStorage.getItem('savedClassName'))) {
+                    select.value = localStorage.getItem('savedClassName');
+                } else {
+                    localStorage.removeItem('savedClassName');
+                    if (classNames.length > 0) select.value = classNames[0];
+                }
             }
-        } catch(e) {}
+        } catch(e) {
+            console.error('Lỗi khi tải danh sách lớp:', e);
+            if (select) select.innerHTML = '<option value="">-- Lỗi tải danh sách lớp --</option>';
+        }
     }
     loadClasses();
 
@@ -500,6 +523,44 @@
         return svg;
     }
 
+    function updateClassHeaderStats() {
+        const container = document.getElementById('classHeaderStats');
+        if (!container) return;
+        const className = document.getElementById('className')?.value || '';
+        if (!className || !studentData || !Array.isArray(studentData)) {
+            container.innerHTML = '';
+            return;
+        }
+
+        const officialRoster = studentData.filter(st => !st.isMakeupToday);
+        const siSo = officialRoster.length;
+        const buLuonCount = studentData.filter(st => st.isMakeupToday && (st.makeupType === 'bu_luon' || st.stuckType === 'bu_luon')).length;
+        const buTamCount = studentData.filter(st => st.isMakeupToday && (st.makeupType === 'bu_tam' || st.makeupType === 'hoc_bu' || st.stuckType === 'bu_tam' || !st.makeupType)).length;
+        
+        const absentCount = document.querySelectorAll('.student-row.is-absent').length;
+        
+        // Formula: Có mặt = Sĩ số lớp + bù tạm + bù luôn - vắng
+        const coMat = Math.max(0, siSo + buTamCount + buLuonCount - absentCount);
+
+        let html = `<span style="background:#e0f2fe; color:#0369a1; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-users"></i> Sĩ số: <b>${siSo}</b></span>`;
+
+        if (buLuonCount > 0) {
+            html += `<span style="background:#fef3c7; color:#b45309; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-user-clock"></i> Bù luôn: <b>+${buLuonCount}</b></span>`;
+        }
+
+        if (buTamCount > 0) {
+            html += `<span style="background:#ffedd5; color:#c2410c; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-user-plus"></i> Bù tạm: <b>+${buTamCount}</b></span>`;
+        }
+
+        if (absentCount > 0) {
+            html += `<span style="background:#fee2e2; color:#b91c1c; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-user-xmark"></i> Vắng: <b>${absentCount}</b></span>`;
+        }
+
+        html += `<span style="background:#dcfce7; color:#15803d; padding:4px 14px; border-radius:20px; font-size:13px; font-weight:700; display:inline-flex; align-items:center; gap:5px; box-shadow:0 1px 3px rgba(0,0,0,0.05);"><i class="fa-solid fa-user-check"></i> Có mặt: <b>${coMat}</b></span>`;
+
+        container.innerHTML = html;
+    }
+
     function renderStudents() {
         const container = document.getElementById('studentListContainer');
         if(studentData.length === 0) {
@@ -582,30 +643,57 @@
                         <!-- VỞ -->
                         <div class="action-btn" onclick="event.stopPropagation(); toggleMenu(this, 'Vở', '${currentPart}')">
                             <span style="color:#94a3b8; font-size:13px; font-weight:bold;">Vở</span>
-                            <div class="popup-menu" onclick="event.stopPropagation()">
-                                <div class="menu-item" onclick="submitEval(this, 'Đúng', '${st.id}', '${textNotebook}', 'none')">${getSvgIcon(textNotebook)}</div>
-                                <div class="menu-item" onclick="submitEval(this, 'Sai nhẹ', '${st.id}', '${textNotebook}', 'arc')">${getSvgIcon(textNotebook, 'text', 'arc')}</div>
-                                <div class="menu-item" onclick="submitEval(this, 'Sai hẳn', '${st.id}', '${textNotebook}', 'circle')">${getSvgIcon(textNotebook, 'text', 'circle')}</div>
-                                <div class="menu-item" onclick="submitEval(this, 'Chép bài', '${st.id}', '${textNotebook}', 'cross')">${getSvgIcon(textNotebook, 'text', 'cross')}</div>
-                                <div class="menu-item" style="color: #ef4444; font-size: 16px;" onclick="undoEval(this, '${st.id}')" title="Hoàn tác đánh giá (trong 3 phút)"><i class="fa-solid fa-rotate-left"></i></div>
-                            </div>
+            let isLate = st.todayAbsenceStatus === 'Đi trễ';
+
+            return `<div class="student-row ${isAbsent ? 'is-absent' : ''} ${isEarly ? 'is-early' : ''} ${isLate ? 'is-late' : ''}" id="row-${st.id}">
+                <div class="row-main">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div class="student-info">
+                            <span class="st-code">${st.code || 'N/A'}</span>
+                            <span class="st-name">${st.fullName || st.name}</span>
+                            ${trendHtml}
+                            <span class="status-badge" style="${isAbsent ? 'display:inline-block;' : 'display:none;'}">${isAbsent ? 'VẮNG' : ''}</span>
                         </div>
-                        
-                        <!-- GHI CHU -->
-                        <div style="display: flex; align-items: center; gap: 4px; margin-left: 5px;">
-                            <input type="text" placeholder="Ghi chú..." class="note-input" style="width: 90px; padding: 6px 8px; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 12px; outline: none;" onchange="saveNote('${st.id}', this.value)" />
-                            <label style="cursor: pointer; color: #64748b; font-size: 16px; margin: 0; padding: 4px;" title="Đính kèm ảnh">
-                                <i class="fa-solid fa-camera"></i>
-                                <input type="file" accept="image/*" style="display: none;" onchange="uploadEvidence('${st.id}', this)" />
-                            </label>
-                            <div id="evidence-preview-${st.id}" style="display: none;">
-                                <i class="fa-solid fa-circle-check" style="color: #10b981; font-size: 14px;" title="Đã đính kèm ảnh"></i>
+                        <div class="quick-actions">
+                            <button class="btn-action btn-late ${isLate ? 'active' : ''}" ${isLate ? 'disabled' : ''} onclick="toggleLate('${st.id}', this)" title="Báo đi trễ"><i class="fa-solid fa-user-clock"></i> Trễ</button>
+                            <button class="btn-action btn-early ${isEarly ? 'active' : ''}" ${isEarly ? 'disabled' : ''} onclick="toggleEarly('${st.id}', this)" title="Báo về sớm"><i class="fa-solid fa-user-minus"></i> Về sớm</button>
+                            <button class="btn-action btn-absent ${isAbsent ? 'active' : ''}" onclick="toggleAbsent('${st.id}', this)" title="Báo vắng"><i class="fa-solid fa-user-xmark"></i> Vắng</button>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div class="eval-buttons" style="${isAbsent ? 'opacity:0.2; pointer-events:none;' : ''}">
+                                <button class="btn-eval" id="btn-board-${st.id}" onclick="quickEval('${st.id}', '${textBoard}')">${getSvgIcon(textBoard)}</button>
+                                <button class="btn-eval" id="btn-notebook-${st.id}" onclick="quickEval('${st.id}', '${textNotebook}')">${getSvgIcon(textNotebook, 'text-blue')}</button>
+                            </div>
+                            <div class="popup-container">
+                                <div class="more-btn" onclick="toggleMenu(this, '${st.id}', '${currentPart}')"><i class="fa-solid fa-ellipsis"></i></div>
+                                <div class="popup-menu" id="menu-${st.id}">
+                                    <div class="menu-item" onclick="openEvalModal('${st.id}', '${currentPart}', 'Kém (K)')">${getSvgIcon('K', 'text-red')} Kém (K)</div>
+                                    <div class="menu-item" onclick="openEvalModal('${st.id}', '${currentPart}', 'Tốt (T)')">${getSvgIcon('T', 'text-green')} Tốt (T)</div>
+                                    <div class="menu-item" onclick="openEvalModal('${st.id}', '${currentPart}', 'Chép bài')">${getSvgIcon(textNotebook, 'text-blue', 'arc')} Chép bài</div>
+                                    <div class="menu-item" onclick="openEvalModal('${st.id}', '${currentPart}', 'Thiếu BTVN')">${getSvgIcon(textNotebook, 'text-red', 'circle')} Thiếu BTVN</div>
+                                    <div class="menu-item" onclick="openEvalModal('${st.id}', '${currentPart}', 'Sai hẳn')">${getSvgIcon(textNotebook, 'text-red', 'cross')} Sai hẳn</div>
+                                    <div class="menu-item" style="color: #ef4444; font-size: 16px;" onclick="undoEval(this, '${st.id}')" title="Hoàn tác đánh giá (trong 3 phút)"><i class="fa-solid fa-rotate-left"></i></div>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 4px; margin-left: 5px;">
+                                <input type="text" placeholder="Ghi chú..." class="note-input" style="width: 90px; padding: 6px 8px; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 12px; outline: none;" onchange="saveNote('${st.id}', this.value)" />
+                                <label style="cursor: pointer; color: #64748b; font-size: 16px; margin: 0; padding: 4px;" title="Đính kèm ảnh">
+                                    <i class="fa-solid fa-camera"></i>
+                                    <input type="file" accept="image/*" style="display: none;" onchange="uploadEvidence('${st.id}', this)" />
+                                </label>
+                                <div id="evidence-preview-${st.id}" style="display: none;">
+                                    <i class="fa-solid fa-circle-check" style="color: #10b981; font-size: 14px;" title="Đã đính kèm ảnh"></i>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>`;
         }).join('');
+        updateClassHeaderStats();
     }
 
     async function toggleAbsent(id, btn) {
@@ -633,6 +721,7 @@
                     btn.disabled = true;
                     row.querySelector('.eval-buttons').style.opacity = '1';
                     row.querySelector('.eval-buttons').style.pointerEvents = 'auto';
+                    updateClassHeaderStats();
                 } catch(e) {}
             }
             return;
@@ -650,6 +739,7 @@
         const evalBtns = row.querySelector('.eval-buttons');
         evalBtns.style.opacity = isAbsent ? '0.2' : '1';
         evalBtns.style.pointerEvents = isAbsent ? 'none' : 'auto';
+        updateClassHeaderStats();
     }
 
     async function toggleEarly(id, btn) {

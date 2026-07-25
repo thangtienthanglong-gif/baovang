@@ -6,10 +6,24 @@
     let currentPart = ''; 
     let currentShift = '';
 
-    function getBranchId() { return localStorage.getItem('selectedBranchId') || 'main'; }
+    function getBranchId() {
+        return localStorage.getItem('activeBranch') || localStorage.getItem('selectedBranchId') || 'main';
+    }
+
+    function getToken() {
+        return localStorage.getItem('token') || '';
+    }
 
     async function apiRequest(endpoint, method = 'GET', body = null) {
-        const headers = { 'Content-Type': 'application/json', 'x-branch-id': getBranchId() };
+        const token = getToken();
+        const headers = {
+            'Content-Type': 'application/json',
+            'x-branch-id': getBranchId(),
+            'X-Branch-Id': getBranchId()
+        };
+        if (token) {
+            headers['Authorization'] = 'Bearer ' + token;
+        }
         const options = { method, headers };
         if (body) options.body = JSON.stringify(body);
         const res = await fetch(endpoint, options);
@@ -28,27 +42,33 @@
     }
 
     async function loadClasses() {
+        const select = document.getElementById('className');
         try {
             const res = await apiRequest('/api/students');
-            const classNames = [...new Set(res.filter(s => s.status !== 'Nghỉ học').map(s => s.className).filter(c => c))].sort();
-            const select = document.getElementById('className');
+            const rawList = Array.isArray(res) ? res : (res.students || []);
+            const classNames = [...new Set(rawList.filter(s => s.status !== 'Nghỉ học').map(s => s.className).filter(c => c))].sort();
             if (classNames.length === 0) {
-                select.innerHTML = '<option value="">-- Chưa có lớp nào --</option>';
+                if (select) select.innerHTML = '<option value="">-- Chưa có lớp nào --</option>';
             } else {
-                select.innerHTML = classNames.map(c => `<option value="${c}">${c}</option>`).join('');
+                if (select) select.innerHTML = classNames.map(c => `<option value="${c}">${c}</option>`).join('');
             }
 
             // Restore from localStorage
-            if(localStorage.getItem('savedTeacherName')) document.getElementById('teacherName').value = localStorage.getItem('savedTeacherName');
-            if(localStorage.getItem('savedShiftName')) document.getElementById('shiftName').value = localStorage.getItem('savedShiftName');
-            if(localStorage.getItem('savedPartName')) document.getElementById('partName').value = localStorage.getItem('savedPartName');
-            if(localStorage.getItem('savedClassName') && classNames.includes(localStorage.getItem('savedClassName'))) {
-                document.getElementById('className').value = localStorage.getItem('savedClassName');
-            } else {
-                localStorage.removeItem('savedClassName');
-                if (classNames.length > 0) document.getElementById('className').value = classNames[0];
+            if(localStorage.getItem('savedTeacherName') && document.getElementById('teacherName')) document.getElementById('teacherName').value = localStorage.getItem('savedTeacherName');
+            if(localStorage.getItem('savedShiftName') && document.getElementById('shiftName')) document.getElementById('shiftName').value = localStorage.getItem('savedShiftName');
+            if(localStorage.getItem('savedPartName') && document.getElementById('partName')) document.getElementById('partName').value = localStorage.getItem('savedPartName');
+            if(select) {
+                if(localStorage.getItem('savedClassName') && classNames.includes(localStorage.getItem('savedClassName'))) {
+                    select.value = localStorage.getItem('savedClassName');
+                } else {
+                    localStorage.removeItem('savedClassName');
+                    if (classNames.length > 0) select.value = classNames[0];
+                }
             }
-        } catch(e) {}
+        } catch(e) {
+            console.error('Lỗi khi tải danh sách lớp:', e);
+            if (select) select.innerHTML = '<option value="">-- Lỗi tải danh sách lớp --</option>';
+        }
     }
     loadClasses();
 
@@ -172,10 +192,49 @@
         return svg;
     }
 
+    function updateClassHeaderStats() {
+        const container = document.getElementById('classHeaderStats');
+        if (!container) return;
+        const className = document.getElementById('className')?.value || '';
+        if (!className || !studentData || !Array.isArray(studentData)) {
+            container.innerHTML = '';
+            return;
+        }
+
+        const officialRoster = studentData.filter(st => !st.isMakeupToday);
+        const siSo = officialRoster.length;
+        const buLuonCount = studentData.filter(st => st.isMakeupToday && (st.makeupType === 'bu_luon' || st.stuckType === 'bu_luon')).length;
+        const buTamCount = studentData.filter(st => st.isMakeupToday && (st.makeupType === 'bu_tam' || st.makeupType === 'hoc_bu' || st.stuckType === 'bu_tam' || !st.makeupType)).length;
+        
+        const absentCount = document.querySelectorAll('.student-row.is-absent').length;
+        
+        // Formula: Có mặt = Sĩ số lớp + bù tạm + bù luôn - vắng
+        const coMat = Math.max(0, siSo + buTamCount + buLuonCount - absentCount);
+
+        let html = `<span style="background:#e0f2fe; color:#0369a1; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-users"></i> Sĩ số: <b>${siSo}</b></span>`;
+
+        if (buLuonCount > 0) {
+            html += `<span style="background:#fef3c7; color:#b45309; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-user-clock"></i> Bù luôn: <b>+${buLuonCount}</b></span>`;
+        }
+
+        if (buTamCount > 0) {
+            html += `<span style="background:#ffedd5; color:#c2410c; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-user-plus"></i> Bù tạm: <b>+${buTamCount}</b></span>`;
+        }
+
+        if (absentCount > 0) {
+            html += `<span style="background:#fee2e2; color:#b91c1c; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-user-xmark"></i> Vắng: <b>${absentCount}</b></span>`;
+        }
+
+        html += `<span style="background:#dcfce7; color:#15803d; padding:4px 14px; border-radius:20px; font-size:13px; font-weight:700; display:inline-flex; align-items:center; gap:5px; box-shadow:0 1px 3px rgba(0,0,0,0.05);"><i class="fa-solid fa-user-check"></i> Có mặt: <b>${coMat}</b></span>`;
+
+        container.innerHTML = html;
+    }
+
     function renderStudents() {
         const container = document.getElementById('studentListContainer');
         if(studentData.length === 0) {
             container.innerHTML = "<p>Lớp chưa có học sinh.</p>";
+            updateClassHeaderStats();
             return;
         }
 
@@ -278,6 +337,7 @@
                 </div>
             </div>`;
         }).join('');
+        updateClassHeaderStats();
     }
 
     async function toggleAbsent(id, btn) {
@@ -305,6 +365,7 @@
                     btn.disabled = true;
                     row.querySelector('.eval-buttons').style.opacity = '1';
                     row.querySelector('.eval-buttons').style.pointerEvents = 'auto';
+                    updateClassHeaderStats();
                 } catch(e) {}
             }
             return;
@@ -322,6 +383,7 @@
         const evalBtns = row.querySelector('.eval-buttons');
         evalBtns.style.opacity = isAbsent ? '0.2' : '1';
         evalBtns.style.pointerEvents = isAbsent ? 'none' : 'auto';
+        updateClassHeaderStats();
     }
 
     async function toggleEarly(id, btn) {
