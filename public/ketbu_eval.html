@@ -955,17 +955,37 @@
         }
     }
 
+    function triggerEvidenceUpload(studentId) {
+        let fileInput = document.getElementById('globalEvidenceInput');
+        if (!fileInput) {
+            fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.id = 'globalEvidenceInput';
+            fileInput.accept = 'image/*';
+            fileInput.style.display = 'none';
+            document.body.appendChild(fileInput);
+        }
+        fileInput.value = '';
+        fileInput.onchange = () => {
+            uploadEvidence(studentId, fileInput);
+        };
+        fileInput.click();
+    }
+
     async function uploadEvidence(studentId, inputEl) {
         if (!inputEl.files || inputEl.files.length === 0) return;
         const file = inputEl.files[0];
         
         try {
             showToast("Đang nén và tải ảnh lên...", "info");
-            const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1024, useWebWorker: true };
-            const compressedFile = await imageCompression(file, options);
+            let fileToUpload = file;
+            if (typeof imageCompression !== 'undefined') {
+                const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1024, useWebWorker: true };
+                fileToUpload = await imageCompression(file, options).catch(() => file);
+            }
             
             const formData = new FormData();
-            formData.append('evidence', compressedFile, compressedFile.name);
+            formData.append('evidence', fileToUpload, fileToUpload.name);
             
             const res = await fetch('/api/upload-evidence', {
                 method: 'POST',
@@ -980,16 +1000,20 @@
             const data = await res.json();
             
             window.studentEvidenceUrls[studentId] = data.url;
-            document.getElementById(`evidence-preview-${studentId}`).style.display = 'block';
-            showToast("Đã đính kèm ảnh thành công!", "success");
             
-            const noteInput = document.querySelector(`#row-${studentId} .note-input`);
-            if (noteInput && noteInput.value) {
-                saveNote(studentId, noteInput.value);
+            const ind = document.getElementById(`evidence-ind-${studentId}`);
+            if (ind) ind.style.display = 'block';
+            
+            const btn = document.getElementById(`evidence-btn-${studentId}`);
+            if (btn) {
+                btn.style.borderColor = '#10b981';
+                btn.style.color = '#10b981';
             }
+            
+            showToast("Đã đính kèm ảnh thành công!", "success");
         } catch (error) {
             console.error(error);
-            showToast("Lỗi tải ảnh: " + error.message);
+            showToast("Lỗi tải ảnh: " + (error.message || error), "error");
         }
     }
 
