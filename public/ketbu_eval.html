@@ -652,9 +652,6 @@
                     <button class="icon-btn absent-toggle ${isAbsent ? 'active' : ''}" onclick="toggleAbsent('${st.id}', this)" ${(isEarly || isExcused || st.isStuckToday) ? 'disabled' : ''}>
                         <i class="fa-solid fa-user-xmark"></i> Vắng
                     </button>
-                    <button class="icon-btn excused-toggle ${isExcused ? 'active' : ''}" onclick="toggleExcused('${st.id}', this)" ${(isEarly || isAbsent || st.isStuckToday) ? 'disabled' : ''} style="${isExcused ? 'background:#6366f1; color:#fff; border-color:#6366f1;' : ''}">
-                        <i class="fa-solid fa-clipboard-check"></i> Có phép
-                    </button>
                     <button class="icon-btn early-toggle ${isEarly ? 'active' : ''}" onclick="toggleEarly('${st.id}', this)" ${(isAbsent || isExcused || st.isStuckToday) ? 'disabled' : ''}>
                         <i class="fa-solid fa-person-walking-arrow-right"></i> Về sớm
                     </button>
