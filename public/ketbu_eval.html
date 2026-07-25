@@ -344,35 +344,64 @@
 
     async function loadClasses() {
         const select = document.getElementById('className');
+        if (!select) return;
         try {
-            const res = await apiRequest('/api/students');
-            const rawList = Array.isArray(res) ? res : (res.students || []);
-            window.allStudentsList = rawList.filter(s => s.status !== 'Nghỉ học');
-            const classNames = [...new Set(window.allStudentsList.map(s => s.className).filter(c => c))].sort();
-            if (classNames.length === 0) {
-                if (select) select.innerHTML = '<option value="">-- Chưa có lớp nào --</option>';
-            } else {
-                if (select) select.innerHTML = classNames.map(c => `<option value="${c}">${c}</option>`).join('');
+            let res = await apiRequest('/api/students');
+            let rawList = Array.isArray(res) ? res : (res ? res.students : []);
+            if (!Array.isArray(rawList)) rawList = [];
+
+            // If current branch has no students, fallback to main branch
+            if (rawList.length === 0) {
+                try {
+                    const fallbackRes = await fetch('/api/students', {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-branch-id': 'main',
+                            'X-Branch-Id': 'main',
+                            'Authorization': 'Bearer ' + getToken()
+                        }
+                    });
+                    if (fallbackRes.ok) {
+                        const fallbackData = await fallbackRes.json();
+                        const fallbackList = Array.isArray(fallbackData) ? fallbackData : (fallbackData.students || []);
+                        if (fallbackList.length > 0) rawList = fallbackList;
+                    }
+                } catch(err) {}
             }
 
-            // Restore from localStorage
-            if(localStorage.getItem('savedTeacherName') && document.getElementById('teacherName')) document.getElementById('teacherName').value = localStorage.getItem('savedTeacherName');
-            if(localStorage.getItem('savedShiftName') && document.getElementById('shiftName')) document.getElementById('shiftName').value = localStorage.getItem('savedShiftName');
-            if(localStorage.getItem('savedPartName') && document.getElementById('partName')) document.getElementById('partName').value = localStorage.getItem('savedPartName');
-            if(select) {
-                if(localStorage.getItem('savedClassName') && classNames.includes(localStorage.getItem('savedClassName'))) {
-                    select.value = localStorage.getItem('savedClassName');
-                } else {
-                    localStorage.removeItem('savedClassName');
-                    if (classNames.length > 0) select.value = classNames[0];
-                }
+            window.allStudentsList = rawList.filter(s => s && typeof s === 'object' && s.status !== 'Nghỉ học');
+            const classNames = [...new Set(window.allStudentsList.map(s => String(s.className || '').trim()).filter(Boolean))].sort();
+
+            if (classNames.length === 0) {
+                select.innerHTML = '<option value="">-- Chưa có lớp nào --</option>';
+            } else {
+                select.innerHTML = classNames.map(c => `<option value="${c}">${c}</option>`).join('');
             }
+
+            const savedClass = localStorage.getItem('savedClassName');
+            if (savedClass && classNames.includes(savedClass)) {
+                select.value = savedClass;
+            } else if (classNames.length > 0) {
+                select.value = classNames[0];
+            }
+
+            const tInput = document.getElementById('teacherName');
+            if (tInput && localStorage.getItem('savedTeacherName')) tInput.value = localStorage.getItem('savedTeacherName');
+            const sInput = document.getElementById('shiftName');
+            if (sInput && localStorage.getItem('savedShiftName')) sInput.value = localStorage.getItem('savedShiftName');
+            const pInput = document.getElementById('partName');
+            if (pInput && localStorage.getItem('savedPartName')) pInput.value = localStorage.getItem('savedPartName');
         } catch(e) {
-            console.error('Lỗi khi tải danh sách lớp:', e);
+            console.error('Lỗi loadClasses:', e);
             if (select) select.innerHTML = '<option value="">-- Lỗi tải danh sách lớp --</option>';
         }
     }
-    loadClasses();
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadClasses);
+    } else {
+        loadClasses();
+    }
 
     function onQuickSearchStudent(query) {
         const resultsContainer = document.getElementById('quickSearchResults');
