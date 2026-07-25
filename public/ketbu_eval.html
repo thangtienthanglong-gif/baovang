@@ -692,8 +692,8 @@
                         </div>
 
                         <!-- Ghi chú nhanh (Mở Hộp thoại Nổi Lớn) -->
-                        <div class="action-btn note-action-btn" id="note-btn-${st.id}" onclick="event.stopPropagation(); openNoteModal('${st.id}', '${(st.name || st.fullName || '').replace(/'/g, "\\'")}')">
-                            <span style="color:#94a3b8; font-size:13px; font-weight:bold;"><i class="fa-solid fa-pen-to-square"></i> Ghi chú</span>
+                        <div class="action-btn note-action-btn" id="note-btn-${st.id}" onclick="event.stopPropagation(); openNoteModal('${st.id}', '${(st.name || st.fullName || '').replace(/'/g, "\\'")}')" style="min-width:52px; padding:0 4px; display:flex; align-items:center; justify-content:center; text-align:center;">
+                            <span style="color:#94a3b8; font-size:12px; font-weight:bold; white-space:nowrap; line-height:1.2;">Ghi chú</span>
                         </div>
 
                         <!-- Evidence (Ảnh) -->
