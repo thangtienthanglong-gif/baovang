@@ -218,47 +218,13 @@ async function getBranchDb(req) {
   if (!rootDb.branches[branchId].callLogs) rootDb.branches[branchId].callLogs = [];
   if (!rootDb.branches[branchId].notificationLogs) rootDb.branches[branchId].notificationLogs = [];
   
-  // Tự động khôi phục danh sách học sinh nếu chi nhánh hiện tại chưa có dữ liệu học sinh
-  if (rootDb.branches[branchId].students.length === 0) {
-    let sourceBranch = rootDb.branches['main'];
-    if (!sourceBranch || !sourceBranch.students || sourceBranch.students.length === 0) {
-      for (const bKey in rootDb.branches) {
-        if (rootDb.branches[bKey].students && rootDb.branches[bKey].students.length > 0) {
-          sourceBranch = rootDb.branches[bKey];
-          break;
-        }
-      }
-    }
-    if (sourceBranch && sourceBranch.students && sourceBranch.students.length > 0) {
-      rootDb.branches[branchId].students = JSON.parse(JSON.stringify(sourceBranch.students));
-      await writeDb(rootDb);
-    }
-  }
-
-  // Tự động khôi phục lịch học bù/đổi lớp (scheduleExceptions) cho chi nhánh nếu bị rỗng
-  if (!rootDb.branches[branchId].scheduleExceptions || rootDb.branches[branchId].scheduleExceptions.length === 0) {
-    let sourceEx = rootDb.branches['main']?.scheduleExceptions;
-    if (!sourceEx || sourceEx.length === 0) {
-      for (const bKey in rootDb.branches) {
-        if (rootDb.branches[bKey].scheduleExceptions && rootDb.branches[bKey].scheduleExceptions.length > 0) {
-          sourceEx = rootDb.branches[bKey].scheduleExceptions;
-          break;
-        }
-      }
-    }
-    if (sourceEx && sourceEx.length > 0) {
-      rootDb.branches[branchId].scheduleExceptions = JSON.parse(JSON.stringify(sourceEx));
-      await writeDb(rootDb);
-    }
-  }
-  
   // Auto-fix existing absences stuck in "Chờ gửi thủ công" but have a call log
   if (rootDb.branches[branchId].callLogs && rootDb.branches[branchId].absences) {
     rootDb.branches[branchId].callLogs.forEach(log => {
       if (log.absenceId) {
         const absence = rootDb.branches[branchId].absences.find(a => a.id === log.absenceId);
         if (absence && absence.noticeStatus === 'Chờ gửi thủ công') {
-      absence.noticeStatus = 'Chưa kết bạn - Cần gọi';
+          absence.noticeStatus = 'Chưa kết bạn - Cần gọi';
         }
       }
     });
@@ -3060,21 +3026,12 @@ app.delete('/api/students/:id', async (req, res, next) => {
 
 app.delete('/api/classes/:className', async (req, res, next) => {
   try {
+    const db = await getBranchDb(req);
     const targetClass = String(req.params.className || '').trim().toLowerCase();
-    const rootDb = await readDb();
-    let deletedCount = 0;
-    
-    if (rootDb.branches) {
-      for (const bId in rootDb.branches) {
-        if (rootDb.branches[bId] && Array.isArray(rootDb.branches[bId].students)) {
-          const before = rootDb.branches[bId].students.length;
-          rootDb.branches[bId].students = rootDb.branches[bId].students.filter(student => String(student.className || '').trim().toLowerCase() !== targetClass);
-          deletedCount += (before - rootDb.branches[bId].students.length);
-        }
-      }
-    }
-    
-    await writeDb(rootDb);
+    const initialCount = db.students.length;
+    db.students = db.students.filter(student => String(student.className || '').trim().toLowerCase() !== targetClass);
+    const deletedCount = initialCount - db.students.length;
+    await saveBranchDb(req, db);
     res.json({ success: true, deletedCount, message: `Đã xóa lớp ${req.params.className} (${deletedCount} học sinh).` });
   } catch (error) {
     next(error);
@@ -3090,20 +3047,11 @@ app.post('/api/classes/bulk-delete', async (req, res, next) => {
       throw err;
     }
     const classSet = new Set(classNames.map(c => String(c || '').trim().toLowerCase()));
-    const rootDb = await readDb();
-    let deletedCount = 0;
-
-    if (rootDb.branches) {
-      for (const bId in rootDb.branches) {
-        if (rootDb.branches[bId] && Array.isArray(rootDb.branches[bId].students)) {
-          const before = rootDb.branches[bId].students.length;
-          rootDb.branches[bId].students = rootDb.branches[bId].students.filter(student => !classSet.has(String(student.className || '').trim().toLowerCase()));
-          deletedCount += (before - rootDb.branches[bId].students.length);
-        }
-      }
-    }
-
-    await writeDb(rootDb);
+    const db = await getBranchDb(req);
+    const initialCount = db.students.length;
+    db.students = db.students.filter(student => !classSet.has(String(student.className || '').trim().toLowerCase()));
+    const deletedCount = initialCount - db.students.length;
+    await saveBranchDb(req, db);
     res.json({ success: true, deletedClasses: classNames.length, deletedStudents: deletedCount, message: `Đã xóa ${classNames.length} lớp (${deletedCount} học sinh).` });
   } catch (error) {
     next(error);
