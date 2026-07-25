@@ -4100,11 +4100,21 @@ app.delete('/api/users/:username', async (req, res) => {
 app.get('/api/branches', async (req, res, next) => {
   try {
     const rootDb = await readDb();
-    const branches = Object.keys(rootDb.branches || {}).map(id => {
-      let bSettings = rootDb.branches[id].settings || {};
-      let bName = bSettings.branchName || (id === 'main' ? 'Cơ sở chính (Main)' : id);
-      return { id, name: bName };
-    });
+    let hasDirty = false;
+    const branches = [];
+    if (rootDb.branches) {
+      for (const id in rootDb.branches) {
+        if (id.includes('branch_branch_') || id.length > 50) {
+          delete rootDb.branches[id];
+          hasDirty = true;
+          continue;
+        }
+        let bSettings = rootDb.branches[id].settings || {};
+        let bName = bSettings.branchName || (id === 'main' ? 'Cơ sở chính (Main)' : id);
+        branches.push({ id, name: bName });
+      }
+      if (hasDirty) await writeDb(rootDb);
+    }
     if (!branches.find(b => b.id === 'main')) branches.unshift({ id: 'main', name: 'Cơ sở chính (Main)' });
     res.json(branches);
   } catch (error) {
