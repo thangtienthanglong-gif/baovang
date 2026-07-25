@@ -555,15 +555,15 @@
         const officialRoster = studentData.filter(st => !st.isMakeupToday);
         const siSo = officialRoster.length;
         
-        // Tách riêng "Học bù" (hoc_bu / bu_luon) và "Bù tạm" (bu_tam)
         const hocBuCount = studentData.filter(st => st.isMakeupToday && (st.makeupType === 'hoc_bu' || st.makeupType === 'bu_luon' || st.stuckType === 'bu_luon')).length;
         const buTamCount = studentData.filter(st => st.isMakeupToday && st.makeupType === 'bu_tam').length;
         
-        const absentCount = document.querySelectorAll('.student-row.is-absent').length;
+        const absentUnexcusedCount = document.querySelectorAll('.student-row.is-absent-unexcused').length;
+        const absentExcusedCount = document.querySelectorAll('.student-row.is-absent-excused').length;
         const earlyCount = document.querySelectorAll('.student-row.is-early').length;
         
-        // Công thức: Có mặt = Sĩ số gốc + Học bù + Bù tạm - Vắng - Về sớm
-        const coMat = Math.max(0, siSo + hocBuCount + buTamCount - absentCount - earlyCount);
+        // Công thức: Có mặt = Sĩ số gốc + Học bù + Bù tạm - Vắng KP - Vắng CP - Về sớm
+        const coMat = Math.max(0, siSo + hocBuCount + buTamCount - absentUnexcusedCount - absentExcusedCount - earlyCount);
 
         let html = `<span style="background:#e0f2fe; color:#0369a1; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-users"></i> Sĩ số: <b>${siSo}</b></span>`;
 
@@ -575,8 +575,12 @@
             html += `<span style="background:#ffedd5; color:#c2410c; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-user-plus"></i> Bù tạm: <b>+${buTamCount}</b></span>`;
         }
 
-        if (absentCount > 0) {
-            html += `<span style="background:#fee2e2; color:#b91c1c; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-user-xmark"></i> Vắng: <b>${absentCount}</b></span>`;
+        if (absentUnexcusedCount > 0) {
+            html += `<span style="background:#fee2e2; color:#b91c1c; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-user-xmark"></i> Vắng KP: <b>-${absentUnexcusedCount}</b></span>`;
+        }
+
+        if (absentExcusedCount > 0) {
+            html += `<span style="background:#e0e7ff; color:#4338ca; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-clipboard-check"></i> Vắng CP: <b>-${absentExcusedCount}</b></span>`;
         }
 
         if (earlyCount > 0) {
@@ -605,9 +609,11 @@
             else if (st.trend_status === 'up') trendHtml = `<span class="trend-badge-up" style="color:#10b981; font-weight:bold; margin-left: 5px;"><i class="fa-solid fa-star" style="color:#f59e0b; margin-right: 3px;"></i>${displayParts} <i class="fa-solid fa-arrow-up"></i></span>`;
 
             let isAbsent = st.todayAbsenceStatus === 'Vắng';
+            let isExcused = st.todayAbsenceStatus === 'Có phép' || st.todayAbsenceStatus === 'Vắng có phép';
             let isEarly = st.todayAbsenceStatus === 'Về sớm';
             let rowClasses = 'student-row';
-            if (isAbsent) rowClasses += ' is-absent';
+            if (isAbsent) rowClasses += ' is-absent is-absent-unexcused';
+            if (isExcused) rowClasses += ' is-absent is-absent-excused';
             if (isEarly) rowClasses += ' is-early';
             if (st.isMakeupToday) rowClasses += ' is-makeup';
             if (st.isStuckToday) rowClasses += ' is-stuck';
@@ -615,8 +621,14 @@
             let statusBadgeHtml = '';
             if (st.isStuckToday) {
                 statusBadgeHtml = `<span class="status-badge" style="display:inline-block; background:#f59e0b;">KẸT LỊCH</span>`;
+            } else if (isExcused) {
+                statusBadgeHtml = `<span class="status-badge" style="display:inline-block; background:#6366f1;">VẮNG CÓ PHÉP</span>`;
+            } else if (isEarly) {
+                statusBadgeHtml = `<span class="status-badge" style="display:inline-block; background:#10b981;">VỀ SỚM</span>`;
+            } else if (isAbsent) {
+                statusBadgeHtml = `<span class="status-badge" style="display:inline-block; background:#ef4444;">VẮNG</span>`;
             } else {
-                statusBadgeHtml = `<span class="status-badge" style="display:${(isAbsent || isEarly) ? 'inline-block' : 'none'}; background:${isEarly ? '#10b981' : '#ef4444'}">${isEarly ? 'VỀ SỚM' : 'VẮNG'}</span>`;
+                statusBadgeHtml = `<span class="status-badge" style="display:none; background:#ef4444;">VẮNG</span>`;
             }
             let makeupBadgeHtml = st.isMakeupToday ? `<span class="makeup-badge">${st.makeupType === 'bu_tam' ? 'BÙ TẠM' : 'HỌC BÙ'}</span>` : '';
             let stuckSubText = '';
@@ -637,14 +649,17 @@
                     </div>
                 </div>
                 <div class="actions">
-                    <button class="icon-btn absent-toggle ${isAbsent ? 'active' : ''}" onclick="toggleAbsent('${st.id}', this)" ${(isEarly || st.isStuckToday) ? 'disabled' : ''}>
+                    <button class="icon-btn absent-toggle ${isAbsent ? 'active' : ''}" onclick="toggleAbsent('${st.id}', this)" ${(isEarly || isExcused || st.isStuckToday) ? 'disabled' : ''}>
                         <i class="fa-solid fa-user-xmark"></i> Vắng
                     </button>
-                    <button class="icon-btn early-toggle ${isEarly ? 'active' : ''}" onclick="toggleEarly('${st.id}', this)" ${(isAbsent || isEarly || st.isStuckToday) ? 'disabled' : ''}>
+                    <button class="icon-btn excused-toggle ${isExcused ? 'active' : ''}" onclick="toggleExcused('${st.id}', this)" ${(isEarly || isAbsent || st.isStuckToday) ? 'disabled' : ''} style="${isExcused ? 'background:#6366f1; color:#fff; border-color:#6366f1;' : ''}">
+                        <i class="fa-solid fa-clipboard-check"></i> Có phép
+                    </button>
+                    <button class="icon-btn early-toggle ${isEarly ? 'active' : ''}" onclick="toggleEarly('${st.id}', this)" ${(isAbsent || isExcused || st.isStuckToday) ? 'disabled' : ''}>
                         <i class="fa-solid fa-person-walking-arrow-right"></i> Về sớm
                     </button>
 
-                    <div class="eval-buttons" id="eval-btns-${st.id}" style="opacity: ${(isAbsent || isEarly || st.isStuckToday) ? '0.2' : '1'}; pointer-events: ${(isAbsent || isEarly || st.isStuckToday) ? 'none' : 'auto'}">
+                    <div class="eval-buttons" id="eval-btns-${st.id}" style="opacity: ${(isAbsent || isExcused || isEarly || st.isStuckToday) ? '0.2' : '1'}; pointer-events: ${(isAbsent || isExcused || isEarly || st.isStuckToday) ? 'none' : 'auto'}">
                         <!-- Khảo bài chung -->
                         <div class="action-btn" onclick="event.stopPropagation(); toggleMenu(this, 'Khảo Bài', '${currentPart}')">
                             <span style="color:#94a3b8; font-size:14px; font-weight:bold;">KB</span>
@@ -737,15 +752,62 @@
         }
 
         const isAbsent = row.classList.toggle('is-absent');
+        row.classList.toggle('is-absent-unexcused', isAbsent);
         btn.classList.toggle('active');
         const badge = row.querySelector('.status-badge');
         badge.style.display = isAbsent ? 'inline-block' : 'none';
         badge.textContent = 'VẮNG';
+        badge.style.background = '#ef4444';
         
         const evalBtns = row.querySelector('.eval-buttons');
         evalBtns.style.opacity = isAbsent ? '0.2' : '1';
         evalBtns.style.pointerEvents = isAbsent ? 'none' : 'auto';
         updateClassHeaderStats();
+    }
+
+    async function toggleExcused(id, btn) {
+        if (btn.disabled) return;
+        const row = document.getElementById(`row-${id}`);
+        
+        try {
+            const evUrl = window.studentEvidenceUrls[id] || '';
+            await apiRequest('/api/absences', 'POST', {
+                studentId: id, date: new Date().toISOString().slice(0, 10),
+                absenceStatus: 'Có phép',
+                session: document.getElementById('shiftName')?.value || 'Không rõ',
+                className: document.getElementById('className')?.value, 
+                initialReason: 'Báo vắng có phép',
+                evidenceUrl: evUrl
+            });
+            
+            row.classList.add('is-absent', 'is-absent-excused');
+            const badge = row.querySelector('.status-badge');
+            badge.style.display = 'inline-block';
+            badge.textContent = 'VẮNG CÓ PHÉP';
+            badge.style.background = '#6366f1';
+            
+            const evalBtns = row.querySelector('.eval-buttons');
+            if (evalBtns) {
+                evalBtns.style.opacity = '0.2';
+                evalBtns.style.pointerEvents = 'none';
+            }
+            
+            btn.classList.add('active');
+            btn.style.background = '#6366f1';
+            btn.style.color = '#fff';
+            btn.style.borderColor = '#6366f1';
+            btn.disabled = true;
+            
+            const absentBtn = row.querySelector('.absent-toggle');
+            if (absentBtn) absentBtn.disabled = true;
+            const earlyBtn = row.querySelector('.early-toggle');
+            if (earlyBtn) earlyBtn.disabled = true;
+
+            updateClassHeaderStats();
+            showToast("Đã cập nhật Vắng có phép!");
+        } catch(e) {
+            showToast(e.message || "Lỗi cập nhật vắng có phép!");
+        }
     }
 
     async function toggleEarly(id, btn) {

@@ -2572,7 +2572,8 @@ app.get('/api/ketbu/students', async (req, res, next) => {
       const todayAbsences = allAbsences.filter(a => a.studentId === st.id && a.date === todayStr);
       let todayAbsenceStatus = null;
       if (todayAbsences.length > 0) {
-         if (todayAbsences.some(a => a.absenceStatus === 'Vắng' || a.absenceStatus === 'Nghỉ học')) todayAbsenceStatus = 'Vắng';
+         if (todayAbsences.some(a => a.absenceStatus === 'Có phép' || a.absenceStatus === 'Vắng có phép')) todayAbsenceStatus = 'Có phép';
+         else if (todayAbsences.some(a => a.absenceStatus === 'Vắng' || a.absenceStatus === 'Nghỉ học')) todayAbsenceStatus = 'Vắng';
          else if (todayAbsences.some(a => a.absenceStatus === 'Về sớm')) todayAbsenceStatus = 'Về sớm';
       }
       
@@ -3377,7 +3378,7 @@ app.post('/api/absences', async (req, res, next) => {
     }
 
     const absenceStatus = normalizeAbsenceStatus(req.body.absenceStatus);
-    const shouldAutoSend = req.body.sendZalo !== false && absenceStatus !== 'Đi trễ';
+    const shouldAutoSend = req.body.sendZalo !== false && absenceStatus !== 'Đi trễ' && absenceStatus !== 'Có phép' && absenceStatus !== 'Vắng có phép';
     const noticeDelayMinutes = shouldAutoSend ? delayMinutesFromSettings(db.settings || defaultSettings()) : 0;
     const absence = {
       id: id('abs'),
