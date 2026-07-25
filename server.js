@@ -3158,12 +3158,11 @@ app.delete('/api/schedule-exceptions/:id', async (req, res, next) => {
     const db = await getBranchDb(req);
     if (!db.scheduleExceptions) db.scheduleExceptions = [];
     
-    const idx = db.scheduleExceptions.findIndex(e => e.id === req.params.id);
-    if (idx !== -1) {
-      db.scheduleExceptions.splice(idx, 1);
-      await saveBranchDb(req, db);
-    }
-    res.json({ success: true });
+    const target = req.params.id;
+    const initialCount = db.scheduleExceptions.length;
+    db.scheduleExceptions = db.scheduleExceptions.filter(e => e.id !== target && e.studentId !== target);
+    await saveBranchDb(req, db);
+    res.json({ success: true, deletedCount: initialCount - db.scheduleExceptions.length });
   } catch (error) {
     next(error);
   }

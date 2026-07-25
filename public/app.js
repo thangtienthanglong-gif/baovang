@@ -3386,7 +3386,9 @@ async function saveMakeupSchedule() {
       body: JSON.stringify({ studentId, originalClass, stuckDay, makeupClass, makeupDay, type })
     });
     toast('Đã lưu lịch kẹt bù thành công!');
+    try { state.scheduleExceptions = await api('/api/schedule-exceptions'); } catch(e) {}
     await reloadMakeupList(studentId);
+    renderClassDropdown();
     renderRoster(); // re-render roster to show badges
   } catch (error) {
     toast('Lỗi khi lưu lịch bù: ' + error.message);
@@ -3398,7 +3400,9 @@ async function deleteMakeupSchedule(id, studentId) {
   try {
     await api(`/api/schedule-exceptions/${id}`, { method: 'DELETE' });
     toast('Đã xóa lịch bù.');
+    try { state.scheduleExceptions = await api('/api/schedule-exceptions'); } catch(e) {}
     await reloadMakeupList(studentId);
+    renderClassDropdown();
     renderRoster(); // re-render roster to hide badges
   } catch (error) {
     toast('Lỗi khi xóa: ' + error.message);
