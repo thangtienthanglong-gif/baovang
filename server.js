@@ -202,27 +202,39 @@ async function writeDb(db) {
 }
 
 function getBranchId(req) {
-  const branch = req ? (req.headers['x-branch-id'] || req.query.branchId || req.body.branchId) : null;
-  return branch ? String(branch).trim().toLowerCase().replace(/[^a-z0-9-_]/g, '') : 'main';
+  let branch = req ? (req.headers['x-branch-id'] || req.query.branchId || req.body.branchId) : null;
+  if (!branch) return 'main';
+  let str = String(branch).trim().toLowerCase().replace(/[^a-z0-9-_]/g, '');
+  while (str.includes('branch_branch_')) {
+    str = str.replace('branch_branch_', 'branch_');
+  }
+  return str || 'main';
 }
 
 async function getBranchDb(req) {
   const rootDb = await readDb();
-  const branchId = getBranchId(req);
+  let branchId = getBranchId(req);
   if (!rootDb.branches) rootDb.branches = {};
+  
+  // Ngăn chặn tự sinh chi nhánh rác vào CSDL nếu ID chi nhánh không tồn tại
   if (!rootDb.branches[branchId]) {
-    rootDb.branches[branchId] = { students: [], absences: [], callLogs: [], notificationLogs: [], settings: defaultSettings() };
+    branchId = 'main';
   }
-  if (!rootDb.branches[branchId].students) rootDb.branches[branchId].students = [];
-  if (!rootDb.branches[branchId].absences) rootDb.branches[branchId].absences = [];
-  if (!rootDb.branches[branchId].callLogs) rootDb.branches[branchId].callLogs = [];
-  if (!rootDb.branches[branchId].notificationLogs) rootDb.branches[branchId].notificationLogs = [];
+  if (!rootDb.branches['main']) {
+    rootDb.branches['main'] = { students: [], absences: [], callLogs: [], notificationLogs: [], settings: defaultSettings() };
+  }
+  
+  const targetBranch = rootDb.branches[branchId] || rootDb.branches['main'];
+  if (!targetBranch.students) targetBranch.students = [];
+  if (!targetBranch.absences) targetBranch.absences = [];
+  if (!targetBranch.callLogs) targetBranch.callLogs = [];
+  if (!targetBranch.notificationLogs) targetBranch.notificationLogs = [];
   
   // Auto-fix existing absences stuck in "Chờ gửi thủ công" but have a call log
-  if (rootDb.branches[branchId].callLogs && rootDb.branches[branchId].absences) {
-    rootDb.branches[branchId].callLogs.forEach(log => {
+  if (targetBranch.callLogs && targetBranch.absences) {
+    targetBranch.callLogs.forEach(log => {
       if (log.absenceId) {
-        const absence = rootDb.branches[branchId].absences.find(a => a.id === log.absenceId);
+        const absence = targetBranch.absences.find(a => a.id === log.absenceId);
         if (absence && absence.noticeStatus === 'Chờ gửi thủ công') {
           absence.noticeStatus = 'Chưa kết bạn - Cần gọi';
         }
@@ -230,7 +242,7 @@ async function getBranchDb(req) {
     });
   }
 
-  return rootDb.branches[branchId];
+  return targetBranch;
 }
 
 async function saveBranchDb(req, branchDb) {
