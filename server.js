@@ -217,16 +217,18 @@ function getBranchId(req) {
   return str || 'main';
 }
 
+function resolveValidBranchId(req, rootDb) {
+  const reqId = getBranchId(req);
+  if (!rootDb || !rootDb.branches) return 'main';
+  if (rootDb.branches[reqId]) return reqId;
+  const nonMain = Object.keys(rootDb.branches).find(k => k !== 'main');
+  return nonMain || 'main';
+}
+
 async function getBranchDb(req) {
   const rootDb = await readDb();
-  let branchId = getBranchId(req);
-  if (!rootDb.branches) rootDb.branches = {};
+  let branchId = resolveValidBranchId(req, rootDb);
   
-  // Nếu chi nhánh được yêu cầu không tồn tại, điều hướng về chi nhánh sẵn có đầu tiên hoặc 'main'
-  if (!rootDb.branches[branchId]) {
-    const available = Object.keys(rootDb.branches).find(k => k !== 'main');
-    branchId = available || 'main';
-  }
   if (!rootDb.branches[branchId]) {
     rootDb.branches['main'] = { students: [], absences: [], callLogs: [], notificationLogs: [], settings: defaultSettings() };
     branchId = 'main';
@@ -255,7 +257,7 @@ async function getBranchDb(req) {
 
 async function saveBranchDb(req, branchDb) {
   const rootDb = await readDb();
-  const branchId = getBranchId(req);
+  const branchId = resolveValidBranchId(req, rootDb);
   if (!rootDb.branches) rootDb.branches = {};
   rootDb.branches[branchId] = branchDb;
   await writeDb(rootDb);
@@ -4113,12 +4115,15 @@ app.get('/api/branches', async (req, res, next) => {
     const branches = [];
     if (rootDb.branches) {
       for (const id in rootDb.branches) {
-        if (id.includes('branch_branch_') || id.length > 50) {
+        const bObj = rootDb.branches[id] || {};
+        const stCount = (bObj.students || []).length;
+        const bSettings = bObj.settings || {};
+
+        if (id.includes('branch_branch_') || id.length > 50 || (id !== 'main' && stCount === 0 && !bSettings.branchName)) {
           delete rootDb.branches[id];
           hasDirty = true;
           continue;
         }
-        let bSettings = rootDb.branches[id].settings || {};
         let bName = bSettings.branchName || (id === 'main' ? 'Cơ sở chính (Main)' : id);
         branches.push({ id, name: bName });
       }
