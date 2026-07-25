@@ -3155,14 +3155,22 @@ app.post('/api/schedule-exceptions', async (req, res, next) => {
 
 app.delete('/api/schedule-exceptions/:id', async (req, res, next) => {
   try {
-    const db = await getBranchDb(req);
-    if (!db.scheduleExceptions) db.scheduleExceptions = [];
-    
     const target = req.params.id;
-    const initialCount = db.scheduleExceptions.length;
-    db.scheduleExceptions = db.scheduleExceptions.filter(e => e.id !== target && e.studentId !== target);
-    await saveBranchDb(req, db);
-    res.json({ success: true, deletedCount: initialCount - db.scheduleExceptions.length });
+    const rootDb = await readDb();
+    let deletedCount = 0;
+    
+    if (rootDb.branches) {
+      for (const bId in rootDb.branches) {
+        if (rootDb.branches[bId] && Array.isArray(rootDb.branches[bId].scheduleExceptions)) {
+          const before = rootDb.branches[bId].scheduleExceptions.length;
+          rootDb.branches[bId].scheduleExceptions = rootDb.branches[bId].scheduleExceptions.filter(e => e.id !== target && e.studentId !== target);
+          deletedCount += (before - rootDb.branches[bId].scheduleExceptions.length);
+        }
+      }
+    }
+    
+    await writeDb(rootDb);
+    res.json({ success: true, deletedCount });
   } catch (error) {
     next(error);
   }
