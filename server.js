@@ -2510,9 +2510,12 @@ app.get('/api/ketbu/students', async (req, res, next) => {
         return sData;
       });
 
-      const makeupExceptions = scheduleExceptions.filter(e => e.makeupClass === className && e.makeupDay === currentDayStr);
+      const makeupExceptions = scheduleExceptions.filter(e => String(e.makeupClass || '').trim().toLowerCase() === String(className || '').trim().toLowerCase() && String(e.makeupDay) === currentDayStr);
       makeupExceptions.forEach(e => {
-        const st = allBranchStudents.find(s => s.id === e.studentId);
+        let st = allBranchStudents.find(s => s.id === e.studentId);
+        if (!st && e.studentName) {
+          st = allBranchStudents.find(s => String(s.fullName || s.name || '').trim().toLowerCase() === String(e.studentName).trim().toLowerCase());
+        }
         if (st && !baseStudents.some(b => b.id === st.id)) {
           baseStudents.push({ ...st, isMakeupToday: true, makeupType: e.type || 'hoc_bu' });
         }
@@ -3128,9 +3131,13 @@ app.post('/api/schedule-exceptions', async (req, res, next) => {
     const db = await getBranchDb(req);
     if (!db.scheduleExceptions) db.scheduleExceptions = [];
     
+    const student = db.students ? db.students.find(s => s.id === req.body.studentId) : null;
+    const studentName = student ? (student.fullName || student.name) : (req.body.studentName || '');
+
     const exception = {
       id: id('exc'),
       studentId: req.body.studentId,
+      studentName: studentName,
       originalClass: req.body.originalClass,
       stuckDay: req.body.stuckDay,
       makeupClass: req.body.makeupClass,
