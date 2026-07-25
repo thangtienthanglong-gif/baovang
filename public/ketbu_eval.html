@@ -554,18 +554,21 @@
 
         const officialRoster = studentData.filter(st => !st.isMakeupToday);
         const siSo = officialRoster.length;
-        const buLuonCount = studentData.filter(st => st.isMakeupToday && (st.makeupType === 'bu_luon' || st.stuckType === 'bu_luon')).length;
-        const buTamCount = studentData.filter(st => st.isMakeupToday && (st.makeupType === 'bu_tam' || st.makeupType === 'hoc_bu' || st.stuckType === 'bu_tam' || !st.makeupType)).length;
+        
+        // Tách riêng "Học bù" (hoc_bu / bu_luon) và "Bù tạm" (bu_tam)
+        const hocBuCount = studentData.filter(st => st.isMakeupToday && (st.makeupType === 'hoc_bu' || st.makeupType === 'bu_luon' || st.stuckType === 'bu_luon')).length;
+        const buTamCount = studentData.filter(st => st.isMakeupToday && st.makeupType === 'bu_tam').length;
         
         const absentCount = document.querySelectorAll('.student-row.is-absent').length;
+        const earlyCount = document.querySelectorAll('.student-row.is-early').length;
         
-        // Formula: Có mặt = Sĩ số lớp + bù tạm + bù luôn - vắng
-        const coMat = Math.max(0, siSo + buTamCount + buLuonCount - absentCount);
+        // Công thức: Có mặt = Sĩ số gốc + Học bù + Bù tạm - Vắng - Về sớm
+        const coMat = Math.max(0, siSo + hocBuCount + buTamCount - absentCount - earlyCount);
 
         let html = `<span style="background:#e0f2fe; color:#0369a1; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-users"></i> Sĩ số: <b>${siSo}</b></span>`;
 
-        if (buLuonCount > 0) {
-            html += `<span style="background:#fef3c7; color:#b45309; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-user-clock"></i> Bù luôn: <b>+${buLuonCount}</b></span>`;
+        if (hocBuCount > 0) {
+            html += `<span style="background:#e0e7ff; color:#3730a3; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-graduation-cap"></i> Học bù: <b>+${hocBuCount}</b></span>`;
         }
 
         if (buTamCount > 0) {
@@ -574,6 +577,10 @@
 
         if (absentCount > 0) {
             html += `<span style="background:#fee2e2; color:#b91c1c; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-user-xmark"></i> Vắng: <b>${absentCount}</b></span>`;
+        }
+
+        if (earlyCount > 0) {
+            html += `<span style="background:#fef3c7; color:#b45309; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-person-walking-arrow-right"></i> Về sớm: <b>-${earlyCount}</b></span>`;
         }
 
         html += `<span style="background:#dcfce7; color:#15803d; padding:4px 14px; border-radius:20px; font-size:13px; font-weight:700; display:inline-flex; align-items:center; gap:5px; box-shadow:0 1px 3px rgba(0,0,0,0.05);"><i class="fa-solid fa-user-check"></i> Có mặt: <b>${coMat}</b></span>`;
@@ -774,6 +781,7 @@
             
             btn.classList.add('active');
             btn.disabled = true;
+            updateClassHeaderStats();
         } catch(e) {
             if (e.message && e.message.includes('đã được ghi vắng')) {
                 showToast("Học sinh này đã được đánh dấu vắng/về sớm trước đó!");
@@ -784,6 +792,7 @@
                 }
                 btn.classList.add('active');
                 btn.disabled = true;
+                updateClassHeaderStats();
             } else {
                 showToast(e.message || "Lỗi cập nhật về sớm!");
             }
