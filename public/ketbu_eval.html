@@ -691,13 +691,9 @@
                             </div>
                         </div>
 
-                        <!-- Ghi chú nhanh -->
-                        <div class="action-btn" onclick="event.stopPropagation(); toggleMenu(this, 'Ghi chú', '${currentPart}')">
-                            <span style="color:#94a3b8; font-size:13px; font-weight:bold;">Lưu ý</span>
-                            <div class="popup-menu" onclick="event.stopPropagation()">
-                                <input type="text" placeholder="Ghi chú..." class="note-input" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; margin-bottom:8px; font-size:14px;">
-                                <div class="menu-item" onclick="submitEval(this, 'Ghi chú', '${st.id}', this.previousElementSibling.value, 'none')" style="justify-content:center; background:#f8fafc; color:#3b82f6; font-weight:bold;">Lưu</div>
-                            </div>
+                        <!-- Ghi chú nhanh (Mở Hộp thoại Nổi Lớn) -->
+                        <div class="action-btn note-action-btn" id="note-btn-${st.id}" onclick="event.stopPropagation(); openNoteModal('${st.id}', '${(st.name || st.fullName || '').replace(/'/g, "\\'")}')">
+                            <span style="color:#94a3b8; font-size:13px; font-weight:bold;"><i class="fa-solid fa-pen-to-square"></i> Ghi chú</span>
                         </div>
 
                         <!-- Evidence (Ảnh) -->
@@ -997,16 +993,69 @@
         }
     }
 
-    async function saveNote(studentId, noteVal) {
-        if (!currentSession) return;
+    let currentNoteStudentId = null;
+
+    function openNoteModal(studentId, studentName) {
+        currentNoteStudentId = studentId;
+        const st = studentData.find(s => s.id === studentId);
+        const nameDisplay = studentName || (st ? (st.name || st.fullName) : '');
+        
+        const titleEl = document.getElementById('noteModalStudentName');
+        if (titleEl) titleEl.textContent = nameDisplay;
+        
+        const textarea = document.getElementById('noteModalTextarea');
+        if (textarea) {
+            textarea.value = window.studentNotesMap && window.studentNotesMap[studentId] ? window.studentNotesMap[studentId] : '';
+        }
+        
+        const modal = document.getElementById('noteModal');
+        if (modal) {
+            modal.style.display = 'flex';
+            if (textarea) setTimeout(() => textarea.focus(), 100);
+        }
+    }
+
+    function closeNoteModal() {
+        const modal = document.getElementById('noteModal');
+        if (modal) modal.style.display = 'none';
+        currentNoteStudentId = null;
+    }
+
+    async function saveNoteFromModal() {
+        const studentId = currentNoteStudentId;
+        if (!studentId) return;
+        const textarea = document.getElementById('noteModalTextarea');
+        const noteVal = (textarea ? textarea.value : '').trim();
+        if (!currentSession) {
+            showToast("Chưa có ca dạy đang diễn ra!");
+            return;
+        }
+        
         try {
             const evUrl = window.studentEvidenceUrls[studentId] || '';
             await apiRequest('/api/evaluations', 'POST', {
-                sessionId: currentSession.id, studentId, location: 'Ghi chú', status: noteVal, part: currentPart, evidenceUrl: evUrl
+                sessionId: currentSession.id, 
+                studentId: studentId, 
+                location: 'Ghi chú', 
+                status: noteVal || 'Ghi chú', 
+                part: currentPart, 
+                evidenceUrl: evUrl
             });
-            event.target.style.borderColor = '#10b981';
-            setTimeout(() => { event.target.style.borderColor = '#cbd5e1'; }, 2000);
-        } catch(e) {}
+            
+            if (!window.studentNotesMap) window.studentNotesMap = {};
+            window.studentNotesMap[studentId] = noteVal;
+
+            const noteBtn = document.getElementById(`note-btn-${studentId}`);
+            if (noteBtn) {
+                noteBtn.style.borderColor = noteVal ? '#10b981' : '#cbd5e1';
+                noteBtn.style.color = noteVal ? '#10b981' : '#94a3b8';
+            }
+
+            showToast("Đã lưu ghi chú thành công!", "success");
+            closeNoteModal();
+        } catch(e) {
+            showToast("Lỗi lưu ghi chú: " + (e.message || e));
+        }
     }
 
     async function openHistoryPanel(studentId) {
@@ -1446,13 +1495,25 @@
     </div>
 </div>
 
-<div id="customConfirmModal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; justify-content:center; align-items:center;">
-    <div style="background:#fff; padding:24px; border-radius:12px; width:400px; max-width:90%; box-shadow: 0 10px 25px rgba(0,0,0,0.2); font-family: sans-serif; color:#0f172a;">
-        <h3 style="margin-top:0; font-size:18px; color:#1e293b;">Thông báo từ hệ thống</h3>
-        <p id="customConfirmMessage" style="margin-bottom:24px; font-size:15px; line-height:1.5; white-space: pre-wrap;"></p>
+<div id="noteModal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15, 23, 42, 0.6); backdrop-filter:blur(2px); z-index:10000; justify-content:center; align-items:center;">
+    <div style="background:#fff; padding:24px; border-radius:16px; width:560px; max-width:92%; box-shadow:0 20px 30px rgba(0,0,0,0.25); font-family: sans-serif; color:#0f172a; border: 1px solid #e2e8f0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom: 1px solid #f1f5f9; padding-bottom:12px;">
+            <h3 style="margin:0; font-size:18px; color:#1e293b; display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-pen-to-square" style="color:#3b82f6; font-size:20px;"></i>
+                <span>Ghi chú cho học sinh: <strong id="noteModalStudentName" style="color:#2563eb;"></strong></span>
+            </h3>
+            <button onclick="closeNoteModal()" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; padding:4px;"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        
+        <div style="margin-bottom:20px;">
+            <textarea id="noteModalTextarea" rows="5" placeholder="Nhập ghi chú chi tiết cho học sinh tại đây..." style="width:100%; padding:14px; font-size:14px; line-height:1.5; border:1px solid #cbd5e1; border-radius:10px; resize:vertical; outline:none; font-family:inherit; min-height:130px; box-shadow:inset 0 1px 2px rgba(0,0,0,0.03); transition: border-color 0.2s;"></textarea>
+        </div>
+        
         <div style="display:flex; justify-content:flex-end; gap:12px;">
-            <button id="customConfirmCancel" class="btn" style="background:#f1f5f9; color:#475569; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-weight:600; font-size: 14px;">Hủy</button>
-            <button id="customConfirmOk" class="btn" style="background:#3b82f6; color:#fff; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-weight:600; font-size: 14px;">OK</button>
+            <button class="btn" onclick="closeNoteModal()" style="background:#f1f5f9; color:#475569; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-weight:600; font-size:14px;">Hủy</button>
+            <button id="noteModalSaveBtn" class="btn" onclick="saveNoteFromModal()" style="background:#10b981; color:#fff; border:none; padding:10px 22px; border-radius:8px; cursor:pointer; font-weight:600; font-size:14px; display:inline-flex; align-items:center; gap:8px; box-shadow:0 2px 5px rgba(16,185,129,0.3);">
+                <i class="fa-solid fa-floppy-disk" style="font-size:16px;"></i> Lưu
+            </button>
         </div>
     </div>
 </div>
