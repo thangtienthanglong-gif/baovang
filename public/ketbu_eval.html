@@ -239,7 +239,15 @@
     let currentShift = '';
 
     function getBranchId() {
-        return localStorage.getItem('activeBranch') || localStorage.getItem('selectedBranchId') || 'main';
+        let b = localStorage.getItem('activeBranch') || localStorage.getItem('selectedBranchId') || 'main';
+        if (b && b.indexOf('branch_') !== -1) {
+            const secondIdx = b.indexOf('branch_', b.indexOf('branch_') + 7);
+            if (secondIdx !== -1) {
+                b = b.substring(0, secondIdx);
+                localStorage.setItem('activeBranch', b);
+            }
+        }
+        return b;
     }
 
     function getToken() {

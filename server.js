@@ -205,8 +205,14 @@ function getBranchId(req) {
   let branch = req ? (req.headers['x-branch-id'] || req.query.branchId || req.body.branchId) : null;
   if (!branch) return 'main';
   let str = String(branch).trim().toLowerCase().replace(/[^a-z0-9-_]/g, '');
-  while (str.includes('branch_branch_')) {
-    str = str.replace('branch_branch_', 'branch_');
+  
+  // Tự động gọt bỏ phần mã chi nhánh bị nối lặp (vd: branch_123branch_123)
+  const firstIdx = str.indexOf('branch_');
+  if (firstIdx !== -1) {
+    const secondIdx = str.indexOf('branch_', firstIdx + 7);
+    if (secondIdx !== -1) {
+      str = str.substring(0, secondIdx);
+    }
   }
   return str || 'main';
 }
@@ -216,15 +222,17 @@ async function getBranchDb(req) {
   let branchId = getBranchId(req);
   if (!rootDb.branches) rootDb.branches = {};
   
-  // Ngăn chặn tự sinh chi nhánh rác vào CSDL nếu ID chi nhánh không tồn tại
+  // Nếu chi nhánh được yêu cầu không tồn tại, điều hướng về chi nhánh sẵn có đầu tiên hoặc 'main'
   if (!rootDb.branches[branchId]) {
+    const available = Object.keys(rootDb.branches).find(k => k !== 'main');
+    branchId = available || 'main';
+  }
+  if (!rootDb.branches[branchId]) {
+    rootDb.branches['main'] = { students: [], absences: [], callLogs: [], notificationLogs: [], settings: defaultSettings() };
     branchId = 'main';
   }
-  if (!rootDb.branches['main']) {
-    rootDb.branches['main'] = { students: [], absences: [], callLogs: [], notificationLogs: [], settings: defaultSettings() };
-  }
   
-  const targetBranch = rootDb.branches[branchId] || rootDb.branches['main'];
+  const targetBranch = rootDb.branches[branchId];
   if (!targetBranch.students) targetBranch.students = [];
   if (!targetBranch.absences) targetBranch.absences = [];
   if (!targetBranch.callLogs) targetBranch.callLogs = [];
