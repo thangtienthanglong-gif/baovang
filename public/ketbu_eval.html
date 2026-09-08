@@ -186,6 +186,43 @@
             <input type="text" id="teacherName" placeholder="VD: Cô Trang">
         </div>
 
+        <div class="flex-row">
+            <div class="form-group">
+                <label>Chọn khối</label>
+                <select id="gradeFilter">
+                    <option value="ALL">Tất cả khối</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Chọn môn</label>
+                <select id="subjectFilter">
+                    <option value="ALL">Tất cả môn</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Chọn thứ</label>
+                <select id="dayFilter">
+                    <option value="ALL">Tất cả thứ</option>
+                    <option value="2">Thứ 2</option>
+                    <option value="3">Thứ 3</option>
+                    <option value="4">Thứ 4</option>
+                    <option value="5">Thứ 5</option>
+                    <option value="6">Thứ 6</option>
+                    <option value="7">Thứ 7</option>
+                    <option value="C">Chủ nhật</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Chọn buổi</label>
+                <select id="sessionFilter">
+                    <option value="ALL">Tất cả buổi</option>
+                    <option value="S">Buổi sáng</option>
+                    <option value="C">Buổi chiều</option>
+                    <option value="T">Buổi tối</option>
+                </select>
+            </div>
+        </div>
+
         <div class="form-group">
             <label>Lớp học</label>
             <select id="className">
@@ -350,6 +387,79 @@
         });
     }
 
+    function escapeClassText(value) {
+        return String(value || '').replace(/[&<>'"]/g, character => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+        }[character]));
+    }
+
+    function getClassGrade(className) {
+        return String(className || '').trim().match(/^\d+/)?.[0] || '';
+    }
+
+    function getClassSubjectKey(className) {
+        const code = String(className || '').trim().match(/^\d+([A-Za-z])/i)?.[1]?.toUpperCase();
+        return ['S', 'C', 'T'].includes(code) ? 'TOAN' : (code || 'OTHER');
+    }
+
+    function getClassSubjectLabel(subjectKey) {
+        return { TOAN: 'Toán', V: 'Văn', A: 'Anh', K: 'KHTN' }[subjectKey] || 'Môn khác';
+    }
+
+    function getClassScheduleSlots(className) {
+        const text = String(className || '').trim().toUpperCase();
+        const slots = [];
+        const addSlots = (session, days) => days.split('').forEach(day => slots.push({ session, day }));
+
+        if (/^9?CT1\b/.test(text)) addSlots('T', '357');
+        else if (/^9?CT2\b/.test(text)) addSlots('T', '246');
+        else {
+            const parenthesizedDays = text.match(/^\d+CT.*?\(([\d-]+)\)/);
+            const numericSchedules = [...text.matchAll(/([SCT])(\d+)/g)];
+            if (parenthesizedDays) addSlots('T', parenthesizedDays[1].replace(/-/g, ''));
+            else numericSchedules.forEach(match => addSlots(match[1], match[2]));
+        }
+
+        [...text.matchAll(/(SC|CC|TC)/g)].forEach(match => addSlots(match[1][0], 'C'));
+        return slots;
+    }
+
+    function setCurrentScheduleFilters() {
+        const now = new Date();
+        const dayFilter = document.getElementById('dayFilter');
+        const sessionFilter = document.getElementById('sessionFilter');
+        if (dayFilter && dayFilter.value === 'ALL') {
+            dayFilter.value = now.getDay() === 0 ? 'C' : String(now.getDay() + 1);
+        }
+        if (sessionFilter && sessionFilter.value === 'ALL') {
+            const time = now.getHours() + now.getMinutes() / 60;
+            sessionFilter.value = time < 12 ? 'S' : time < 16.5 ? 'C' : 'T';
+        }
+    }
+
+    function renderClassOptions(preferredClass = '') {
+        const select = document.getElementById('className');
+        if (!select) return;
+        const grade = document.getElementById('gradeFilter')?.value || 'ALL';
+        const subject = document.getElementById('subjectFilter')?.value || 'ALL';
+        const day = document.getElementById('dayFilter')?.value || 'ALL';
+        const session = document.getElementById('sessionFilter')?.value || 'ALL';
+        const filteredClasses = [...new Set((window.allStudentsList || [])
+            .map(student => String(student.className || '').trim())
+            .filter(Boolean))]
+            .filter(className => (grade === 'ALL' || getClassGrade(className) === grade) &&
+                (subject === 'ALL' || getClassSubjectKey(className) === subject) &&
+                (day === 'ALL' && session === 'ALL' || getClassScheduleSlots(className).some(slot =>
+                    (day === 'ALL' || slot.day === day) && (session === 'ALL' || slot.session === session))))
+            .sort((a, b) => a.localeCompare(b, 'vi'));
+
+        select.innerHTML = filteredClasses.length
+            ? filteredClasses.map(className => `<option value="${escapeClassText(className)}">${escapeClassText(className)}</option>`).join('')
+            : '<option value="">-- Không có lớp phù hợp --</option>';
+
+        if (filteredClasses.includes(preferredClass)) select.value = preferredClass;
+    }
+
     async function loadClasses() {
         const select = document.getElementById('className');
         if (!select) return;
@@ -362,19 +472,19 @@
 
             window.allStudentsList = rawList.filter(s => s && typeof s === 'object' && s.status !== 'Nghỉ học');
             const classNames = [...new Set(window.allStudentsList.map(s => String(s.className || '').trim()).filter(Boolean))].sort();
-
-            if (classNames.length === 0) {
-                select.innerHTML = '<option value="">-- Chưa có lớp nào --</option>';
-            } else {
-                select.innerHTML = classNames.map(c => `<option value="${c}">${c}</option>`).join('');
-            }
-
+            const grades = [...new Set(classNames.map(getClassGrade).filter(Boolean))].sort((a, b) => Number(a) - Number(b));
+            const subjects = [...new Set(classNames.map(getClassSubjectKey))].sort();
+            const gradeFilter = document.getElementById('gradeFilter');
+            const subjectFilter = document.getElementById('subjectFilter');
+            if (gradeFilter) gradeFilter.innerHTML = '<option value="ALL">Tất cả khối</option>' + grades.map(grade => `<option value="${grade}">Khối ${grade}</option>`).join('');
+            if (subjectFilter) subjectFilter.innerHTML = '<option value="ALL">Tất cả môn</option>' + subjects.map(subject => `<option value="${subject}">${getClassSubjectLabel(subject)}</option>`).join('');
+            setCurrentScheduleFilters();
             const savedClass = localStorage.getItem('savedClassName');
-            if (savedClass && classNames.includes(savedClass)) {
-                select.value = savedClass;
-            } else if (classNames.length > 0) {
-                select.value = classNames[0];
-            }
+            renderClassOptions(savedClass && classNames.includes(savedClass) ? savedClass : classNames[0] || '');
+            gradeFilter?.addEventListener('change', () => renderClassOptions());
+            subjectFilter?.addEventListener('change', () => renderClassOptions());
+            document.getElementById('dayFilter')?.addEventListener('change', () => renderClassOptions());
+            document.getElementById('sessionFilter')?.addEventListener('change', () => renderClassOptions());
 
             const tInput = document.getElementById('teacherName');
             if (tInput && localStorage.getItem('savedTeacherName')) tInput.value = localStorage.getItem('savedTeacherName');

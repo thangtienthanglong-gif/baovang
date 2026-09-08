@@ -302,17 +302,28 @@ function getClassScheduleInfo(className, dateString, forcedDay = 'ALL') {
       sessionName = 'Tối';
       daysStr = ctMatch[1].replace(/-/g, '');
     } else {
-      const stdMatch = str.match(/^\d+([SCT])(\d+)/);
-      if (stdMatch) {
-        const sessionCode = stdMatch[1];
+      const scheduleMatch = str.match(/^\d+[A-Z]?([SCT])(\d+)/);
+      const sundaySessionMatch = str.match(/^\d+[A-Z]?(SC|CC|TC)/);
+      if (scheduleMatch) {
+        const sessionCode = scheduleMatch[1];
         sessionName = sessionCode === 'S' ? 'Sáng' : sessionCode === 'C' ? 'Chiều' : 'Tối';
-        daysStr = stdMatch[2];
+        daysStr = scheduleMatch[2];
+      } else if (sundaySessionMatch) {
+        const sessionCode = sundaySessionMatch[1][0];
+        sessionName = sessionCode === 'S' ? 'Sáng' : sessionCode === 'C' ? 'Chiều' : 'Tối';
+      } else {
+        const numericDays = [...str.matchAll(/[SCT](\d+)/g)].flatMap(match => match[1].split(''));
+        daysStr = [...new Set(numericDays)].join('');
       }
     }
   }
 
+  if (/(?:SC|CC|TC)/.test(str)) {
+    daysStr = [...new Set((daysStr + 'C').split(''))].join('');
+  }
+
   if (sessionName === 'Khác') {
-    return { sessionName, matchesDate: true };
+    return { sessionName, matchesDate: true, daysStr };
   }
   
   let dayNumberStr;
@@ -727,6 +738,14 @@ function selectedDay() {
   return $('#dayDropdown')?.value || 'ALL';
 }
 
+function selectedGrade() {
+  return $('#gradeDropdown')?.value || 'ALL';
+}
+
+function getClassGrade(className) {
+  return String(className || '').trim().match(/^\d+/)?.[0] || '';
+}
+
 function renderClassDropdown() {
   const dropdown = $('#classDropdown');
   const meta = $('#classDropdownMeta');
@@ -737,9 +756,21 @@ function renderClassDropdown() {
   const dateStr = selectedDate();
   const activeSession = selectedSession();
   const activeDay = selectedDay();
+  const gradeDropdown = $('#gradeDropdown');
+  const currentGrade = gradeDropdown?.value || 'ALL';
+  const grades = [...new Set(classNames.map(getClassGrade).filter(Boolean))]
+    .sort((a, b) => Number(a) - Number(b));
+  if (gradeDropdown) {
+    gradeDropdown.innerHTML = ['<option value="ALL">Tất cả khối</option>']
+      .concat(grades.map(grade => `<option value="${grade}">Khối ${grade}</option>`))
+      .join('');
+    gradeDropdown.value = grades.includes(currentGrade) ? currentGrade : 'ALL';
+  }
+  const activeGrade = gradeDropdown?.value || 'ALL';
   
   const sessionGroups = { 'Sáng': [], 'Chiều': [], 'Tối': [], 'Khác': [] };
   classNames.forEach(className => {
+    if (activeGrade !== 'ALL' && getClassGrade(className) !== activeGrade) return;
     const info = getClassScheduleInfo(className, dateStr, activeDay);
     if (info.matchesDate && (activeSession === 'ALL' || info.sessionName === activeSession)) {
       sessionGroups[info.sessionName].push(className);
@@ -792,6 +823,7 @@ function renderRoster() {
   const dateStr = selectedDate();
   const activeSession = selectedSession();
   const activeDay = selectedDay();
+  const activeGrade = selectedGrade();
   const searchQuery = ($('#quickStudentSearchMain')?.value || '').trim().toLowerCase();
   
   const filtered = activeStudents().filter(student => {
@@ -804,6 +836,7 @@ function renderRoster() {
       return true;
     }
     const studentClass = student.className || 'Chưa có lớp';
+    if (activeGrade !== 'ALL' && getClassGrade(studentClass) !== activeGrade) return false;
     const info = getClassScheduleInfo(studentClass, dateStr, activeDay);
     
     const matchesSession = activeSession === 'ALL' || info.sessionName === activeSession;
@@ -2356,6 +2389,11 @@ function initEvents() {
     renderRoster();
   });
 
+  $('#gradeDropdown')?.addEventListener('change', () => {
+    renderClassDropdown();
+    renderRoster();
+  });
+
   $('#classDropdown')?.addEventListener('change', async event => {
     if ($('#quickStudentSearchMain')) $('#quickStudentSearchMain').value = '';
     $('#filterClass').value = event.target.value;
@@ -3343,8 +3381,38 @@ async function openMakeupModal(studentId, studentName, originalClass) {
     }
   }
   
-  const classNames = [...new Set(activeStudents().map(s => s.className).filter(c => c && c !== originalClass))].sort();
-  document.getElementById('makeupModalTargetClass').innerHTML = classNames.map(c => `<option value="${c}">${c}</option>`).join('');
+  const originalGrade = String(originalClass || '').trim().match(/^\d+/)?.[0];
+  const getClassSubjectKey = className => {
+    const subjectCode = String(className || '').trim().match(/^\d+([A-Za-z])/i)?.[1]?.toUpperCase();
+    return ['S', 'C', 'T'].includes(subjectCode) ? 'TOAN' : subjectCode;
+  };
+  const originalSubject = getClassSubjectKey(originalClass);
+  const classNames = [...new Set(activeStudents()
+    .map(s => String(s.className || '').trim())
+    .filter(className => {
+      const classGrade = className.match(/^\d+/)?.[0];
+      const classSubject = getClassSubjectKey(className);
+      return className && className !== originalClass &&
+        (!originalGrade || classGrade === originalGrade) &&
+        (!originalSubject || classSubject === originalSubject);
+    }))].sort((a, b) => a.localeCompare(b, 'vi'));
+  document.getElementById('makeupModalTargetClass').innerHTML = classNames
+    .map(className => `<option value="${escapeHtml(className)}">${escapeHtml(className)}</option>`)
+    .join('');
+  const targetClassEl = document.getElementById('makeupModalTargetClass');
+  const targetDayEl = document.getElementById('makeupModalTargetDay');
+  const updateTargetDayOptions = (className, preferredDay) => {
+    const targetSchedule = getClassScheduleInfo(className, state.today);
+    const days = targetSchedule.daysStr ? targetSchedule.daysStr.split('') : ['2', '3', '4', '5', '6', '7', 'C'];
+    targetDayEl.innerHTML = days.map(day =>
+      `<option value="${day}">${day === 'C' ? 'Chủ Nhật' : 'Thứ ' + day}</option>`
+    ).join('');
+    if (days.includes(preferredDay)) targetDayEl.value = preferredDay;
+  };
+  if (targetClassEl && targetDayEl) {
+    updateTargetDayOptions(targetClassEl.value, targetDayEl.value);
+    targetClassEl.onchange = () => updateTargetDayOptions(targetClassEl.value, targetDayEl.value);
+  }
   
   await reloadMakeupList(studentId);
   document.getElementById('makeupModal').style.display = 'flex';
