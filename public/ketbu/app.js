@@ -1615,11 +1615,6 @@ function collectScheduleFieldsFrom(container, classCode, defaultRoom, defaultCap
     return { error: `Phần học chỉ được chọn: ${validOptions.join(", ")}.` };
   }
 
-  const missingRoom = sessions.find((session) => !session.roomName);
-  if (missingRoom) {
-    return { error: `Vui lòng nhập phòng học cho ${missingRoom.label} hoặc nhập phòng mặc định.` };
-  }
-
   const invalidCapacity = sessions.find((session) =>
     session.capacity !== "" && (!Number.isFinite(session.capacity) || session.capacity <= 0)
   );
@@ -1673,8 +1668,8 @@ function syncClassInputFromData() {
 }
 
 function cleanupRooms() {
-  const usedRooms = new Set(data.classSessions.map((session) => session.roomId));
-  data.rooms = data.rooms.filter((room) => usedRooms.has(room.id));
+  const usedRooms = new Set(data.classSessions.map((session) => session.roomId).filter(Boolean));
+  data.rooms = data.rooms.filter((room) => room.id && usedRooms.has(room.id));
 }
 
 function removeInvalidAssignments() {
@@ -1703,7 +1698,7 @@ function classDraftResult(classCode, count, scheduleResult) {
   if (scheduleResult.error) {
     return {
       error: scheduleResult.error,
-      autoText: "Chờ đủ dữ liệu"
+      autoText: "Chờ dữ liệu hợp lệ"
     };
   }
 
@@ -1780,6 +1775,7 @@ function saveParsedClass(parsed, previousClassCode = "") {
 
   const roomsById = new Map();
   parsed.sessions.forEach((session) => {
+    if (!session.roomId) return;
     roomsById.set(session.roomId, {
       id: session.roomId,
       name: session.roomName,
