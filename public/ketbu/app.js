@@ -871,13 +871,36 @@ function subjectLabelFromCode(subjectCode) {
   return subjectMap[subjectCode] || subjectCode;
 }
 
-function classCodeDetails(classCode) {
-  const normalizedCode = String(classCode || "").trim().toUpperCase();
+function normalizeClassCodeValue(classCode) {
+  return String(classCode || "").trim().replace(/\s+/g, "").toUpperCase();
+}
 
-  const ctMatch = normalizedCode.match(/^([0-9]{1,2})CT([12])$/);
+function parseWeekdaysFromClassNote(note) {
+  const weekdays = Array.from(new Set(String(note || "").match(/[2-8]/g) || []))
+    .map(Number)
+    .sort((a, b) => a - b);
+  return weekdays.length ? weekdays : null;
+}
+
+function splitClassCodeWeekdayNote(classCode) {
+  const normalizedCode = normalizeClassCodeValue(classCode);
+  const noteMatch = normalizedCode.match(/\(([2-8][2-8,\-]*)\)$/);
+  const weekdays = noteMatch ? parseWeekdaysFromClassNote(noteMatch[1]) : null;
+
+  return {
+    code: normalizedCode,
+    codeCore: weekdays ? normalizedCode.slice(0, noteMatch.index) : normalizedCode,
+    explicitWeekdays: weekdays
+  };
+}
+
+function classCodeDetails(classCode) {
+  const { code: normalizedCode, codeCore, explicitWeekdays } = splitClassCodeWeekdayNote(classCode);
+
+  const ctMatch = codeCore.match(/^([0-9]{1,2})CT([12])$/);
   if (ctMatch) {
     const group = ctMatch[2];
-    const weekdays = group === '1' ? [3, 5, 7] : [2, 4, 6];
+    const weekdays = explicitWeekdays || (group === '1' ? [3, 5, 7] : [2, 4, 6]);
     return {
       code: normalizedCode,
       grade: Number(ctMatch[1]),
@@ -887,15 +910,35 @@ function classCodeDetails(classCode) {
       subjectCode: "TOAN",
       subjectLabel: "Toán",
       levelCode: `CT${group}`,
-      baseCode: normalizedCode,
+      baseCode: codeCore,
       weekdays,
       format: "generic"
     };
   }
 
-  const mathMatch = normalizedCode.match(/^([0-9]{1,2})([SCT])([2-8]+)([A-Z]*)$/);
+  const mathSundayMatch = codeCore.match(/^([0-9]{1,2})([SCT])C([A-Z0-9]*\+?)$/);
+  if (mathSundayMatch) {
+    const levelCode = mathSundayMatch[3].toUpperCase();
+    const baseCode = `${mathSundayMatch[1]}${mathSundayMatch[2].toUpperCase()}C`;
+
+    return {
+      code: normalizedCode,
+      grade: Number(mathSundayMatch[1]),
+      shift: shiftLabelFromToken(mathSundayMatch[2]),
+      shiftToken: mathSundayMatch[2].toUpperCase(),
+      programGroup: levelCode,
+      subjectCode: "TOAN",
+      subjectLabel: "Toán",
+      levelCode,
+      baseCode,
+      weekdays: explicitWeekdays || [8],
+      format: "math"
+    };
+  }
+
+  const mathMatch = codeCore.match(/^([0-9]{1,2})([SCT])([2-8]+)([A-Z0-9]*\+?)$/);
   if (mathMatch) {
-    const weekdays = Array.from(new Set(mathMatch[3].split("").map(Number)))
+    const weekdays = explicitWeekdays || Array.from(new Set(mathMatch[3].split("").map(Number)))
       .filter((weekday) => weekday >= 2 && weekday <= 8);
 
     if (!weekdays.length) return null;
@@ -918,9 +961,30 @@ function classCodeDetails(classCode) {
     };
   }
 
-  const subjectMatch = normalizedCode.match(/^([0-9]{1,2})([A-Z]+)([SCT])([2-8]+)([A-Z]*)$/);
+  const subjectSundayMatch = codeCore.match(/^([0-9]{1,2})([A-Z]+)([SCT])C([A-Z0-9]*\+?)$/);
+  if (subjectSundayMatch) {
+    const subjectCode = subjectSundayMatch[2].toUpperCase();
+    const levelCode = subjectSundayMatch[4].toUpperCase();
+    const baseCode = `${subjectSundayMatch[1]}${subjectCode}${subjectSundayMatch[3].toUpperCase()}C`;
+
+    return {
+      code: normalizedCode,
+      grade: Number(subjectSundayMatch[1]),
+      shift: shiftLabelFromToken(subjectSundayMatch[3]),
+      shiftToken: subjectSundayMatch[3].toUpperCase(),
+      programGroup: levelCode,
+      subjectCode,
+      subjectLabel: subjectLabelFromCode(subjectCode),
+      levelCode,
+      baseCode,
+      weekdays: explicitWeekdays || [8],
+      format: "subject"
+    };
+  }
+
+  const subjectMatch = codeCore.match(/^([0-9]{1,2})([A-Z]+)([SCT])([2-8]+)([A-Z0-9]*\+?)$/);
   if (subjectMatch) {
-    const weekdays = Array.from(new Set(subjectMatch[4].split("").map(Number)))
+    const weekdays = explicitWeekdays || Array.from(new Set(subjectMatch[4].split("").map(Number)))
       .filter((weekday) => weekday >= 2 && weekday <= 8);
 
     if (weekdays.length) {
@@ -944,7 +1008,7 @@ function classCodeDetails(classCode) {
     }
   }
 
-  const genericMatch = normalizedCode.match(/^([0-9]{1,2})([A-Z0-9]+)$/);
+  const genericMatch = codeCore.match(/^([0-9]{1,2})([A-Z0-9]+\+?)$/);
   if (genericMatch) {
     return {
       code: normalizedCode,
@@ -955,8 +1019,8 @@ function classCodeDetails(classCode) {
       subjectCode: "TOAN",
       subjectLabel: "Toán",
       levelCode: genericMatch[2],
-      baseCode: genericMatch[0],
-      weekdays: [],
+      baseCode: codeCore,
+      weekdays: explicitWeekdays || [],
       format: "generic"
     };
   }
@@ -1061,17 +1125,17 @@ function normalizeSessionsToClassCode(sessions, details, fallbackRoomNamesString
 
 function parseClassLine(line, lineNumber) {
   const source = line.trim().replace(/[.a?,;]+$/, "");
-  const classMatch = source.match(/^\s*([a-zA-Z0-9]+)(?:\s+|$)(.*)/i);
+  const classMatch = source.match(/^\s*([a-zA-Z0-9+]+(?:\([2-8][2-8,\-\s]*\))?)(?=\s|[-\u2013\u2014:,\t]|$)(.*)/i);
 
   if (!classMatch) {
     return { error: `Dòng ${lineNumber}: chưa nhận được mã lớp.` };
   }
 
-  const classCode = classMatch[1].toUpperCase();
-  const codeDetails = classCodeDetails(classCode);
+  const codeDetails = classCodeDetails(classMatch[1]);
   if (!codeDetails) {
     return { error: `Dòng ${lineNumber}: mã lớp không đúng định dạng.` };
   }
+  const classCode = codeDetails.code;
 
   let rest = classMatch[2].trim();
   rest = rest.replace(/^[-–—:,\t]+\s*/, "");
@@ -1418,7 +1482,7 @@ function scheduleFieldsMarkup(classCode, existingSessions = []) {
 
   if (!details) {
     return `
-      <div class="schedule-empty">Nhập mã lớp như 8S35A, 8VC2, 8AT2 hoặc 8KT4 để tự tách các buổi học.</div>
+      <div class="schedule-empty">Nhập mã lớp như 8S35A, 8VC2, 6ASC, 6T2M+ hoặc 6CT1(3-5) để tự tách các buổi học.</div>
     `;
   }
 
@@ -1513,7 +1577,7 @@ function renderClassCodeScheduleFields() {
 function collectScheduleFieldsFrom(container, classCode, defaultRoom, defaultCapacity) {
   const details = classCodeDetails(classCode);
   if (!details) {
-    return { error: "Mã lớp cần có dạng Toán 8S35A/8C24B hoặc dạng môn-ca-thứ như 8VC2, 8AT2, 8KT4." };
+    return { error: "Mã lớp cần có dạng Toán 8S35A/8C24B, mã Chủ nhật như 6ASC/7ACC/7KSC, mã có hậu tố + như 6T2M+, hoặc dạng CT như 6CT1(3-5)." };
   }
 
   const fields = Array.from(container.querySelectorAll(".lesson-part-input[data-weekday]"));
@@ -1631,7 +1695,7 @@ function classDraftResult(classCode, count, scheduleResult) {
 
   if (!details) {
     return {
-      error: "Mã lớp cần có dạng Toán 8S35A/8C24B hoặc dạng môn-ca-thứ như 8VC2, 8AT2, 8KT4.",
+      error: "Mã lớp cần có dạng Toán 8S35A/8C24B, mã Chủ nhật như 6ASC/7ACC/7KSC, mã có hậu tố + như 6T2M+, hoặc dạng CT như 6CT1(3-5).",
       autoText: "Chờ mã lớp hợp lệ"
     };
   }
@@ -2908,20 +2972,25 @@ elements.branchSelect.addEventListener("change", () => switchBranch(elements.bra
 
 if (elements.loadBtn) {
   elements.loadBtn.addEventListener("click", () => {
-    const text = elements.classInputText.value;
-    const parsed = parseClassData(text);
-    if (parsed.errors && parsed.errors.length > 0) {
-      alert("Có lỗi xảy ra:\n" + parsed.errors.join("\n"));
-      return;
+    try {
+      const text = elements.classInputText.value;
+      const parsed = parseClassData(text);
+      if (parsed.errors && parsed.errors.length > 0) {
+        alert("Có lỗi xảy ra:\n" + parsed.errors.join("\n"));
+        return;
+      }
+      data.rooms = parsed.rooms;
+      data.classes = parsed.classes;
+      data.classSessions = parsed.classSessions;
+      data.classInputText = text;
+
+      saveData();
+      renderAll();
+      alert("Nhập dữ liệu thành công!");
+    } catch (error) {
+      console.error("Import class data failed:", error);
+      alert("Lỗi nhập dữ liệu: " + (error && error.message ? error.message : error));
     }
-    data.rooms = parsed.rooms;
-    data.classes = parsed.classes;
-    data.classSessions = parsed.classSessions;
-    data.classInputText = text;
-    
-    triggerAutoSave();
-    renderAll();
-    alert("Nhập dữ liệu thành công!");
   });
 }
 
