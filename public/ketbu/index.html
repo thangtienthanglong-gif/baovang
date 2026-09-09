@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>App xếp lịch học bù</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <link rel="stylesheet" href="./styles.css?v=20260717-8" />
+  <link rel="stylesheet" href="./styles.css?v=20260909-1" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
@@ -353,6 +353,20 @@
               <span>Xóa tất cả</span>
             </button>
           </div>
+          <div class="class-search-panel" aria-label="Tìm lớp để chỉnh sửa">
+            <div class="class-search-control">
+              <span class="class-search-icon" aria-hidden="true"><i class="fa-solid fa-magnifying-glass"></i></span>
+              <input id="classSearchInput" type="search" autocomplete="off" placeholder="Tìm mã lớp" />
+              <button id="classSearchClearBtn" class="class-search-clear" type="button" aria-label="Xóa tìm kiếm" hidden>
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+              </button>
+              <button id="classSearchEditBtn" class="class-search-edit" type="button" disabled>
+                <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+                <span>Mở sửa</span>
+              </button>
+            </div>
+            <div id="classSearchResults" class="class-search-results" aria-live="polite"></div>
+          </div>
           <div id="parsedClassesBody" class="class-tree" aria-label="Cây danh mục lớp"></div>
         </section>
       </section>
@@ -399,6 +413,6 @@
     </main>
   </div>
 
-  <script src="./app.js?v=7"></script>
+  <script src="./app.js?v=9"></script>
 </body>
 </html>

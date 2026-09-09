@@ -67,6 +67,10 @@ const elements = {
   totalAssignments: document.getElementById("totalAssignments"),
   fullSessions: document.getElementById("fullSessions"),
   parsedClassesBody: document.getElementById("parsedClassesBody"),
+  classSearchInput: document.getElementById("classSearchInput"),
+  classSearchResults: document.getElementById("classSearchResults"),
+  classSearchEditBtn: document.getElementById("classSearchEditBtn"),
+  classSearchClearBtn: document.getElementById("classSearchClearBtn"),
   settingClassCode: document.getElementById("settingClassCode"),
   settingScheduleFields: document.getElementById("settingScheduleFields"),
   settingRoom: document.getElementById("settingRoom"),
@@ -2161,12 +2165,104 @@ function classNodeMarkup(classItem) {
   `;
 }
 
+function classSearchMatches(query) {
+  const normalizedQuery = normalizeClassCodeValue(query);
+  if (!normalizedQuery) return [];
+
+  return data.classes
+    .slice()
+    .map((classItem) => {
+      const normalizedCode = normalizeClassCodeValue(classItem.code);
+      const includes = normalizedCode.includes(normalizedQuery);
+      if (!includes) return null;
+
+      return {
+        classItem,
+        rank: normalizedCode === normalizedQuery ? 0 : normalizedCode.startsWith(normalizedQuery) ? 1 : 2
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.rank - b.rank || a.classItem.code.localeCompare(b.classItem.code, "vi"))
+    .slice(0, 10)
+    .map((item) => item.classItem);
+}
+
+function classSearchResultMarkup(classItem) {
+  const sessions = getClassSessions(classItem.code);
+  const summary = classSummaryDetails(classItem, sessions);
+  const grade = Number(classItem.grade);
+  const gradeText = Number.isFinite(grade) ? `Khối ${grade}` : "Khối ?";
+  const sessionText = `${sessions.length} buổi`;
+  const activeClass = activeInlineEditClassCode === classItem.code ? " is-active" : "";
+
+  return `
+    <button class="class-search-result${activeClass}" type="button" data-action="search-edit-class" data-class-code="${escapeHtml(classItem.code)}">
+      <span class="class-search-code">${escapeHtml(classItem.code)}</span>
+      <span class="class-search-meta">${escapeHtml(gradeText)} · ${escapeHtml(summary.subjectText)} · ${sessionText}</span>
+      <span class="class-search-room">${escapeHtml(summary.roomText)}</span>
+      <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+    </button>
+  `;
+}
+
+function renderClassSearch() {
+  if (!elements.classSearchInput || !elements.classSearchResults) return;
+
+  const query = elements.classSearchInput.value.trim();
+  const matches = classSearchMatches(query);
+
+  if (elements.classSearchClearBtn) {
+    elements.classSearchClearBtn.hidden = !query;
+  }
+
+  if (elements.classSearchEditBtn) {
+    elements.classSearchEditBtn.disabled = !matches.length;
+  }
+
+  if (!query) {
+    elements.classSearchResults.innerHTML = "";
+    return;
+  }
+
+  elements.classSearchResults.innerHTML = matches.length
+    ? matches.map((classItem) => classSearchResultMarkup(classItem)).join("")
+    : `<div class="class-search-empty">Không tìm thấy mã lớp</div>`;
+}
+
+function openClassSearchResult(classCode) {
+  const normalizedCode = normalizeClassCodeValue(classCode);
+  const classItem = data.classes.find((item) => normalizeClassCodeValue(item.code) === normalizedCode);
+  if (!classItem) {
+    renderClassSearch();
+    return false;
+  }
+
+  if (elements.classSearchInput) {
+    elements.classSearchInput.value = classItem.code;
+  }
+
+  openInlineClassEditor(classItem.code);
+  renderClassSearch();
+  return true;
+}
+
+function openFirstClassSearchMatch() {
+  const matches = classSearchMatches(elements.classSearchInput ? elements.classSearchInput.value : "");
+  if (!matches.length) {
+    renderClassSearch();
+    return false;
+  }
+
+  return openClassSearchResult(matches[0].code);
+}
+
 function renderParsedClasses() {
   if (!data.classes.length) {
     activeInlineEditClassCode = "";
     elements.parsedClassesBody.innerHTML = `
       <div class="empty-state class-tree-empty">Chưa có dữ liệu lớp học.</div>
     `;
+    renderClassSearch();
 
     return;
   }
@@ -2212,6 +2308,7 @@ function renderParsedClasses() {
       `;
     }).join("");
 
+  renderClassSearch();
 
 }
 
@@ -2607,6 +2704,7 @@ function evaluateCandidate(student, session) {
     shift: session.shift,
     lessonParts: session.lessonParts,
     roomName: room ? room.name : "Chưa có phòng",
+    hasRoom: Boolean(room),
     teacher: classInfo ? classInfo.teacher : "Chưa khai báo",
     levelCode: sessionDetails ? sessionDetails.levelCode : "",
     currentCount,
@@ -2616,7 +2714,6 @@ function evaluateCandidate(student, session) {
     suitability: suitabilityForLevel(mainDetails, sessionDetails)
   };
 
-  if (!room) return { accepted: false, row: { ...candidate, reason: "Chưa khai báo phòng học" } };
   if (session.classCode === student.mainClassCode) return { accepted: false, row: { ...candidate, reason: "Đây là lớp chính của học sinh" } };
   if (mainDetails && sessionDetails && !mainDetails.levelCode && sessionDetails.baseCode === mainDetails.baseCode) {
     return { accepted: false, row: { ...candidate, reason: "Cùng mã lớp gốc của học sinh" } };
@@ -2697,9 +2794,7 @@ function findMakeupSuggestions() {
   currentRejected = rejected;
 
   const matchMessage = matchingSessions.length
-    ? isCapacityCheckEnabled()
-      ? `Tìm thấy <strong>${suggestions.length}</strong> lớp còn chỗ, <strong>${rejected.length}</strong> lớp bị loại.`
-      : `Tìm thấy <strong>${suggestions.length}</strong> lớp phù hợp, <strong>${rejected.length}</strong> lớp bị loại.`
+    ? `Tìm thấy <strong>${suggestions.length}</strong> lớp phù hợp, <strong>${rejected.length}</strong> lớp bị loại.`
     : "Chưa có lớp nào cùng phần học trong buổi muốn bù.";
 
   elements.resultSummary.innerHTML = `
@@ -2754,6 +2849,9 @@ function renderSuggestions() {
     const label = `${item.shift} ${weekdayLabel(item.weekday)}`;
     const hasCapacity = Number(item.capacity) > 0;
     const capacityText = hasCapacity ? item.capacity : "?";
+    const roomText = item.hasRoom
+      ? escapeHtml(item.roomName)
+      : `<span class="badge warning">Chưa có phòng</span>`;
     const seatBadge = isCapacityCheckEnabled()
       ? hasCapacity
         ? `<span class="badge ${item.remainingSeats <= 1 ? "danger" : item.remainingSeats <= 4 ? "warning" : "success"}">${item.remainingSeats} chỗ</span>`
@@ -2775,7 +2873,7 @@ function renderSuggestions() {
           <strong>${escapeHtml(label)}</strong>
         </td>
         <td>${escapeHtml(item.lessonParts)}</td>
-        <td>${escapeHtml(item.roomName)}</td>
+        <td>${roomText}</td>
         <td>${seatBadge}</td>
         <td><span class="badge ${suitability.type}">${suitability.label}</span></td>
         <td><button class="small-button" type="button" data-action="confirm" data-session-id="${escapeHtml(item.sessionId)}">Chọn lớp này</button></td>
@@ -3091,6 +3189,38 @@ elements.settingScheduleFields.addEventListener("change", (event) => {
 
   scheduleClassAutoSave();
 });
+
+if (elements.classSearchInput) {
+  elements.classSearchInput.addEventListener("input", () => {
+    elements.classSearchInput.value = elements.classSearchInput.value.toUpperCase();
+    renderClassSearch();
+  });
+
+  elements.classSearchInput.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    openFirstClassSearchMatch();
+  });
+}
+
+if (elements.classSearchEditBtn) {
+  elements.classSearchEditBtn.addEventListener("click", openFirstClassSearchMatch);
+}
+
+if (elements.classSearchClearBtn) {
+  elements.classSearchClearBtn.addEventListener("click", () => {
+    elements.classSearchInput.value = "";
+    renderClassSearch();
+    elements.classSearchInput.focus();
+  });
+}
+
+if (elements.classSearchResults) {
+  elements.classSearchResults.addEventListener("click", (event) => {
+    const resultButton = event.target.closest("[data-action='search-edit-class']");
+    if (resultButton) openClassSearchResult(resultButton.dataset.classCode);
+  });
+}
 
 elements.parsedClassesBody.addEventListener("click", (event) => {
   const editButton = event.target.closest("[data-action='edit-class']");
