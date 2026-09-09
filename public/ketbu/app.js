@@ -916,16 +916,18 @@ function classCodeDetails(classCode) {
     };
   }
 
-  const mathSundayMatch = codeCore.match(/^([0-9]{1,2})([SCT])C([A-Z0-9]*\+?)$/);
+  const mathSundayMatch = codeCore.match(/^([0-9]{1,2})(N?)([SCT])C([A-Z0-9]*\+?)$/);
   if (mathSundayMatch) {
-    const levelCode = mathSundayMatch[3].toUpperCase();
-    const baseCode = `${mathSundayMatch[1]}${mathSundayMatch[2].toUpperCase()}C`;
+    const mathPrefix = mathSundayMatch[2].toUpperCase();
+    const shiftToken = mathSundayMatch[3].toUpperCase();
+    const levelCode = mathSundayMatch[4].toUpperCase();
+    const baseCode = `${mathSundayMatch[1]}${mathPrefix}${shiftToken}C`;
 
     return {
       code: normalizedCode,
       grade: Number(mathSundayMatch[1]),
-      shift: shiftLabelFromToken(mathSundayMatch[2]),
-      shiftToken: mathSundayMatch[2].toUpperCase(),
+      shift: shiftLabelFromToken(shiftToken),
+      shiftToken,
       programGroup: levelCode,
       subjectCode: "TOAN",
       subjectLabel: "Toán",
@@ -936,21 +938,23 @@ function classCodeDetails(classCode) {
     };
   }
 
-  const mathMatch = codeCore.match(/^([0-9]{1,2})([SCT])([2-8]+)([A-Z0-9]*\+?)$/);
+  const mathMatch = codeCore.match(/^([0-9]{1,2})(N?)([SCT])([2-8]+)([A-Z0-9]*\+?)$/);
   if (mathMatch) {
-    const weekdays = explicitWeekdays || Array.from(new Set(mathMatch[3].split("").map(Number)))
+    const weekdays = explicitWeekdays || Array.from(new Set(mathMatch[4].split("").map(Number)))
       .filter((weekday) => weekday >= 2 && weekday <= 8);
 
     if (!weekdays.length) return null;
 
-    const levelCode = mathMatch[4].toUpperCase();
-    const baseCode = `${mathMatch[1]}${mathMatch[2].toUpperCase()}${mathMatch[3]}`;
+    const mathPrefix = mathMatch[2].toUpperCase();
+    const shiftToken = mathMatch[3].toUpperCase();
+    const levelCode = mathMatch[5].toUpperCase();
+    const baseCode = `${mathMatch[1]}${mathPrefix}${shiftToken}${mathMatch[4]}`;
 
     return {
       code: normalizedCode,
       grade: Number(mathMatch[1]),
-      shift: shiftLabelFromToken(mathMatch[2]),
-      shiftToken: mathMatch[2].toUpperCase(),
+      shift: shiftLabelFromToken(shiftToken),
+      shiftToken,
       programGroup: levelCode,
       subjectCode: "TOAN",
       subjectLabel: "Toán",
@@ -1482,7 +1486,7 @@ function scheduleFieldsMarkup(classCode, existingSessions = []) {
 
   if (!details) {
     return `
-      <div class="schedule-empty">Nhập mã lớp như 8S35A, 8VC2, 6ASC, 6T2M+ hoặc 6CT1(3-5) để tự tách các buổi học.</div>
+      <div class="schedule-empty">Nhập mã lớp như 8S35A, 7NC7A, 7NT7B, 7NSC, 8VC2, 6ASC, 6T2M+ hoặc 6CT1(3-5) để tự tách các buổi học.</div>
     `;
   }
 
@@ -1577,7 +1581,7 @@ function renderClassCodeScheduleFields() {
 function collectScheduleFieldsFrom(container, classCode, defaultRoom, defaultCapacity) {
   const details = classCodeDetails(classCode);
   if (!details) {
-    return { error: "Mã lớp cần có dạng Toán 8S35A/8C24B, mã Chủ nhật như 6ASC/7ACC/7KSC, mã có hậu tố + như 6T2M+, hoặc dạng CT như 6CT1(3-5)." };
+    return { error: "Mã lớp cần có dạng Toán 8S35A/8C24B/7NC7A/7NT7B/7NSC, mã Chủ nhật như 6ASC/7ACC/7KSC, mã có hậu tố + như 6T2M+, hoặc dạng CT như 6CT1(3-5)." };
   }
 
   const fields = Array.from(container.querySelectorAll(".lesson-part-input[data-weekday]"));
@@ -1690,7 +1694,7 @@ function classDraftResult(classCode, count, scheduleResult) {
 
   if (!details) {
     return {
-      error: "Mã lớp cần có dạng Toán 8S35A/8C24B, mã Chủ nhật như 6ASC/7ACC/7KSC, mã có hậu tố + như 6T2M+, hoặc dạng CT như 6CT1(3-5).",
+      error: "Mã lớp cần có dạng Toán 8S35A/8C24B/7NC7A/7NT7B/7NSC, mã Chủ nhật như 6ASC/7ACC/7KSC, mã có hậu tố + như 6T2M+, hoặc dạng CT như 6CT1(3-5).",
       autoText: "Chờ mã lớp hợp lệ"
     };
   }
