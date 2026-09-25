@@ -875,6 +875,11 @@ function subjectLabelFromCode(subjectCode) {
   return subjectMap[subjectCode] || subjectCode;
 }
 
+function subjectCodeFromClassPrefix(prefix) {
+  const normalizedPrefix = String(prefix || "").toUpperCase();
+  return ["A", "V", "K"].includes(normalizedPrefix) ? normalizedPrefix : "TOAN";
+}
+
 function normalizeClassCodeValue(classCode) {
   return String(classCode || "").trim().replace(/\s+/g, "").toUpperCase();
 }
@@ -998,9 +1003,10 @@ function classCodeDetails(classCode) {
 
   const subjectSundayMatch = codeCore.match(/^([0-9]{1,2})([A-Z]+)([SCT])C([A-Z0-9]*\+?)$/);
   if (subjectSundayMatch) {
-    const subjectCode = subjectSundayMatch[2].toUpperCase();
+    const encodedSubjectCode = subjectSundayMatch[2].toUpperCase();
+    const subjectCode = subjectCodeFromClassPrefix(encodedSubjectCode);
     const levelCode = subjectSundayMatch[4].toUpperCase();
-    const baseCode = `${subjectSundayMatch[1]}${subjectCode}${subjectSundayMatch[3].toUpperCase()}C`;
+    const baseCode = `${subjectSundayMatch[1]}${encodedSubjectCode}${subjectSundayMatch[3].toUpperCase()}C`;
 
     return {
       code: normalizedCode,
@@ -1023,9 +1029,10 @@ function classCodeDetails(classCode) {
       .filter((weekday) => weekday >= 2 && weekday <= 8);
 
     if (weekdays.length) {
-      const subjectCode = subjectMatch[2].toUpperCase();
+      const encodedSubjectCode = subjectMatch[2].toUpperCase();
+      const subjectCode = subjectCodeFromClassPrefix(encodedSubjectCode);
       const levelCode = subjectMatch[5].toUpperCase();
-      const baseCode = `${subjectMatch[1]}${subjectCode}${subjectMatch[3].toUpperCase()}${subjectMatch[4]}`;
+      const baseCode = `${subjectMatch[1]}${encodedSubjectCode}${subjectMatch[3].toUpperCase()}${subjectMatch[4]}`;
 
       return {
         code: normalizedCode,
@@ -2256,6 +2263,52 @@ function openFirstClassSearchMatch() {
   return openClassSearchResult(matches[0].code);
 }
 
+const subjectTreeOrder = ["A", "V", "TOAN", "K"];
+
+function classSubjectGroup(classItem) {
+  const details = classCodeDetails(classItem.code);
+  const code = details && details.subjectCode ? details.subjectCode : "UNKNOWN";
+  const label = details && details.subjectLabel ? details.subjectLabel : "Không rõ môn";
+
+  return { code, label };
+}
+
+function subjectTreeRank(subjectCode) {
+  const rank = subjectTreeOrder.indexOf(subjectCode);
+  return rank === -1 ? subjectTreeOrder.length : rank;
+}
+
+function subjectGroupMarkup(gradeKey, subject, classes) {
+  const sessionCount = classes.reduce((total, classItem) => total + getClassSessions(classItem.code).length, 0);
+  const containsActiveEditor = classes.some((classItem) => classItem.code === activeInlineEditClassCode);
+  const classCodes = classes.map((classItem) => classItem.code).join(", ");
+
+  return `
+    <details class="tree-subject" data-grade-key="${escapeHtml(gradeKey)}" data-subject-code="${escapeHtml(subject.code)}" ${containsActiveEditor ? "open" : ""}>
+      <summary class="tree-subject-summary">
+        <span class="tree-subject-toggle" aria-hidden="true"></span>
+        <span class="tree-subject-title">${escapeHtml(subject.label)}</span>
+        <span class="tree-subject-count">${classes.length} lớp · ${sessionCount} buổi</span>
+      </summary>
+      <div class="subject-code-editor">
+        <label>
+          <span>Danh sách mã lớp</span>
+          <textarea data-subject-code-list rows="2" spellcheck="false">${escapeHtml(classCodes)}</textarea>
+        </label>
+        <button class="small-button subject-code-save" type="button" data-action="save-subject-codes">
+          <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+          Lưu danh sách
+        </button>
+        <span class="subject-code-status" aria-live="polite"></span>
+        <div class="subject-code-added" aria-live="polite"></div>
+      </div>
+      <div class="tree-class-list">
+        ${classes.map((classItem) => classNodeMarkup(classItem)).join("")}
+      </div>
+    </details>
+  `;
+}
+
 function renderParsedClasses() {
   if (!data.classes.length) {
     activeInlineEditClassCode = "";
@@ -2293,6 +2346,21 @@ function renderParsedClasses() {
     .map(([gradeKey, classes]) => {
       const gradeLabel = gradeKey === "unknown" ? "Không rõ khối" : `Khối ${gradeKey}`;
       const sessionCount = classes.reduce((total, classItem) => total + getClassSessions(classItem.code).length, 0);
+      const defaultSubjectGroups = new Map(subjectTreeOrder.map((subjectCode) => [
+        subjectCode,
+        { subject: { code: subjectCode, label: subjectLabelFromCode(subjectCode) }, classes: [] }
+      ]));
+      const subjectGroups = classes.reduce((groups, classItem) => {
+        const subject = classSubjectGroup(classItem);
+        if (!groups.has(subject.code)) groups.set(subject.code, { subject, classes: [] });
+        groups.get(subject.code).classes.push(classItem);
+        return groups;
+      }, defaultSubjectGroups);
+      const sortedSubjectGroups = Array.from(subjectGroups.values()).sort((a, b) => {
+        const rankDifference = subjectTreeRank(a.subject.code) - subjectTreeRank(b.subject.code);
+        if (rankDifference !== 0) return rankDifference;
+        return a.subject.label.localeCompare(b.subject.label, "vi");
+      });
 
       return `
         <details class="tree-grade" open>
@@ -2301,8 +2369,8 @@ function renderParsedClasses() {
             <span class="tree-grade-title">${escapeHtml(gradeLabel)}</span>
             <span class="tree-grade-count">${classes.length} lớp · ${sessionCount} buổi</span>
           </summary>
-          <div class="tree-class-list">
-            ${classes.map((classItem) => classNodeMarkup(classItem)).join("")}
+          <div class="tree-subject-list">
+            ${sortedSubjectGroups.map(({ subject, classes: subjectClasses }) => subjectGroupMarkup(gradeKey, subject, subjectClasses)).join("")}
           </div>
         </details>
       `;
@@ -2310,6 +2378,120 @@ function renderParsedClasses() {
 
   renderClassSearch();
 
+}
+
+function splitSubjectClassCodes(value) {
+  const codes = [];
+  let current = "";
+  let parenthesesDepth = 0;
+
+  for (const character of String(value || "")) {
+    if (character === "(") parenthesesDepth += 1;
+    if (character === ")") parenthesesDepth = Math.max(0, parenthesesDepth - 1);
+
+    if ((character === "," || character === "\n") && parenthesesDepth === 0) {
+      if (current.trim()) codes.push(normalizeClassCodeValue(current));
+      current = "";
+    } else {
+      current += character;
+    }
+  }
+
+  if (current.trim()) codes.push(normalizeClassCodeValue(current));
+  return codes;
+}
+
+function setSubjectCodeStatus(subjectNode, message, type = "success") {
+  const status = subjectNode.querySelector(".subject-code-status");
+  if (!status) return;
+  status.textContent = message;
+  status.classList.toggle("error", type === "error");
+}
+
+function saveSubjectCodeList(button) {
+  const subjectNode = button.closest(".tree-subject");
+  const input = subjectNode ? subjectNode.querySelector("[data-subject-code-list]") : null;
+  if (!subjectNode || !input) return;
+
+  const gradeKey = subjectNode.dataset.gradeKey;
+  const subjectCode = subjectNode.dataset.subjectCode;
+  const requestedCodes = splitSubjectClassCodes(input.value);
+  const duplicateCodes = requestedCodes.filter((code, index) => requestedCodes.indexOf(code) !== index);
+
+  if (duplicateCodes.length) {
+    setSubjectCodeStatus(subjectNode, `Mã bị lặp: ${Array.from(new Set(duplicateCodes)).join(", ")}.`, "error");
+    return;
+  }
+
+  const parsedNewClasses = [];
+  for (let index = 0; index < requestedCodes.length; index += 1) {
+    const code = requestedCodes[index];
+    const parsed = parseClassLine(code, index + 1);
+    if (parsed.error) {
+      setSubjectCodeStatus(subjectNode, `${code}: mã lớp không hợp lệ.`, "error");
+      return;
+    }
+
+    const parsedGradeKey = Number.isFinite(Number(parsed.grade)) ? String(parsed.grade) : "unknown";
+    if (parsedGradeKey !== gradeKey || parsed.subjectCode !== subjectCode) {
+      setSubjectCodeStatus(subjectNode, `${code} không thuộc đúng khối và môn đang chọn.`, "error");
+      return;
+    }
+
+    if (!getClass(code)) parsedNewClasses.push(parsed);
+  }
+
+  const currentCodes = data.classes
+    .filter((classItem) => {
+      const classGrade = Number(classItem.grade);
+      const classGradeKey = Number.isFinite(classGrade) ? String(classGrade) : "unknown";
+      return classGradeKey === gradeKey && classSubjectGroup(classItem).code === subjectCode;
+    })
+    .map((classItem) => classItem.code);
+  const requestedCodeSet = new Set(requestedCodes);
+  const removedCodes = currentCodes.filter((code) => !requestedCodeSet.has(code));
+
+  if (removedCodes.length && !confirm(`Xóa ${removedCodes.length} mã lớp khỏi nhóm này?\n\n${removedCodes.join(", ")}\n\nCác lịch bù liên quan cũng sẽ bị xóa.`)) {
+    return;
+  }
+
+  if (removedCodes.length) {
+    const removedCodeSet = new Set(removedCodes);
+    data.classes = data.classes.filter((item) => !removedCodeSet.has(item.code));
+    data.classSessions = data.classSessions.filter((session) => !removedCodeSet.has(session.classCode));
+    data.makeupAssignments = data.makeupAssignments.filter((item) =>
+      !removedCodeSet.has(item.mainClassCode) && !removedCodeSet.has(item.makeupClassCode)
+    );
+  }
+
+  parsedNewClasses.forEach((parsed) => saveParsedClass(parsed, parsed.classCode));
+  cleanupRooms();
+  removeInvalidAssignments();
+  syncClassInputFromData();
+  saveData();
+  renderAll(false);
+
+  const nextSubjectNode = Array.from(elements.parsedClassesBody.querySelectorAll(".tree-subject")).find((node) =>
+    node.dataset.gradeKey === gradeKey && node.dataset.subjectCode === subjectCode
+  );
+  if (nextSubjectNode) {
+    nextSubjectNode.open = true;
+    setSubjectCodeStatus(nextSubjectNode, `Đã lưu: thêm ${parsedNewClasses.length}, xóa ${removedCodes.length}.`);
+    const addedClasses = nextSubjectNode.querySelector(".subject-code-added");
+    if (addedClasses && parsedNewClasses.length) {
+      addedClasses.innerHTML = `
+        <strong>Lớp vừa thêm</strong>
+        <div class="subject-code-added-actions">
+          ${parsedNewClasses.map((parsed) => `
+            <button class="small-button" type="button" data-action="edit-class" data-class-code="${escapeHtml(parsed.classCode)}">
+              <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+              ${escapeHtml(parsed.classCode)}
+            </button>
+          `).join("")}
+        </div>
+      `;
+    }
+  }
 }
 
 function setAutoSaveState(state, text) {
@@ -2471,8 +2653,20 @@ function openInlineClassEditor(classCode) {
 
 function closeInlineClassEditor() {
   window.clearTimeout(inlineAutoSaveTimer);
+  const currentEditor = elements.parsedClassesBody.querySelector(".inline-class-editor");
+  if (currentEditor && !upsertClassFromInlineEditor(currentEditor)) return;
+
   activeInlineEditClassCode = "";
-  renderParsedClasses();
+  const editor = elements.parsedClassesBody.querySelector(".inline-class-editor");
+  const classNode = editor ? editor.closest(".tree-class-node") : null;
+  if (editor) editor.remove();
+
+  if (classNode) {
+    const editButton = classNode.querySelector("[data-action='edit-class']");
+    if (editButton) editButton.textContent = "Sửa";
+  }
+
+  renderClassSearch();
 }
 
 function settingsFormHasAnyValue() {
@@ -3226,10 +3420,12 @@ elements.parsedClassesBody.addEventListener("click", (event) => {
   const editButton = event.target.closest("[data-action='edit-class']");
   const deleteButton = event.target.closest("[data-action='delete-class']");
   const closeButton = event.target.closest("[data-action='close-inline-editor']");
+  const saveSubjectCodesButton = event.target.closest("[data-action='save-subject-codes']");
 
   if (editButton) openInlineClassEditor(editButton.dataset.classCode);
   if (deleteButton) deleteClass(deleteButton.dataset.classCode);
   if (closeButton) closeInlineClassEditor();
+  if (saveSubjectCodesButton) saveSubjectCodeList(saveSubjectCodesButton);
 });
 
 elements.parsedClassesBody.addEventListener("input", (event) => {

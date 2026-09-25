@@ -2177,6 +2177,30 @@ app.post('/api/ketbu/state', async (req, res, next) => {
       throw err;
     }
 
+    let currentPayload = { state: null, updatedAt: null };
+    if (getApps().length) {
+      const currentSnapshot = await getDatabase().ref('/ketbu_state').once('value');
+      if (currentSnapshot.exists()) currentPayload = currentSnapshot.val();
+    } else if (fs.existsSync(KETBU_STATE_FILE)) {
+      currentPayload = JSON.parse(fs.readFileSync(KETBU_STATE_FILE, 'utf8'));
+    }
+
+    const currentBranches = Array.isArray(currentPayload?.state?.branches)
+      ? currentPayload.state.branches
+      : [];
+    const incomingBranches = Array.isArray(body.state.branches)
+      ? body.state.branches
+      : [];
+    const isExplicitRestore = req.headers['x-ketbu-restore'] === 'true';
+
+    if (!isExplicitRestore && currentBranches.length > incomingBranches.length) {
+      const err = new Error(
+        `Từ chối đồng bộ làm giảm số chi nhánh từ ${currentBranches.length} xuống ${incomingBranches.length}.`
+      );
+      err.status = 409;
+      throw err;
+    }
+
     const payload = {
       state: body.state,
       updatedAt: new Date().toISOString()
