@@ -958,6 +958,26 @@ function shiftForWeekday(details, weekday) {
 function classCodeDetails(classCode) {
   const { code: normalizedCode, codeCore, explicitWeekdays } = splitClassCodeWeekdayNote(classCode);
 
+  const advancedSundayMatch = codeCore.match(/^([0-9]{1,2})([SC])NC([A-Z0-9]*\+?)$/);
+  if (advancedSundayMatch) {
+    const shiftToken = advancedSundayMatch[2];
+    const levelCode = `NC${advancedSundayMatch[3]}`;
+    return {
+      code: normalizedCode,
+      grade: Number(advancedSundayMatch[1]),
+      shift: shiftLabelFromToken(shiftToken),
+      shiftToken,
+      shiftByWeekday: { 8: shiftLabelFromToken(shiftToken) },
+      programGroup: levelCode,
+      subjectCode: 'TOAN',
+      subjectLabel: 'Toán',
+      levelCode,
+      baseCode: `${advancedSundayMatch[1]}${shiftToken}NC`,
+      weekdays: explicitWeekdays || [8],
+      format: 'math'
+    };
+  }
+
   const ctMatch = codeCore.match(/^([0-9]{1,2})CT([12])$/);
   if (ctMatch) {
     const group = ctMatch[2];

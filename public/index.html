@@ -298,6 +298,10 @@
               <label for="contactsFile">File danh bạ .xlsx</label>
               <input id="contactsFile" name="contacts" type="file" accept=".xlsx,.xls" multiple required>
             </div>
+            <div class="actions span-4">
+              <a class="btn ghost" href="/api/import/students/template" download="mau-danh-ba-hoc-sinh.xlsx"><i class="fa-solid fa-download"></i> Tải Excel mẫu</a>
+              <span>Thay hoặc xóa các dòng [MẪU] trong trang đầu tiên trước khi nạp.</span>
+            </div>
             <div class="field span-4" style="display: flex; align-items: center; gap: 8px;">
               <input type="checkbox" id="overwriteContacts" name="overwrite" value="true" style="width: auto;">
               <label for="overwriteContacts" style="margin: 0; font-weight: normal; color: var(--danger);">Xóa sạch học sinh cũ (Chỉ giữ lại học sinh trong file này)</label>
@@ -855,7 +859,7 @@
     </div>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="/app.js?v=20260724-8"></script>
+  <script src="/app.js?v=20261001-3"></script>
   <script src="/exams.js"></script>
   <nav class="bottom-nav">
     <button class="bottom-tab active" data-tab="absenceTab" type="button"><i class="fa-solid fa-clipboard-user"></i><span>Điểm danh</span></button>

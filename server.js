@@ -126,6 +126,11 @@ function nowISO() {
   return new Date().toISOString();
 }
 
+function normalizeScheduleDay(value) {
+  const day = String(value ?? '').trim().toUpperCase();
+  return day === 'C' ? '8' : day;
+}
+
 function addMinutesISO(minutes) {
   return new Date(Date.now() + Number(minutes || 0) * 60 * 1000).toISOString();
 }
@@ -753,11 +758,25 @@ function detectClassFromMessage(db, message) {
       const classNoSpace = classText.replace(/\s+/g, '');
       const queryNoSpace = query.replace(/\s+/g, '');
       
-      if (classText.length >= 2 && query.includes(classText)) return true;
-      if (classNoSpace.length >= 3 && queryNoSpace.includes(classNoSpace)) return true;
+      let aliases = [classText];
+      const match = classNoSpace.match(/^(\d{1,2})n([cts])(7c|cs)$/);
+      if (match) {
+        const g = match[1];
+        const time = match[2] === 'c' ? 'chieu' : match[2] === 't' ? 'toi' : 'sang';
+        const day = match[3] === '7c' ? '7' : 'chu nhat';
+        aliases.push(`${g} ngay ${time} ${day}`, `${g} ${time} ${day}`);
+        if (match[2] === 'c' && match[3] === 'cs') {
+          aliases.push(`${g} ngay toi chu nhat`, `${g} toi chu nhat`);
+        }
+      }
       
-      const parts = classText.split(/\s+/).filter(p => p.length >= 4);
-      return parts.some(part => query.includes(part));
+      return aliases.some(alias => {
+        const aliasNoSpace = alias.replace(/\s+/g, '');
+        if (alias.length >= 2 && query.includes(alias)) return true;
+        if (aliasNoSpace.length >= 3 && queryNoSpace.includes(aliasNoSpace)) return true;
+        const parts = alias.split(/\s+/).filter(p => p.length >= 4);
+        return parts.some(part => query.includes(part));
+      });
     })
     .sort((a, b) => normalizeSearchText(b).length - normalizeSearchText(a).length)[0] || '';
 }
@@ -2041,11 +2060,25 @@ function parseContactsWorkbook(buffer) {
   const rows = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName], { defval: '', raw: false });
 
   return rows.flatMap((row, index) => {
+    // Những dòng ví dụ trong file mẫu chỉ để hướng dẫn, không tạo học sinh thật.
+    if (String(getCell(row, ['Họ', 'Ho']) || '').trim().toUpperCase().startsWith('[MẪU]')) return [];
     const notesColumn = String(getCell(row, ['Notes', 'Ghi chú', 'Labels', 'Custom Field 1 - Value', 'Custom Field 2 - Value', 'Nhóm', 'Group', 'Categories', 'Tag', 'Tags', 'GhiChu']) || '');
-    const rawClassName = String(getCell(row, ['Lop', 'Lớp', 'Class', 'Class Name', 'Name Prefix', 'Mã lớp', 'MaLop', 'Lớp học', 'LopHoc', 'Lớp ĐK', 'Lớp đăng ký', 'Môn', 'Môn học', 'Lớp HP', 'LopHP', 'Phòng', 'Phong']) || '');
+    const rawClassName = Object.keys(row)
+      .map(k => {
+         const kTrim = k.trim();
+         const isClassCode = /^\d{1,2}N[CTS](7C|CS)$/i.test(kTrim);
+         // sheet_to_json renames repeated headers such as "Lớp" to "Lớp_1".
+         const isClassCol = /^(lop|lớp|class|class name|name prefix|mã lớp|malop|lớp học|lophoc|lớp đk|lớp đăng ký|môn|môn học|lớp hp|lophp|phòng|phong)( [\w\d]+)?(?:_\d+)?$/i.test(kTrim);
+         if (isClassCol) return String(row[k]);
+         if (isClassCode && row[k]) return kTrim;
+         return '';
+      })
+      .filter(v => v.trim() !== '')
+      .join(', ');
     
     const cleanClass = (str) => cleanText(String(str || '').replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').replace(/\*/g, ''));
-    const parseStr = (str) => !str ? [] : String(str).split(/[,;\n\/&+]|\bva\b|\bvà\b/i).map(cleanClass).filter(Boolean);
+    // Dấu + là một phần của mã lớp (ví dụ 9T6M+, 9T7C+), không phải dấu phân cách.
+    const parseStr = (str) => !str ? [] : String(str).split(/[,;\n\/&]|\bva\b|\bvà\b/i).map(cleanClass).filter(Boolean);
 
     let classes = parseStr(notesColumn);
     if (!classes.length) {
@@ -2059,7 +2092,11 @@ function parseContactsWorkbook(buffer) {
     const middle = cleanText(getCell(row, ['Middle Name', 'Tên đệm', 'Ten dem']));
     const last = cleanText(getCell(row, ['Last Name', 'Họ', 'Ho']));
     const display = cleanText(getCell(row, ['HoTen', 'Họ tên', 'Full Name', 'Name', 'File As', 'Tên học sinh', 'TenHocSinh', 'Họ và tên', 'Học sinh']));
-    const fullName = display || [first, middle, last].filter(Boolean).join(' ');
+    const hasVietnameseNameColumns = ['Họ', 'Ho'].some(key => Object.hasOwn(row, key))
+      && ['Tên', 'Ten'].some(key => Object.hasOwn(row, key));
+    const fullName = display || (hasVietnameseNameColumns
+      ? [getCell(row, ['Họ', 'Ho']), middle, getCell(row, ['Tên', 'Ten'])]
+      : [first, middle, last]).filter(Boolean).join(' ');
     let phones = extractPhones(
       getCell(row, ['SDT', 'SĐT', 'DienThoai', 'Điện thoại', 'Phone', 'Phone 1 - Value', 'Phone 1 - Label', 'Phone 1', 'Phone1', 'Mobile', 'Cell', 'Số điện thoại', 'Số ĐT', 'SoDT', 'SDT PH', 'SĐT PH', 'SDT Phụ Huynh', 'SĐT Phụ huynh', 'Tel']),
       getCell(row, ['Phone 2 - Value', 'Phone 2 - Label', 'SDT2', 'SĐT2', 'Phone 2']),
@@ -2548,7 +2585,7 @@ app.get('/api/ketbu/students', async (req, res, next) => {
       
       baseStudents = baseStudents.map(s => {
         const allExceptions = scheduleExceptions.filter(e => e.studentId === s.id && e.originalClass === className);
-        const exception = allExceptions.find(e => e.stuckDay === currentDayStr);
+        const exception = allExceptions.find(e => normalizeScheduleDay(e.stuckDay) === currentDayStr);
         let sData = { ...s, allExceptions };
         if (exception) {
           sData = { ...sData, isStuckToday: true, stuckType: exception.type || 'hoc_bu', stuckDay: exception.stuckDay, makeupDay: exception.makeupDay, makeupClass: exception.makeupClass };
@@ -2556,7 +2593,7 @@ app.get('/api/ketbu/students', async (req, res, next) => {
         return sData;
       });
 
-      const makeupExceptions = scheduleExceptions.filter(e => String(e.makeupClass || '').trim().toLowerCase() === String(className || '').trim().toLowerCase() && String(e.makeupDay) === currentDayStr);
+      const makeupExceptions = scheduleExceptions.filter(e => String(e.makeupClass || '').trim().toLowerCase() === String(className || '').trim().toLowerCase() && normalizeScheduleDay(e.makeupDay) === currentDayStr);
       makeupExceptions.forEach(e => {
         let st = allBranchStudents.find(s => s.id === e.studentId);
         if (!st && e.studentName) {
@@ -3108,6 +3145,59 @@ app.post('/api/classes/bulk-delete', async (req, res, next) => {
   }
 });
 
+app.get('/api/import/students/template', (req, res) => {
+  const workbook = XLSX.utils.book_new();
+  const headers = ['Họ', 'Tên', 'Lớp', 'Lớp 2', 'Điện thoại'];
+  const examples = [
+    ['[MẪU] Nguyễn Văn', 'An', '6AC7', '', '0900000001'],
+    ['[MẪU] Trần Thị', 'Bình', '9T7C+', '9NCCA', '0900000002'],
+    ['[MẪU] Lê Minh', 'Châu', '8NCCA', '8NTCA', '0900000003']
+  ];
+  const contacts = XLSX.utils.aoa_to_sheet([headers, ...examples]);
+  contacts['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 20 }];
+  contacts['!autofilter'] = { ref: `A1:E${examples.length + 1}` };
+  headers.forEach((_, index) => {
+    const cell = contacts[XLSX.utils.encode_cell({ r: 0, c: index })];
+    cell.s = {
+      font: { bold: true, color: { rgb: 'FFFFFF' } },
+      fill: { fgColor: { rgb: '2563EB' } },
+      alignment: { horizontal: 'center' }
+    };
+  });
+  examples.forEach((_, rowIndex) => {
+    headers.forEach((__, columnIndex) => {
+      const cell = contacts[XLSX.utils.encode_cell({ r: rowIndex + 1, c: columnIndex })];
+      if (!cell) return;
+      cell.s = {
+        fill: { fgColor: { rgb: 'FEF3C7' } },
+        font: { color: { rgb: '92400E' } },
+        ...(columnIndex === 4 ? { numFmt: '@' } : {})
+      };
+    });
+  });
+  XLSX.utils.book_append_sheet(workbook, contacts, 'Danh ba hoc sinh');
+
+  const guide = XLSX.utils.aoa_to_sheet([
+    ['HƯỚNG DẪN NẠP DANH BẠ HỌC SINH'],
+    ['1. Thay hoặc xóa các dòng [MẪU] ở trang "Danh ba hoc sinh" rồi nhập mỗi học sinh một dòng.'],
+    ['   Các dòng vẫn có [MẪU] trong cột Họ sẽ tự được bỏ qua khi nạp.'],
+    ['2. Giữ nguyên tên và thứ tự các cột ở dòng đầu tiên. Không gộp ô.'],
+    ['3. Cột Họ gồm họ và tên đệm; cột Tên là tên gọi.'],
+    ['4. Cột Lớp bắt buộc. Cột Lớp 2 để trống nếu học sinh chỉ học một lớp.'],
+    ['5. Nhập Điện thoại dưới dạng văn bản để giữ số 0 ở đầu.'],
+    [],
+    ['Ví dụ một lớp và hai lớp đã được điền ở trang đầu tiên.']
+  ]);
+  guide['!cols'] = [{ wch: 77 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 20 }];
+  guide['A1'].s = { font: { bold: true, sz: 15, color: { rgb: '1D4ED8' } } };
+  XLSX.utils.book_append_sheet(workbook, guide, 'Huong dan');
+
+  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="mau-danh-ba-hoc-sinh.xlsx"');
+  res.send(buffer);
+});
+
 app.post('/api/import/students', upload.array('contacts', 50), async (req, res, next) => {
   try {
     if (!req.files || req.files.length === 0) {
@@ -3186,9 +3276,9 @@ app.post('/api/schedule-exceptions', async (req, res, next) => {
       studentId: req.body.studentId,
       studentName: studentName,
       originalClass: req.body.originalClass,
-      stuckDay: req.body.stuckDay,
+      stuckDay: normalizeScheduleDay(req.body.stuckDay),
       makeupClass: req.body.makeupClass,
-      makeupDay: req.body.makeupDay,
+      makeupDay: normalizeScheduleDay(req.body.makeupDay),
       type: req.body.type || 'hoc_bu',
       createdAt: new Date().toISOString()
     };

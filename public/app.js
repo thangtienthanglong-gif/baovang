@@ -14,6 +14,31 @@ const state = {
 
 let absencePieChart = null;
 let classBarChart = null;
+let quickSearchIndex = [];
+let quickSearchTimer = null;
+const QUICK_SEARCH_ROSTER_LIMIT = 80;
+
+function normalizeQuickSearch(value) {
+  return String(value || '').toLowerCase().normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function rebuildQuickSearchIndex() {
+  quickSearchIndex = (state.students || []).filter(isActiveStudent).map(student => ({
+    student,
+    text: normalizeQuickSearch([
+      student.fullName || student.name, student.code, student.className,
+      student.phone1, student.phone2
+    ].join(' '))
+  }));
+}
+
+function findQuickSearchStudents(query) {
+  const needle = normalizeQuickSearch(query);
+  if (!needle) return [];
+  return quickSearchIndex.filter(entry => entry.text.includes(needle)).map(entry => entry.student);
+}
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => Array.from(document.querySelectorAll(selector));
@@ -278,6 +303,7 @@ async function loadAttendanceAbsences() {
 async function loadStudents(q = '') {
   const rows = await api('/api/students?' + queryString({ q }));
   state.students = rows;
+  rebuildQuickSearchIndex();
   renderStudentSelect();
   renderClassDropdown();
   renderRoster();
@@ -285,15 +311,45 @@ async function loadStudents(q = '') {
 }
 
 function getClassScheduleInfo(className, dateString, forcedDay = 'ALL') {
+  const str = String(className || '').toUpperCase().trim();
+  let dayNumberStr;
+  if (forcedDay && forcedDay !== 'ALL') {
+    dayNumberStr = String(forcedDay).toUpperCase() === 'C' ? '8' : String(forcedDay);
+  } else {
+    const date = new Date(dateString);
+    const day = date.getDay();
+    dayNumberStr = day === 0 ? '8' : String(day + 1);
+  }
+
+  const advancedSundayMatch = str.match(/^\d{1,2}([SC])NC[A-Z0-9]*\+?$/);
+  if (advancedSundayMatch) {
+    return {
+      sessionName: advancedSundayMatch[1] === 'S' ? 'Sáng' : 'Chiều',
+      matchesDate: dayNumberStr === '8',
+      daysStr: '8'
+    };
+  }
+
+  if (/(?:SC|CC|TC)/.test(str)) {
+    // A trailing C after S/C/T means Chủ nhật (day 8), e.g. 8NSCA or 6T2SCC.
+    const entries = [...str.matchAll(/([SCT])([2-8]+|C)/g)].map(match => ({
+      shift: match[1],
+      days: match[2] === 'C' ? ['8'] : match[2].split('')
+    }));
+    if (entries.length) {
+      const daysStr = [...new Set(entries.flatMap(entry => entry.days))].sort().join('');
+      const currentEntry = entries.find(entry => entry.days.includes(dayNumberStr)) || entries[0];
+      const sessionName = currentEntry.shift === 'S' ? 'Sáng' : currentEntry.shift === 'C' ? 'Chiều' : 'Tối';
+      return { sessionName, matchesDate: daysStr.includes(dayNumberStr), daysStr };
+    }
+  }
+
   let sessionName = 'Khác';
   let daysStr = '';
-  
-  const str = String(className || '').toUpperCase().trim();
-  
-  if (/^9?CT1\b/i.test(str)) {
+  if (/^9?CT1\b/.test(str)) {
     sessionName = 'Tối';
     daysStr = '357';
-  } else if (/^9?CT2\b/i.test(str)) {
+  } else if (/^9?CT2\b/.test(str)) {
     sessionName = 'Tối';
     daysStr = '246';
   } else {
@@ -303,40 +359,22 @@ function getClassScheduleInfo(className, dateString, forcedDay = 'ALL') {
       daysStr = ctMatch[1].replace(/-/g, '');
     } else {
       const scheduleMatch = str.match(/^\d+[A-Z]?([SCT])(\d+)/);
-      const sundaySessionMatch = str.match(/^\d+[A-Z]?(SC|CC|TC)/);
       if (scheduleMatch) {
         const sessionCode = scheduleMatch[1];
         sessionName = sessionCode === 'S' ? 'Sáng' : sessionCode === 'C' ? 'Chiều' : 'Tối';
         daysStr = scheduleMatch[2];
-      } else if (sundaySessionMatch) {
-        const sessionCode = sundaySessionMatch[1][0];
-        sessionName = sessionCode === 'S' ? 'Sáng' : sessionCode === 'C' ? 'Chiều' : 'Tối';
       } else {
         const numericDays = [...str.matchAll(/[SCT](\d+)/g)].flatMap(match => match[1].split(''));
         daysStr = [...new Set(numericDays)].join('');
       }
     }
   }
+  if (sessionName === 'Khác') return { sessionName, matchesDate: true, daysStr };
+  return { sessionName, matchesDate: daysStr.includes(dayNumberStr), daysStr };
+}
 
-  if (/(?:SC|CC|TC)/.test(str)) {
-    daysStr = [...new Set((daysStr + 'C').split(''))].join('');
-  }
-
-  if (sessionName === 'Khác') {
-    return { sessionName, matchesDate: true, daysStr };
-  }
-  
-  let dayNumberStr;
-  if (forcedDay && forcedDay !== 'ALL') {
-    dayNumberStr = String(forcedDay);
-  } else {
-    const date = new Date(dateString);
-    const day = date.getDay();
-    dayNumberStr = day === 0 ? '8' : String(day + 1);
-  }
-
-  const matchesDate = daysStr.includes(dayNumberStr);
-  return { sessionName, matchesDate, daysStr };
+function scheduleDayLabel(day) {
+  return String(day).toUpperCase() === 'C' || String(day) === '8' ? 'Chủ nhật' : `Thứ ${day}`;
 }
 
 function renderFilters() {
@@ -817,24 +855,16 @@ function renderClassDropdown() {
   }
 }
 
-function renderRoster() {
+function renderRoster(searchMatches) {
   const roster = $('#studentRoster');
   const className = selectedClass();
   const dateStr = selectedDate();
   const activeSession = selectedSession();
   const activeDay = selectedDay();
   const activeGrade = selectedGrade();
-  const searchQuery = ($('#quickStudentSearchMain')?.value || '').trim().toLowerCase();
+  const searchQuery = ($('#quickStudentSearchMain')?.value || '').trim();
   
-  const filtered = activeStudents().filter(student => {
-    if (searchQuery) {
-      const matchSearch = (student.fullName || student.name || '').toLowerCase().includes(searchQuery) ||
-                          (student.code || '').toLowerCase().includes(searchQuery) ||
-                          (student.className || '').toLowerCase().includes(searchQuery) ||
-                          (student.phone1 || student.phone2 || '').toLowerCase().includes(searchQuery);
-      if (!matchSearch) return false;
-      return true;
-    }
+  const filtered = searchQuery ? (searchMatches || findQuickSearchStudents(searchQuery)) : activeStudents().filter(student => {
     const studentClass = student.className || 'Chưa có lớp';
     if (activeGrade !== 'ALL' && getClassGrade(studentClass) !== activeGrade) return false;
     const info = getClassScheduleInfo(studentClass, dateStr, activeDay);
@@ -847,18 +877,21 @@ function renderRoster() {
     }
     return studentClass === className;
   });
+  const visibleStudents = searchQuery ? filtered.slice(0, QUICK_SEARCH_ROSTER_LIMIT) : filtered;
 
-  const absentCount = filtered.filter(student => absenceForStudent(student.id)).length;
+  const absentCount = visibleStudents.filter(student => absenceForStudent(student.id)).length;
 
   $('#rosterTitle').textContent = className === 'ALL' ? 'Danh sách học sinh' : `Lớp ${className}`;
-  $('#rosterMeta').textContent = `${filtered.length} học sinh · ${absentCount} đang báo vắng`;
+  $('#rosterMeta').textContent = searchQuery && filtered.length > QUICK_SEARCH_ROSTER_LIMIT
+    ? `${filtered.length} kết quả · Hiển thị ${QUICK_SEARCH_ROSTER_LIMIT} đầu tiên, nhập thêm để thu hẹp`
+    : `${filtered.length} học sinh · ${absentCount} đang báo vắng`;
 
   if (!filtered.length) {
     roster.innerHTML = '<div class="empty">Chưa có học sinh trong phạm vi đang chọn.</div>';
     return;
   }
 
-  const groups = groupByClass(filtered);
+  const groups = groupByClass(visibleStudents);
   
   const sortedGroups = Object.keys(groups).sort((a, b) => {
     const infoA = getClassScheduleInfo(a, dateStr, activeDay);
@@ -907,7 +940,7 @@ function renderRosterStudent(student) {
             ${student.recentAbsenceCount >= 3 ? `<span title="Vắng ${student.recentAbsenceCount} buổi trong 30 ngày qua" style="color: #ef4444; font-size: 14px; margin-left: 4px;">⚠️ (${student.recentAbsenceCount})</span>` : ''}
           </div>
           <div class="student-phone">${escapeHtml(phone)}</div>
-          ${(state.scheduleExceptions || []).filter(e => e.studentId === student.id).map(e => `<div style="font-size:12px; color:#3b82f6; margin-top:4px; font-weight:600;"><i class="fa-solid fa-repeat"></i> Kẹt T${e.stuckDay} ➔ ${e.type === 'hoc_bu' ? 'Học bù' : 'Bù tạm'} T${e.makeupDay} (${e.makeupClass})</div>`).join('')}
+          ${(state.scheduleExceptions || []).filter(e => e.studentId === student.id).map(e => `<div style="font-size:12px; color:#3b82f6; margin-top:4px; font-weight:600;"><i class="fa-solid fa-repeat"></i> Kẹt ${scheduleDayLabel(e.stuckDay)} ➔ ${e.type === 'hoc_bu' ? 'Học bù' : 'Bù tạm'} ${scheduleDayLabel(e.makeupDay)} (${e.makeupClass})</div>`).join('')}
         </div>
       </div>
       <div class="student-status-control">
@@ -2844,35 +2877,43 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // ==================== QUICK STUDENT SEARCH & NOTIFY ====================
 window.onQuickSearchStudentMain = function(query) {
-  renderRoster();
   const resultsContainer = document.getElementById('quickSearchResultsMain');
   if (!resultsContainer) return;
-  const q = (query || '').trim().toLowerCase();
-  if (!q) {
+  clearTimeout(quickSearchTimer);
+  if (!String(query || '').trim()) {
     resultsContainer.style.display = 'none';
+    quickSearchTimer = setTimeout(renderRoster, 120);
     return;
   }
-  const matches = (state.students || []).filter(s => s.status !== 'Nghỉ học' && (
-    (s.fullName || s.name || '').toLowerCase().includes(q) || 
-    (s.code || '').toLowerCase().includes(q) || 
-    (s.className || '').toLowerCase().includes(q)
-  )).slice(0, 10);
+  quickSearchTimer = setTimeout(() => {
+    const currentQuery = document.getElementById('quickStudentSearchMain')?.value || '';
+    if (!currentQuery.trim()) {
+      resultsContainer.style.display = 'none';
+      renderRoster();
+      return;
+    }
+    const allMatches = findQuickSearchStudents(currentQuery);
+    renderQuickSearchResults(resultsContainer, allMatches.slice(0, 10));
+    renderRoster(allMatches);
+  }, 120);
+};
 
-  if (matches.length === 0) {
+function renderQuickSearchResults(resultsContainer, matches) {
+  if (!matches.length) {
     resultsContainer.innerHTML = '<div style="padding:10px; color:#94a3b8; font-style:italic; font-size:13px;">Không tìm thấy học sinh.</div>';
   } else {
     resultsContainer.innerHTML = matches.map(s => `
       <div onclick="openHistoryPanel('${s.id}'); document.getElementById('quickSearchResultsMain').style.display='none';" style="padding:10px 12px; border-bottom:1px solid #f1f5f9; cursor:pointer; font-size:13px; display:flex; justify-content:space-between; align-items:center;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
         <div>
-          <strong style="color:#1e293b;">${s.fullName || s.name}</strong> 
-          <span style="color:#64748b; font-size:12px;">(${s.code || 'N/A'})</span>
+          <strong style="color:#1e293b;">${escapeHtml(s.fullName || s.name)}</strong>
+          <span style="color:#64748b; font-size:12px;">(${escapeHtml(s.code || 'N/A')})</span>
         </div>
-        <span style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:4px; font-weight:bold; font-size:11px;">Lớp ${s.className || 'N/A'}</span>
+        <span style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:4px; font-weight:bold; font-size:11px;">Lớp ${escapeHtml(s.className || 'N/A')}</span>
       </div>
     `).join('');
   }
   resultsContainer.style.display = 'block';
-};
+}
 
 window.closeHistoryPanel = function() {
     const overlay = document.getElementById('panelOverlay');
@@ -3369,7 +3410,7 @@ async function openMakeupModal(studentId, studentName, originalClass) {
   if (stuckDayEl) {
     if (sched.daysStr) {
       const daysArr = sched.daysStr.split('');
-      stuckDayEl.innerHTML = daysArr.map(d => `<option value="${d}">${d === 'C' ? 'Chủ Nhật' : 'Thứ ' + d}</option>`).join('');
+      stuckDayEl.innerHTML = daysArr.map(d => `<option value="${d}">${scheduleDayLabel(d)}</option>`).join('');
     } else {
       stuckDayEl.innerHTML = `<option value="2">Thứ 2</option>
       <option value="3">Thứ 3</option>
@@ -3377,7 +3418,7 @@ async function openMakeupModal(studentId, studentName, originalClass) {
       <option value="5">Thứ 5</option>
       <option value="6">Thứ 6</option>
       <option value="7">Thứ 7</option>
-      <option value="C">Chủ Nhật</option>`;
+      <option value="8">Chủ nhật</option>`;
     }
   }
   
@@ -3403,9 +3444,9 @@ async function openMakeupModal(studentId, studentName, originalClass) {
   const targetDayEl = document.getElementById('makeupModalTargetDay');
   const updateTargetDayOptions = (className, preferredDay) => {
     const targetSchedule = getClassScheduleInfo(className, state.today);
-    const days = targetSchedule.daysStr ? targetSchedule.daysStr.split('') : ['2', '3', '4', '5', '6', '7', 'C'];
+    const days = targetSchedule.daysStr ? targetSchedule.daysStr.split('') : ['2', '3', '4', '5', '6', '7', '8'];
     targetDayEl.innerHTML = days.map(day =>
-      `<option value="${day}">${day === 'C' ? 'Chủ Nhật' : 'Thứ ' + day}</option>`
+      `<option value="${day}">${scheduleDayLabel(day)}</option>`
     ).join('');
     if (days.includes(preferredDay)) targetDayEl.value = preferredDay;
   };
@@ -3431,7 +3472,7 @@ async function reloadMakeupList(studentId) {
     }
     listDiv.innerHTML = myExceptions.map(e => `
       <div style="background:#f1f5f9; padding:8px; border-radius:4px; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center;">
-        <div>Kẹt <b>Thứ ${e.stuckDay}</b> ➔ ${e.type === 'hoc_bu' ? 'Học bù' : 'Bù tạm'} <b>Thứ ${e.makeupDay} (${e.makeupClass})</b></div>
+        <div>Kẹt <b>${scheduleDayLabel(e.stuckDay)}</b> ➔ ${e.type === 'hoc_bu' ? 'Học bù' : 'Bù tạm'} <b>${scheduleDayLabel(e.makeupDay)} (${e.makeupClass})</b></div>
         <button class="btn danger btn-sm" onclick="deleteMakeupSchedule('${e.id}', '${studentId}')"><i class="fa-solid fa-trash"></i></button>
       </div>
     `).join('');
@@ -3607,6 +3648,7 @@ document.addEventListener('submit', async (e) => {
       });
       const idx = state.students.findIndex(s => s.id === id);
       if (idx !== -1) state.students[idx] = res;
+      rebuildQuickSearchIndex();
       
       document.getElementById('editStudentModal').style.display = 'none';
       toast('Cập nhật thành công!', 'success');
@@ -3653,6 +3695,7 @@ document.addEventListener('submit', async (e) => {
       if (!state.classes.includes(newClass)) state.classes.push(newClass);
       const idx = state.students.findIndex(s => s.id === id);
       if (idx !== -1) state.students[idx] = res || payload;
+      rebuildQuickSearchIndex();
       
       document.getElementById('transferClassModal').style.display = 'none';
       document.getElementById('studentProfileDrawer')?.classList.remove('open');
