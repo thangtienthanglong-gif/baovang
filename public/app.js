@@ -810,6 +810,53 @@ function getClassGrade(className) {
   return String(className || '').trim().match(/^\d+/)?.[0] || '';
 }
 
+function normalizeComparableText(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function scheduleExceptionMatchesStudent(exception, student) {
+  if (!exception || !student) return false;
+  if (exception.studentId && exception.studentId === student.id) return true;
+
+  const exceptionName = normalizeComparableText(exception.studentName || exception.fullName || '');
+  const studentName = normalizeComparableText(student.fullName || student.name || '');
+  const exceptionClass = normalizeComparableText(exception.originalClass || exception.className || '');
+  const studentClass = normalizeComparableText(student.className || '');
+
+  if (!exceptionName || !studentName || !exceptionClass || !studentClass) return false;
+  return exceptionName === studentName && exceptionClass === studentClass;
+}
+
+function normalizeScheduleDayCode(value) {
+  const code = String(value ?? '').trim().toUpperCase();
+  if (!code) return '';
+  return code === 'C' ? '8' : code;
+}
+
+function scheduleDayForDate(dateString) {
+  const match = String(dateString || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return '';
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  if (date.getFullYear() !== Number(match[1]) ||
+      date.getMonth() !== Number(match[2]) - 1 ||
+      date.getDate() !== Number(match[3])) return '';
+  const day = date.getDay();
+  return String(day === 0 ? 8 : day + 1);
+}
+
+function scheduleExceptionAppliesToDate(exception, dateStr, selectedDayCode = 'ALL') {
+  const targetDay = selectedDayCode !== 'ALL'
+    ? normalizeScheduleDayCode(selectedDayCode)
+    : scheduleDayForDate(dateStr);
+  if (!targetDay) return false;
+  return normalizeScheduleDayCode(exception.stuckDay) === targetDay;
+}
+
 function attendanceRosterStudents(dateStr) {
   const students = activeStudents();
   const byId = new Map(students.map(student => [student.id, student]));
@@ -824,7 +871,7 @@ function attendanceRosterStudents(dateStr) {
     const makeupDay = String(exception.makeupDay || '').toUpperCase() === 'C'
       ? '8' : String(exception.makeupDay || '');
     if (makeupDay !== weekday) continue;
-    const student = byId.get(exception.studentId);
+    const student = byId.get(exception.studentId) || students.find(candidate => scheduleExceptionMatchesStudent(exception, candidate));
     const makeupClass = String(exception.makeupClass || '').trim();
     if (!student || !makeupClass || makeupClass === student.className) continue;
     const key = `${student.id}\u0000${makeupClass}`;
@@ -980,6 +1027,11 @@ function renderRosterStudent(student) {
   const absence = absenceForStudent(student.id, student.className);
   const currentStatus = absence ? normalizeAbsenceStatus(absence.absenceStatus) : 'Đang học';
   const phone = student.phone1 || student.phone2 || 'Chưa có SĐT';
+  const rosterDate = selectedDate();
+  const rosterDay = selectedDay();
+  const scheduleNotes = (state.scheduleExceptions || []).filter(e => scheduleExceptionMatchesStudent(e, student));
+  const isStuckToday = scheduleNotes.some(e => scheduleExceptionAppliesToDate(e, rosterDate, rosterDay));
+  const hasStuckNote = !student.isMakeupAttendance && isStuckToday;
   const statusOptions = [
     ['Đang học', 'Đang học'],
     ['Vắng', 'Vắng'],
@@ -994,8 +1046,10 @@ function renderRosterStudent(student) {
     statusOptions.push([currentStatus, currentStatus]);
   }
 
+  const isLocked = hasStuckNote;
+
   return `
-    <article class="student-card ${absence ? 'is-absent' : ''}">
+    <article class="student-card ${absence ? 'is-absent' : ''} ${student.isMakeupAttendance ? 'is-makeup' : ''} ${hasStuckNote ? 'is-stuck' : ''}">
       <div class="student-main">
         <div>
           <div class="person-main clickable-name" onclick="openStudentProfile('${escapeHtml(student.id)}')">
@@ -1004,13 +1058,13 @@ function renderRosterStudent(student) {
           </div>
           <div class="student-phone">${escapeHtml(phone)}</div>
           ${student.isMakeupAttendance
-            ? `<div style="font-size:12px; color:#0d9488; margin-top:4px; font-weight:600;"><i class="fa-solid fa-repeat"></i> Học bù từ lớp ${escapeHtml(student.makeupOriginalClass)}</div>`
-            : (state.scheduleExceptions || []).filter(e => e.studentId === student.id).map(e => `<div style="font-size:12px; color:#3b82f6; margin-top:4px; font-weight:600;"><i class="fa-solid fa-repeat"></i> Kẹt ${scheduleDayLabel(e.stuckDay)} ➔ ${e.type === 'hoc_bu' ? 'Học bù' : 'Bù tạm'} ${scheduleDayLabel(e.makeupDay)} (${escapeHtml(e.makeupClass)})</div>`).join('')}
+            ? `<div class="schedule-note schedule-note-makeup"><i class="fa-solid fa-repeat"></i> Học bù từ lớp ${escapeHtml(student.makeupOriginalClass)}</div>`
+            : scheduleNotes.map(e => `<div class="schedule-note schedule-note-stuck"><i class="fa-solid fa-repeat"></i> Kẹt ${scheduleDayLabel(e.stuckDay)} ➔ ${e.type === 'hoc_bu' ? 'Học bù' : 'Bù tạm'} ${scheduleDayLabel(e.makeupDay)} (${escapeHtml(e.makeupClass)})</div>`).join('')}
         </div>
       </div>
       <div class="student-status-control">
         <label for="status-${escapeHtml(student.id)}-${escapeHtml(student.className)}">Trạng thái</label>
-        <select id="status-${escapeHtml(student.id)}-${escapeHtml(student.className)}" class="roster-status-select" data-student-id="${escapeHtml(student.id)}" data-attendance-class="${escapeHtml(student.className)}" data-absence-id="${escapeHtml(absence?.id || '')}">
+        <select id="status-${escapeHtml(student.id)}-${escapeHtml(student.className)}" class="roster-status-select" data-student-id="${escapeHtml(student.id)}" data-attendance-class="${escapeHtml(student.className)}" data-absence-id="${escapeHtml(absence?.id || '')}" ${isLocked ? 'disabled' : ''} title="${isLocked ? 'Học sinh bị kẹt lịch, không thể thay đổi trạng thái ở đây.' : ''}">
           ${statusOptions.map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === currentStatus ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}
         </select>
       </div>
@@ -2697,17 +2751,16 @@ async function loadBranches() {
     const branches = await api('/api/branches');
     const branchSelector = document.getElementById('branchSelector');
     if (!branchSelector) return;
-    
+
     branchSelector.innerHTML = branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
-    
+
     const active = getActiveBranch();
-    if (branches.find(b => b.id === active)) {
-      branchSelector.value = active;
-    } else {
-      branchSelector.value = branches[0]?.id || 'main';
+    const fallbackBranch = branches.find(b => b.id === active)?.id || branches[0]?.id || 'main';
+    branchSelector.value = fallbackBranch;
+    if (branchSelector.value !== active) {
       localStorage.setItem('activeBranch', branchSelector.value);
     }
-    
+
     const delBtn = document.getElementById('delBranchBtn');
     if (delBtn) {
       delBtn.disabled = branchSelector.value === 'main';
@@ -2720,14 +2773,17 @@ async function loadBranches() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  if (window.__branchUiInitialized) return;
+  window.__branchUiInitialized = true;
+
   const branchSelector = document.getElementById('branchSelector');
   if (branchSelector) {
     branchSelector.addEventListener('change', (e) => {
       localStorage.setItem('activeBranch', e.target.value);
-      location.reload(); // Reload the page to fetch new branch data
+      location.reload();
     });
   }
-  
+
   const newBranchBtn = document.getElementById('newBranchBtn');
   if (newBranchBtn) {
     newBranchBtn.addEventListener('click', async () => {
@@ -2743,7 +2799,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-  
+
   const delBranchBtn = document.getElementById('delBranchBtn');
   if (delBranchBtn) {
     delBranchBtn.addEventListener('click', async () => {
@@ -2765,7 +2821,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (renameBranchBtn) {
     renameBranchBtn.addEventListener('click', async () => {
       const branchId = getActiveBranch();
-      const currentName = branchSelector.options[branchSelector.selectedIndex]?.text || '';
+      const selector = document.getElementById('branchSelector');
+      const currentName = selector?.options[selector.selectedIndex]?.text || '';
       const newName = prompt('Nhập tên mới cho chi nhánh này:', currentName);
       if (!newName || newName === currentName) return;
       try {
@@ -2777,7 +2834,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-
 });
 
 
@@ -3531,7 +3587,12 @@ async function reloadMakeupList(studentId) {
     listDiv.innerHTML = 'Đang tải...';
     const exceptions = await api('/api/schedule-exceptions');
     state.scheduleExceptions = exceptions; // update global cache
-    const myExceptions = exceptions.filter(e => e.studentId === studentId);
+    const fallbackStudent = {
+      id: studentId,
+      fullName: studentName,
+      className: originalClass
+    };
+    const myExceptions = exceptions.filter(e => scheduleExceptionMatchesStudent(e, fallbackStudent));
     if (myExceptions.length === 0) {
       listDiv.innerHTML = 'Chưa có lịch bù nào.';
       return;

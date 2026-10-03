@@ -785,8 +785,51 @@ input[type="file"]::file-selector-button:hover {
   border-left-color: #f5b637;
 }
 
+.student-card.is-stuck {
+  background: rgba(148, 163, 184, 0.08);
+  opacity: 0.72;
+  border-left-color: #94a3b8;
+}
+
+.student-card.is-makeup {
+  background: rgba(16, 185, 129, 0.08);
+  border-left-color: #10b981;
+}
+
+.student-card.is-stuck .student-phone,
+.student-card.is-stuck .person-main,
+.student-card.is-stuck .schedule-note {
+  opacity: 0.72;
+}
+
+.student-card.is-stuck .roster-status-select,
+.student-card.is-stuck .roster-status-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  background: rgba(148, 163, 184, 0.06);
+}
+
+.student-card.is-makeup .schedule-note {
+  color: #0f766e;
+}
+
 .student-card.is-inactive {
   opacity: 0.68;
+}
+
+.schedule-note {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.schedule-note-stuck {
+  color: #3b82f6;
+}
+
+.schedule-note-makeup {
+  color: #0d9488;
 }
 
 .student-main {
