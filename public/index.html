@@ -859,7 +859,7 @@
     </div>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="/app.js?v=20261001-3"></script>
+  <script src="/app.js?v=20261002-3"></script>
   <script src="/exams.js"></script>
   <nav class="bottom-nav">
     <button class="bottom-tab active" data-tab="absenceTab" type="button"><i class="fa-solid fa-clipboard-user"></i><span>Điểm danh</span></button>
@@ -1029,8 +1029,18 @@
       <input type="hidden" id="transferStudentId">
       <div style="margin-bottom: 15px;">Học sinh: <strong id="transferStudentName"></strong></div>
       <div style="margin-bottom: 15px;">Lớp hiện tại: <strong id="transferCurrentClass"></strong></div>
+      <div style="display:flex; gap:10px; margin-bottom:15px;">
+        <div class="form-group" style="flex:1; min-width:0;">
+          <label for="transferGradeFilter">Chọn khối</label>
+          <select id="transferGradeFilter" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;"></select>
+        </div>
+        <div class="form-group" style="flex:1; min-width:0;">
+          <label for="transferSubjectFilter">Chọn môn</label>
+          <select id="transferSubjectFilter" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;"></select>
+        </div>
+      </div>
       <div class="form-group" style="margin-bottom: 15px;">
-        <label>Chuyển sang lớp</label>
+        <label for="transferTargetClass">Chuyển sang lớp</label>
         <select id="transferTargetClass" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
         </select>
       </div>
@@ -1039,7 +1049,7 @@
         <input type="text" id="transferTeacherName" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" placeholder="VD: Cô Trang">
       </div>
       <div style="display: flex; justify-content: flex-end;">
-        <button type="submit" class="btn primary">Xác nhận chuyển</button>
+        <button id="transferSubmitBtn" type="submit" class="btn primary">Xác nhận chuyển</button>
       </div>
     </form>
   </div>

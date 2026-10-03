@@ -3050,34 +3050,57 @@ app.put('/api/students/:id', async (req, res, next) => {
 });
 
 
-app.post('/api/students/:id/transfer', async (req, res, next) => {
+app.post('/api/students/:id/transfer', (req, res, next) => authenticateToken(req, res, next), async (req, res, next) => {
   try {
-    const db = await getBranchDb(req);
-    
-    // Update student class directly to avoid race conditions with PUT
-    const index = (db.students || []).findIndex(s => s.id === req.params.id);
-    let updatedStudent = null;
-    if (index !== -1) {
-      const oldClass = db.students[index].className;
-      db.students[index].className = req.body.toClass;
-      updatedStudent = db.students[index];
-      
-      if (oldClass !== req.body.toClass && db.scheduleExceptions) {
-        db.scheduleExceptions = db.scheduleExceptions.filter(e => e.studentId !== req.params.id);
-      }
+    const branchId = getBranchId(req);
+    const rootDb = await readDb();
+    const db = rootDb.branches?.[branchId];
+    if (!db) {
+      const err = new Error('Không tìm thấy dữ liệu chi nhánh đang chọn. Vui lòng tải lại trang và chọn lại chi nhánh.');
+      err.status = 404;
+      throw err;
     }
-    
+    const index = (db.students || []).findIndex(s => s.id === req.params.id);
+    if (index === -1) {
+      const err = new Error('Không tìm thấy học sinh trong chi nhánh đang chọn. Vui lòng tải lại danh sách học sinh của chi nhánh này.');
+      err.status = 404;
+      throw err;
+    }
+
+    const toClass = cleanText(req.body.toClass);
+    const oldClass = db.students[index].className;
+    if (!toClass || toClass === oldClass) {
+      const err = new Error('Vui lòng chọn lớp khác lớp hiện tại.');
+      err.status = 400;
+      throw err;
+    }
+    if (req.body.fromClass && req.body.fromClass !== oldClass) {
+      const err = new Error('Lớp của học sinh đã thay đổi. Vui lòng tải lại trang trước khi chuyển lớp.');
+      err.status = 409;
+      throw err;
+    }
+
+    db.students[index].className = toClass;
+    if (db.scheduleExceptions) {
+      db.scheduleExceptions = db.scheduleExceptions.filter(e => e.studentId !== req.params.id);
+    }
+
     if (!db.transferHistory) db.transferHistory = [];
     db.transferHistory.push({
       studentId: req.params.id,
-      fromClass: req.body.fromClass,
-      toClass: req.body.toClass,
-      date: req.body.date,
-      teacher: req.body.teacher,
+      fromClass: oldClass,
+      toClass,
+      date: cleanText(req.body.date) || todayISO(),
+      teacher: cleanText(req.body.teacher),
       timestamp: Date.now()
     });
-    await saveBranchDb(req, db);
-    res.json(updatedStudent || { success: true });
+    if (!getApps().length) {
+      const err = new Error('Chưa kết nối được cơ sở dữ liệu. Vui lòng thử lại sau.');
+      err.status = 503;
+      throw err;
+    }
+    await getDatabase().ref(`/branches/${branchId}`).set(db);
+    res.json(db.students[index]);
   } catch (error) {
     next(error);
   }

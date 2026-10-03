@@ -179,7 +179,11 @@ async function api(path, options = {}) {
     localStorage.removeItem('token');
     window.location.href = '/login.html';
   }
-  if (!response.ok) throw new Error(data.error || 'Có lỗi xảy ra.');
+  if (!response.ok) {
+    const error = new Error(data.error || 'Có lỗi xảy ra.');
+    error.status = response.status;
+    throw error;
+  }
   return data;
 }
 
@@ -3667,6 +3671,13 @@ document.addEventListener('submit', async (e) => {
     const newClass = document.getElementById('transferTargetClass').value;
     const teacherInput = document.getElementById('transferTeacherName');
     const teacherName = teacherInput ? teacherInput.value.trim() : '';
+
+    if (!student) {
+      document.getElementById('transferClassModal').style.display = 'none';
+      toast('Hồ sơ học sinh đã thay đổi. Vui lòng tải lại trang.', 'error');
+      await loadBootstrap().catch(loadError => console.error('Không thể tải lại danh sách học sinh:', loadError));
+      return;
+    }
     
     if (!newClass) {
       return toast('Vui lòng chọn lớp đích!', 'error');
@@ -3675,26 +3686,16 @@ document.addEventListener('submit', async (e) => {
       return toast('Vui lòng nhập tên giáo viên chuyển lớp!', 'error');
     }
     
-    localStorage.setItem('savedTransferTeacher', teacherName);
-    
-    const payload = { ...student, className: newClass };
-    
     try {
-      const res = await api('/api/students/' + id, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      
-      await api('/api/students/' + id + '/transfer', {
+      const res = await api('/api/students/' + id + '/transfer', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fromClass: student.className, toClass: newClass, date: state.today, teacher: teacherName })
-      }).catch(err => console.warn(err));
-      
+      });
+
+      localStorage.setItem('savedTransferTeacher', teacherName);
       if (!state.classes.includes(newClass)) state.classes.push(newClass);
       const idx = state.students.findIndex(s => s.id === id);
-      if (idx !== -1) state.students[idx] = res || payload;
+      if (idx !== -1) state.students[idx] = res;
       rebuildQuickSearchIndex();
       
       document.getElementById('transferClassModal').style.display = 'none';
@@ -3712,6 +3713,10 @@ document.addEventListener('submit', async (e) => {
     } catch(err) {
       console.error(err);
       toast(err.message || 'Lỗi chuyển lớp', 'error');
+      if (err.status === 404 || err.status === 409) {
+        document.getElementById('transferClassModal').style.display = 'none';
+        await loadBootstrap().catch(loadError => console.error('Không thể tải lại danh sách học sinh:', loadError));
+      }
     }
   }
 });
@@ -3740,15 +3745,67 @@ window.closeTransferSuccessModal = function() {
     if (modal) modal.style.display = 'none';
 };
 
+function getTransferSubjectKey(className) {
+  const code = String(className || '').trim().match(/^\d+([A-Za-z])/i)?.[1]?.toUpperCase();
+  if (['S', 'C', 'T'].includes(code)) return 'TOAN';
+  return ['A', 'V', 'K'].includes(code) ? code : 'OTHER';
+}
+
 function openTransferClassModal(studentId) {
   const student = state.students.find(s => s.id === studentId);
   if (!student) return;
+  const currentClass = String(student.className || '').trim();
   document.getElementById('transferStudentId').value = student.id;
   document.getElementById('transferStudentName').textContent = student.fullName || student.name;
-  document.getElementById('transferCurrentClass').textContent = student.className;
-  
-  const classNames = state.classes.filter(c => c !== student.className);
-  document.getElementById('transferTargetClass').innerHTML = classNames.map(c => '<option value="' + c + '">' + c + '</option>').join('');
+  document.getElementById('transferCurrentClass').textContent = currentClass;
+
+  const classNames = [...new Set(state.classes
+    .map(className => String(className || '').trim())
+    .filter(className => className && className !== currentClass))]
+    .sort((a, b) => a.localeCompare(b, 'vi'));
+  const gradeFilter = document.getElementById('transferGradeFilter');
+  const subjectFilter = document.getElementById('transferSubjectFilter');
+  const targetClass = document.getElementById('transferTargetClass');
+  const submitButton = document.getElementById('transferSubmitBtn');
+  const subjectLabels = { TOAN: 'Toán', A: 'Anh', V: 'Văn', K: 'KHTN', OTHER: 'Môn khác' };
+  const classGrade = className => getClassGrade(className) || 'OTHER';
+
+  const grades = [...new Set(classNames.map(classGrade))]
+    .sort((a, b) => a === 'OTHER' ? 1 : b === 'OTHER' ? -1 : Number(a) - Number(b));
+  gradeFilter.replaceChildren(new Option('Tất cả khối', 'ALL'));
+  grades.forEach(grade => gradeFilter.add(new Option(grade === 'OTHER' ? 'Khối khác' : `Khối ${grade}`, grade)));
+
+  function renderTargetClasses() {
+    const previousClass = targetClass.value;
+    const matchingClasses = classNames.filter(className =>
+      (gradeFilter.value === 'ALL' || classGrade(className) === gradeFilter.value) &&
+      (subjectFilter.value === 'ALL' || getTransferSubjectKey(className) === subjectFilter.value)
+    );
+    targetClass.replaceChildren();
+    if (matchingClasses.length) {
+      matchingClasses.forEach(className => targetClass.add(new Option(className, className)));
+      if (matchingClasses.includes(previousClass)) targetClass.value = previousClass;
+    } else {
+      targetClass.add(new Option('Không có lớp phù hợp', ''));
+    }
+    submitButton.disabled = !matchingClasses.length;
+  }
+
+  function renderSubjectOptions(preferredSubject = subjectFilter.value) {
+    const visibleClasses = classNames.filter(className =>
+      gradeFilter.value === 'ALL' || classGrade(className) === gradeFilter.value
+    );
+    const subjects = [...new Set(visibleClasses.map(getTransferSubjectKey))];
+    subjectFilter.replaceChildren(new Option('Tất cả môn', 'ALL'));
+    ['TOAN', 'A', 'V', 'K', 'OTHER'].filter(subject => subjects.includes(subject))
+      .forEach(subject => subjectFilter.add(new Option(subjectLabels[subject], subject)));
+    subjectFilter.value = subjects.includes(preferredSubject) ? preferredSubject : 'ALL';
+    renderTargetClasses();
+  }
+
+  gradeFilter.onchange = () => renderSubjectOptions();
+  subjectFilter.onchange = renderTargetClasses;
+  renderSubjectOptions('ALL');
   
   if (localStorage.getItem('savedTransferTeacher')) {
     document.getElementById('transferTeacherName').value = localStorage.getItem('savedTransferTeacher');
