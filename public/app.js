@@ -172,11 +172,8 @@ async function api(path, options = {}) {
   
   if (response.status === 401 || response.status === 403) {
     localStorage.removeItem('token');
-    window.location.href = '/login.html';
-  }
-  
-  if (response.status === 401 || response.status === 403) {
-    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('activeBranch');
     window.location.href = '/login.html';
   }
   if (!response.ok) {
@@ -2843,34 +2840,26 @@ document.addEventListener('DOMContentLoaded', () => {
   const userStr = localStorage.getItem('user');
   if (userStr) {
     const user = JSON.parse(userStr);
-    const headerDiv = document.querySelector('header .header-controls');
-    if (headerDiv) {
-      headerDiv.innerHTML += `<div style="margin-left: 15px; display: inline-block;">
-        <span style="font-weight: bold; margin-right: 10px;">👤 ${user.username}</span>
-        <button id="logoutBtn" class="btn" style="padding: 6px 12px; background: #e2e8f0; color: #475569; border:none;"><i class="fa-solid fa-right-from-bracket"></i></button>
-      </div>`;
-      
-      document.getElementById('logoutBtn').addEventListener('click', () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/login.html';
-      });
-      
-      // If not admin, hide branch controls
-      if (user.role !== 'admin') {
-        const newB = document.getElementById('newBranchBtn');
-        const delB = document.getElementById('delBranchBtn');
-        const renB = document.getElementById('renameBranchBtn');
-        if (newB) newB.style.display = 'none';
-        if (delB) delB.style.display = 'none';
-        if (renB) renB.style.display = 'none';
-        const branchSel = document.getElementById('branchSelector');
-        if (branchSel && user.branchId !== 'all') {
-          branchSel.disabled = true;
-        }
+    const username = document.getElementById('currentUsername');
+    if (username) username.textContent = user.username || '';
+
+    // Only administrators can manage or switch branches.
+    if (user.role !== 'admin') {
+      for (const id of ['newBranchBtn', 'delBranchBtn', 'renameBranchBtn']) {
+        const button = document.getElementById(id);
+        if (button) button.style.display = 'none';
       }
+      const branchSelector = document.getElementById('branchSelector');
+      if (branchSelector) branchSelector.disabled = true;
     }
   }
+
+  document.getElementById('logoutBtn')?.addEventListener('click', () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('activeBranch');
+    window.location.href = '/login.html';
+  });
 
   // Socket.io integration
   if (typeof io !== 'undefined') {

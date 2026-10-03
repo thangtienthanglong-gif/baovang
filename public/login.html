@@ -51,6 +51,8 @@
         localStorage.setItem('user', JSON.stringify(data.user));
         if (data.user.branchId !== 'all') {
           localStorage.setItem('activeBranch', data.user.branchId);
+        } else {
+          localStorage.setItem('activeBranch', 'main');
         }
         window.location.href = '/';
       } catch (e) {

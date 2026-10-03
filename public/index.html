@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <link rel="stylesheet" href="/style.css?v=20260717-4">
+  <link rel="stylesheet" href="/style.css?v=20261003-1">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     /* Inner Tabs for History - INLINED TO PREVENT CACHE */
@@ -133,6 +133,10 @@
           <button class="btn danger" id="delBranchBtn" type="button" style="margin-right: 8px; padding: 6px 12px; background: #fee2e2; color: #dc2626; border-color: #fca5a5;" title="Xóa chi nhánh này"><i class="fa-solid fa-trash"></i></button>
           <button class="btn" id="renameBranchBtn" type="button" style="margin-right: 8px; padding: 6px 12px; background: #e0e7ff; color: #4338ca; border-color: #c7d2fe;" title="Đổi tên chi nhánh"><i class="fa-solid fa-pen"></i></button>
           <button class="btn secondary" id="refreshBtn" type="button"><span class="btn-icon"><i class="fa-solid fa-rotate-right"></i></span> Tải lại</button>
+          <div class="account-controls">
+            <span id="currentUsername"></span>
+            <button class="btn secondary" id="logoutBtn" type="button" title="Thoát tài khoản để đăng nhập chi nhánh khác"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</button>
+          </div>
         </div>
       </header>
 
@@ -859,7 +863,7 @@
     </div>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="/app.js?v=20261003-1"></script>
+  <script src="/app.js?v=20261003-2"></script>
   <script src="/exams.js"></script>
   <nav class="bottom-nav">
     <button class="bottom-tab active" data-tab="absenceTab" type="button"><i class="fa-solid fa-clipboard-user"></i><span>Điểm danh</span></button>
