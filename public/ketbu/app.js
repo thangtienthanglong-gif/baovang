@@ -1,6 +1,8 @@
 const LEGACY_STORAGE_KEY = "xep_lich_bu_teacher_v7";
 const STORAGE_KEY = "xep-lich-bu-v2";
 const CLOUD_STATE_ENDPOINT = "/api/ketbu/state";
+const CLOUD_BACKUP_PREFIX = "ketbu-conflict-backup-";
+const CLOUD_VERSIONS_KEY = "ketbu-cloud-versions";
 const DEFAULT_BRANCH_ID = "main-branch";
 const SETTINGS_PASSWORD = "thanglong@123";
 const AUTO_SAVE_DELAY_MS = 900;
@@ -48,8 +50,18 @@ const emptyData = {
 };
 
 let cloudSyncReady = false;
-let cloudSaveTimer = null;
-let cloudLastUpdatedAt = "";
+const cloudSaveTimers = new Map();
+const cloudSaveQueues = new Map();
+let savedCloudVersions = {};
+try {
+  savedCloudVersions = JSON.parse(localStorage.getItem(CLOUD_VERSIONS_KEY) || "{}");
+} catch {
+  savedCloudVersions = {};
+}
+const cloudVersions = new Map(Object.entries(savedCloudVersions || {}));
+const cloudConflicts = new Set(Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+  .filter(key => key && key.startsWith(CLOUD_BACKUP_PREFIX))
+  .map(key => key.slice(CLOUD_BACKUP_PREFIX.length)));
 let autoSaveTimer = null;
 let inlineAutoSaveTimer = null;
 let activeInlineEditClassCode = "";
@@ -104,7 +116,8 @@ const elements = {
   exportDateTo: document.getElementById("exportDateTo"),
   exportAssignmentsBtn: document.getElementById("exportAssignmentsBtn"),
   clearAssignmentsBtn: document.getElementById("clearAssignmentsBtn"),
-  branchSelect: document.getElementById("branchSelect")
+  branchSelect: document.getElementById("branchSelect"),
+  retryCloudSyncBtn: document.getElementById("retryCloudSyncBtn")
 };
 
 const pageCopy = {
@@ -221,7 +234,12 @@ function persistLocalAppState() {
 
 function persistAppState() {
   persistLocalAppState();
-  if (cloudSyncReady) queueCloudPersist();
+  const branchId = getActiveBranch().id;
+  if (cloudConflicts.has(branchId)) {
+    localStorage.setItem(`${CLOUD_BACKUP_PREFIX}${branchId}`, JSON.stringify(getActiveBranch()));
+  } else if (cloudSyncReady) {
+    queueCloudPersist(branchId);
+  }
 }
 
 function saveData() {
@@ -229,57 +247,131 @@ function saveData() {
   persistAppState();
 }
 
-async function pushCloudState() {
+function cloudRequestHeaders(branchId) {
+  return {
+    "Content-Type": "application/json",
+    "X-Branch-Id": branchId,
+    "Authorization": "Bearer " + (localStorage.getItem("token") || "")
+  };
+}
+
+function branchCloudPayload(branchId) {
+  const branch = appState.branches.find(item => item.id === branchId);
+  return branch ? {
+    state: { activeBranchId: branchId, branches: [branch] },
+    expectedUpdatedAt: cloudVersions.get(branchId) || null
+  } : null;
+}
+
+function setCloudVersion(branchId, updatedAt) {
+  cloudVersions.set(branchId, updatedAt || null);
+  localStorage.setItem(CLOUD_VERSIONS_KEY, JSON.stringify(Object.fromEntries(cloudVersions)));
+}
+
+function updateCloudConflictUi() {
+  const branchId = getActiveBranch().id;
+  const hasConflict = cloudConflicts.has(branchId);
+  if (elements.retryCloudSyncBtn) elements.retryCloudSyncBtn.hidden = !hasConflict;
+  if (hasConflict) setNotice("Dữ liệu cơ sở trên máy này chưa đồng bộ. Bấm Thử đồng bộ khi kết nối đã ổn định.", "error");
+}
+
+function markCloudConflict(branchId) {
+  cloudConflicts.add(branchId);
+  const branch = appState.branches.find(item => item.id === branchId);
+  if (branch) localStorage.setItem(`${CLOUD_BACKUP_PREFIX}${branchId}`, JSON.stringify(branch));
+  if (getActiveBranch().id === branchId) updateCloudConflictUi();
+}
+
+async function saveCloudBranch(branchId, keepalive = false) {
+  if (cloudConflicts.has(branchId)) return;
+  const body = branchCloudPayload(branchId);
+  if (!body) return;
   try {
     const response = await fetch(CLOUD_STATE_ENDPOINT, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ state: appState })
+      headers: cloudRequestHeaders(branchId),
+      body: JSON.stringify(body),
+      keepalive
     });
     const payload = await response.json().catch(() => ({}));
-
-    if (!response.ok) throw new Error(payload.error || "Không lưu được dữ liệu cloud.");
-    cloudLastUpdatedAt = payload.updatedAt || cloudLastUpdatedAt;
+    if (!response.ok) {
+      const error = new Error(payload.error || "Không lưu được dữ liệu cloud.");
+      error.status = response.status;
+      throw error;
+    }
+    setCloudVersion(branchId, payload.updatedAt);
+    localStorage.removeItem(`${CLOUD_BACKUP_PREFIX}${branchId}`);
+    cloudConflicts.delete(branchId);
+    if (getActiveBranch().id === branchId) updateCloudConflictUi();
   } catch (error) {
+    markCloudConflict(branchId);
     console.warn("Cloud sync save failed:", error);
-    alert("Lỗi khi lưu cấu hình lớp lên máy chủ: " + error.message + "\n\nDữ liệu chỉ được lưu tạm thời trên máy này. Vui lòng kiểm tra lại kết nối hoặc khởi động lại phần mềm.");
+    alert("Lỗi khi lưu dữ liệu cơ sở lên máy chủ: " + error.message + "\n\nBản trên máy này đã được giữ lại. Vui lòng kiểm tra trước khi tải lại trang.");
   }
 }
 
-function queueCloudPersist() {
-  window.clearTimeout(cloudSaveTimer);
-  cloudSaveTimer = window.setTimeout(pushCloudState, 550);
+async function retryCloudSync() {
+  const branchId = getActiveBranch().id;
+  if (!cloudConflicts.has(branchId)) return;
+  cloudConflicts.delete(branchId);
+  await pushCloudState(branchId);
+  if (!cloudConflicts.has(branchId)) setNotice("Đã đồng bộ dữ liệu cơ sở lên máy chủ.");
+}
+
+function pushCloudState(branchId, keepalive = false) {
+  const previous = cloudSaveQueues.get(branchId) || Promise.resolve();
+  const next = previous.then(() => saveCloudBranch(branchId, keepalive));
+  cloudSaveQueues.set(branchId, next);
+  next.finally(() => {
+    if (cloudSaveQueues.get(branchId) === next) cloudSaveQueues.delete(branchId);
+  });
+  return next;
+}
+
+function queueCloudPersist(branchId) {
+  window.clearTimeout(cloudSaveTimers.get(branchId));
+  cloudSaveTimers.set(branchId, window.setTimeout(() => {
+    cloudSaveTimers.delete(branchId);
+    pushCloudState(branchId);
+  }, 550));
 }
 
 function applyCloudState(nextState, updatedAt, showMessage = false) {
   const normalized = normalizeAppStatePayload(nextState);
-  if (!normalized) return false;
-
-  appState = normalized;
-  data = getActiveBranch().data;
-  cloudLastUpdatedAt = updatedAt || cloudLastUpdatedAt;
+  if (!normalized || normalized.branches.length !== 1) return false;
+  const branch = normalized.branches[0];
+  const index = appState.branches.findIndex(item => item.id === branch.id);
+  if (index >= 0) appState.branches[index] = branch;
+  else appState.branches.push(branch);
+  if (appState.activeBranchId === branch.id) data = branch.data;
+  setCloudVersion(branch.id, updatedAt);
   persistLocalAppState();
-  renderAll();
+  if (appState.activeBranchId === branch.id) renderAll();
 
   if (showMessage) setNotice("Đã đồng bộ dữ liệu lớp từ cloud.");
   return true;
 }
 
-async function pullCloudState({ seedWhenEmpty = false, showMessage = false } = {}) {
+async function pullCloudState({ branchId = getActiveBranch().id, seedWhenEmpty = false, showMessage = false } = {}) {
+  if (cloudConflicts.has(branchId) || cloudSaveTimers.has(branchId) || cloudSaveQueues.has(branchId)) return;
   const ts = new Date().getTime();
-  const response = await fetch(`${CLOUD_STATE_ENDPOINT}?_t=${ts}`, { cache: "no-store" });
+  const response = await fetch(`${CLOUD_STATE_ENDPOINT}?_t=${ts}`, {
+    cache: "no-store",
+    headers: cloudRequestHeaders(branchId)
+  });
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) throw new Error(payload.error || "Không tải được dữ liệu cloud.");
+  if (cloudConflicts.has(branchId) || cloudSaveTimers.has(branchId) || cloudSaveQueues.has(branchId)) return;
 
   if (payload.state) {
-    if (!payload.updatedAt || payload.updatedAt !== cloudLastUpdatedAt) {
+    if (!payload.updatedAt || payload.updatedAt !== cloudVersions.get(branchId)) {
       applyCloudState(payload.state, payload.updatedAt, showMessage);
     }
     return;
   }
 
-  if (seedWhenEmpty) queueCloudPersist();
+  if (seedWhenEmpty) queueCloudPersist(branchId);
 }
 
 function startCloudPolling() {
@@ -289,24 +381,26 @@ function startCloudPolling() {
 }
 
 async function initializeCloudSync() {
+  cloudSyncReady = true;
   try {
-    cloudSyncReady = true;
-    await pullCloudState({ seedWhenEmpty: true, showMessage: true });
-    startCloudPolling();
+    if (cloudConflicts.has(getActiveBranch().id)) updateCloudConflictUi();
+    else await pullCloudState({ seedWhenEmpty: true, showMessage: true });
   } catch (error) {
-    cloudSyncReady = false;
+    markCloudConflict(getActiveBranch().id);
     console.warn("Cloud sync unavailable:", error);
+  } finally {
+    startCloudPolling();
   }
 }
 
 window.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden' && cloudSyncReady) {
-    fetch(CLOUD_STATE_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ state: appState }),
-      keepalive: true
-    }).catch(e => console.warn(e));
+    const branchId = getActiveBranch().id;
+    const timer = cloudSaveTimers.get(branchId);
+    if (!timer || cloudConflicts.has(branchId)) return;
+    window.clearTimeout(timer);
+    cloudSaveTimers.delete(branchId);
+    pushCloudState(branchId, true);
   }
 });
 
@@ -2007,13 +2101,16 @@ function switchBranch(branchId) {
   appState.activeBranchId = nextBranch.id;
   data = nextBranch.data;
   resetBranchWorkspace();
-  persistAppState();
+  persistLocalAppState();
   
   // Sync with main app
   localStorage.setItem('activeBranch', nextBranch.id);
   
   renderAll();
+  if (cloudSyncReady) pullCloudState({ branchId: nextBranch.id, seedWhenEmpty: true })
+    .catch(error => console.warn("Không tải được dữ liệu cơ sở:", error));
   setNotice(`Đang làm việc tại chi nhánh ${nextBranch.name}.`);
+  updateCloudConflictUi();
 }
 
 async function syncBranches() {
@@ -3309,6 +3406,7 @@ document.querySelectorAll("[data-view-shortcut]").forEach((button) => {
 });
 
 elements.branchSelect.addEventListener("change", () => switchBranch(elements.branchSelect.value));
+elements.retryCloudSyncBtn.addEventListener("click", retryCloudSync);
 
 if (elements.loadBtn) {
   elements.loadBtn.addEventListener("click", () => {

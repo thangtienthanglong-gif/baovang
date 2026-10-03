@@ -26,7 +26,7 @@ app.use((req, res, next) => {
 });
 
 const server = http.createServer(app);
-const JWT_SECRET = process.env.JWT_SECRET || 'baovang_secret_key_12345';
+let JWT_SECRET = process.env.JWT_SECRET || null;
 
 // Serve login.html for root if not authenticated
 // Actually we will serve index.html statically, and index.html will redirect to login.html if no token
@@ -71,14 +71,14 @@ try {
 } catch (error) {
   console.error('Lỗi khi đọc cấu hình Firebase:', error);
 }
+if (!JWT_SECRET && serviceAccount?.private_key) {
+  JWT_SECRET = crypto.createHash('sha256').update(serviceAccount.private_key).digest('hex');
+}
 
 const PORT = process.env.PORT || 3000;
 // Hardcoded fallbacks for Vercel if Env Vars are missing
 if (!process.env.FIREBASE_DATABASE_URL) {
   process.env.FIREBASE_DATABASE_URL = 'https://thangtienthanglong-17088-default-rtdb.firebaseio.com';
-}
-if (!process.env.JWT_SECRET) {
-  process.env.JWT_SECRET = 'mat_khau_bao_mat_gi_cung_duoc_123';
 }
 const DATA_DIR = path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
@@ -91,13 +91,15 @@ const DEFAULT_OPENAI_MODEL = 'gpt-5.5';
 const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
 const DEFAULT_GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 const ABSENCE_STATUSES = ['Vắng', 'Có phép', 'Đi trễ', 'Về sớm', 'Cả ngày', 'Nghỉ học', 'Học phí', 'Trễ học phí'];
+const MAKEUP_ATTENDANCE_STATUSES = new Set(['Vắng', 'Có phép', 'Đi trễ', 'Về sớm']);
 const pendingAiActions = new Map();
 
 app.use(express.json({ limit: '5mb' }));
+app.use('/api', (req, res, next) => authenticateToken(req, res, next));
 app.use((req, res, next) => {
   if (
-    ['/', '/index.html', '/app.js', '/style.css'].includes(req.path) ||
-    req.path.startsWith('/ketbu/') ||
+    req.path === '/' ||
+    /\.(?:html|js|css)$/i.test(req.path) ||
     req.path.startsWith('/api/')
   ) {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -131,6 +133,45 @@ function normalizeScheduleDay(value) {
   return day === 'C' ? '8' : day;
 }
 
+function scheduleDayForDate(dateString) {
+  const match = String(dateString || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return '';
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  if (date.toISOString().slice(0, 10) !== dateString) return '';
+  const day = date.getUTCDay();
+  return String(day === 0 ? 8 : day + 1);
+}
+
+function validScheduleExceptions(list, now = new Date()) {
+  return (Array.isArray(list) ? list : []).filter(exception => {
+    if (exception.type !== 'bu_tam' || !exception.createdAt) return true;
+    const created = new Date(exception.createdAt);
+    return Number.isFinite(created.getTime()) && (now - created) / 86400000 <= 6;
+  });
+}
+
+function resolveScheduleExceptionStudent(exception, students) {
+  const byId = students.find(student => student.id === exception.studentId);
+  if (byId) return byId;
+  const name = cleanText(exception.studentName).toLocaleLowerCase('vi');
+  const originalClass = cleanText(exception.originalClass).toLocaleLowerCase('vi');
+  if (!name || !originalClass) return null;
+  const matches = students.filter(student =>
+    cleanText(student.fullName || student.name).toLocaleLowerCase('vi') === name &&
+    cleanText(student.className).toLocaleLowerCase('vi') === originalClass
+  );
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function resolvedScheduleExceptions(list, students) {
+  return validScheduleExceptions(list).map(exception => {
+    const student = resolveScheduleExceptionStudent(exception, students);
+    return student && student.id !== exception.studentId
+      ? { ...exception, studentId: student.id }
+      : exception;
+  });
+}
+
 function addMinutesISO(minutes) {
   return new Date(Date.now() + Number(minutes || 0) * 60 * 1000).toISOString();
 }
@@ -150,28 +191,28 @@ function personalTestLimitFromSettings(settings) {
 
 
 
+const dbSnapshots = new WeakMap();
+
 async function readDb() {
-  if (!getApps().length) return { branches: {} };
+  if (!getApps().length) {
+    const error = new Error('Chưa kết nối được cơ sở dữ liệu.');
+    error.status = 503;
+    throw error;
+  }
   try {
     const snapshot = await getDatabase().ref('/').once('value');
     const db = snapshot.val() || {};
-    
-    // Migration: If old data exists at root, move to 'main' branch
-    if (db.students || db.absences || db.settings) {
+
+    // Keep legacy root data readable until it is migrated explicitly. A read must not overwrite a branch.
+    if ((db.students || db.absences || db.settings) && !db.branches?.main) {
       if (!db.branches) db.branches = {};
-      db.branches['main'] = {
+      db.branches.main = {
         students: db.students || [],
         absences: db.absences || [],
         callLogs: db.callLogs || [],
         notificationLogs: db.notificationLogs || [],
         settings: db.settings || defaultSettings()
       };
-      delete db.students;
-      delete db.absences;
-      delete db.callLogs;
-      delete db.notificationLogs;
-      delete db.settings;
-      await getDatabase().ref('/').set(db); // Save migrated structure immediately
     }
     
     if (!db.branches) db.branches = {};
@@ -187,47 +228,59 @@ async function readDb() {
       if (!db.branches[branchId].warnings) db.branches[branchId].warnings = [];
     }
 
+    dbSnapshots.set(db, JSON.parse(JSON.stringify(db)));
     return db;
   } catch (err) {
     console.error('Lỗi khi đọc dữ liệu từ Firebase:', err);
-    return { students: [], absences: [], callLogs: [], notificationLogs: [], settings: defaultSettings() };
+    throw err;
   }
 }
 
 async function writeDb(db) {
   if (!getApps().length) {
-    console.error('Lỗi: Firebase chưa được khởi tạo, không thể lưu.');
-    return;
+    const error = new Error('Chưa kết nối được cơ sở dữ liệu.');
+    error.status = 503;
+    throw error;
   }
-  try {
-    await getDatabase().ref('/').set(db);
-  } catch (err) {
-    console.error('Lỗi khi ghi dữ liệu lên Firebase:', err);
+  const original = dbSnapshots.get(db);
+  if (!original) throw new Error('Không thể lưu dữ liệu chưa được đọc từ Firebase.');
+  const changes = {};
+  const oldBranches = original.branches || {};
+  const newBranches = db.branches || {};
+  for (const branchId of new Set([...Object.keys(oldBranches), ...Object.keys(newBranches)])) {
+    if (JSON.stringify(oldBranches[branchId]) !== JSON.stringify(newBranches[branchId])) {
+      changes[`branches/${branchId}`] = newBranches[branchId] ?? null;
+    }
   }
+  for (const key of new Set([...Object.keys(original), ...Object.keys(db)])) {
+    if (key === 'branches') continue;
+    if (JSON.stringify(original[key]) !== JSON.stringify(db[key])) {
+      changes[key] = db[key] ?? null;
+    }
+  }
+  if (!Object.keys(changes).length) return;
+  await getDatabase().ref('/').update(changes);
+  dbSnapshots.set(db, JSON.parse(JSON.stringify(db)));
 }
 
 function getBranchId(req) {
-  let branch = req ? (req.headers['x-branch-id'] || req.query.branchId || req.body.branchId) : null;
+  const branch = req ? (req.headers['x-branch-id'] || req.query?.branchId || req.body?.branchId) : null;
   if (!branch) return 'main';
-  let str = String(branch).trim().toLowerCase().replace(/[^a-z0-9-_]/g, '');
-  
-  // Tự động gọt bỏ phần mã chi nhánh bị nối lặp (vd: branch_123branch_123)
-  const firstIdx = str.indexOf('branch_');
-  if (firstIdx !== -1) {
-    const secondIdx = str.indexOf('branch_', firstIdx + 7);
-    if (secondIdx !== -1) {
-      str = str.substring(0, secondIdx);
-    }
+  const str = String(branch).trim().toLowerCase();
+  if (!/^[a-z0-9_-]+$/.test(str)) {
+    const error = new Error('Mã cơ sở không hợp lệ.');
+    error.status = 400;
+    throw error;
   }
-  return str || 'main';
+  return str;
 }
 
 function resolveValidBranchId(req, rootDb) {
   const reqId = getBranchId(req);
-  if (!rootDb || !rootDb.branches) return 'main';
-  if (rootDb.branches[reqId]) return reqId;
-  const nonMain = Object.keys(rootDb.branches).find(k => k !== 'main');
-  return nonMain || 'main';
+  if (rootDb?.branches?.[reqId] || (reqId === 'main' && !rootDb?.branches?.main)) return reqId;
+  const error = new Error('Không tìm thấy cơ sở đang chọn. Vui lòng tải lại danh sách cơ sở.');
+  error.status = 404;
+  throw error;
 }
 
 async function getBranchDb(req) {
@@ -433,7 +486,7 @@ function enrichAbsence(absence, studentsMap) {
     initialReason: normalizeInitialReason(absence.initialReason, normalizeAbsenceStatus(absence.absenceStatus)),
     studentCode: student.code || '',
     studentName: student.fullName || '',
-    className: student.className || '',
+    className: absence.attendanceClass || student.className || '',
     parentName: student.parentName || '',
     phone1: student.phone1 || '',
     phone2: student.phone2 || '',
@@ -592,7 +645,7 @@ function buildMessage(settings, absence, student) {
     date: displayDate,
     studentCode: student.code || '',
     studentName: student.fullName || '',
-    className: student.className || '',
+    className: absence.attendanceClass || student.className || '',
     session: absence.session || '',
     absenceStatus: normalizeAbsenceStatus(absence.absenceStatus),
     reason: normalizeInitialReason(absence.initialReason, normalizeAbsenceStatus(absence.absenceStatus)),
@@ -1892,7 +1945,7 @@ async function sendZaloNotice(db, absenceId, reason = 'auto') {
     studentId: student.id || '',
     studentCode: student.code || '',
     studentName: student.fullName || '',
-    className: student.className || '',
+    className: absence.attendanceClass || student.className || '',
     parentName: student.parentName || '',
     phone1: student.phone1 || '',
     zaloUserId: student.zaloUserId || '',
@@ -2180,26 +2233,28 @@ function upsertImportedStudents(db, importedStudents) {
   return { created, updated, skipped, details };
 }
 
-const KETBU_STATE_FILE = path.join(DATA_DIR, 'ketbu-state.json');
-
 app.get('/api/ketbu/state', async (req, res, next) => {
   try {
-    let payload = { state: null, updatedAt: null };
-    
-    if (getApps().length) {
-      // Firebase mode
-      const snapshot = await getDatabase().ref('/ketbu_state').once('value');
-      if (snapshot.exists()) {
-        payload = snapshot.val();
-      }
-    } else {
-      // Local mode
-      if (fs.existsSync(KETBU_STATE_FILE)) {
-        payload = JSON.parse(fs.readFileSync(KETBU_STATE_FILE, 'utf8'));
+    await getBranchDb(req);
+    const branchId = getBranchId(req);
+    const snapshot = await getDatabase().ref(`/ketbu_state_by_branch/${branchId}`).once('value');
+    let payload = snapshot.val();
+
+    // Existing cloud data stays untouched and is read only until the first branch-specific save.
+    if (!payload) {
+      const legacySnapshot = await getDatabase().ref('/ketbu_state').once('value');
+      const legacy = legacySnapshot.val();
+      const legacyBranch = legacy?.state?.branches?.find(branch =>
+        branch.id === branchId || (branchId === 'main' && branch.id === 'main-branch')
+      );
+      if (legacyBranch) {
+        payload = {
+          state: { activeBranchId: branchId, branches: [{ ...legacyBranch, id: branchId }] },
+          updatedAt: legacy.updatedAt || null
+        };
       }
     }
-    
-    res.json({ state: payload.state || null, updatedAt: payload.updatedAt || null });
+    res.json({ state: payload?.state || null, updatedAt: payload?.updatedAt || null });
   } catch (error) {
     next(error);
   }
@@ -2207,56 +2262,32 @@ app.get('/api/ketbu/state', async (req, res, next) => {
 
 app.post('/api/ketbu/state', async (req, res, next) => {
   try {
+    await getBranchDb(req);
+    const branchId = getBranchId(req);
     const body = req.body || {};
-    if (!body || typeof body.state !== 'object') {
+    const branches = body.state?.branches;
+    if (!Array.isArray(branches) || branches.length !== 1 || branches[0]?.id !== branchId) {
       const err = new Error('Dữ liệu đồng bộ không hợp lệ.');
       err.status = 400;
       throw err;
     }
-
-    let currentPayload = { state: null, updatedAt: null };
-    if (getApps().length) {
-      const currentSnapshot = await getDatabase().ref('/ketbu_state').once('value');
-      if (currentSnapshot.exists()) currentPayload = currentSnapshot.val();
-    } else if (fs.existsSync(KETBU_STATE_FILE)) {
-      currentPayload = JSON.parse(fs.readFileSync(KETBU_STATE_FILE, 'utf8'));
-    }
-
-    const currentBranches = Array.isArray(currentPayload?.state?.branches)
-      ? currentPayload.state.branches
-      : [];
-    const incomingBranches = Array.isArray(body.state.branches)
-      ? body.state.branches
-      : [];
-    const isExplicitRestore = req.headers['x-ketbu-restore'] === 'true';
-
-    if (!isExplicitRestore && currentBranches.length > incomingBranches.length) {
-      const err = new Error(
-        `Từ chối đồng bộ làm giảm số chi nhánh từ ${currentBranches.length} xuống ${incomingBranches.length}.`
-      );
+    const payload = {
+      state: { activeBranchId: branchId, branches: [branches[0]] },
+      updatedAt: new Date().toISOString()
+    };
+    const stateRef = getDatabase().ref(`/ketbu_state_by_branch/${branchId}`);
+    const result = await stateRef.transaction(current => {
+      if (current && current.updatedAt !== (body.expectedUpdatedAt || null)) return;
+      return payload;
+    }, undefined, false);
+    if (!result.committed) {
+      const err = new Error('Dữ liệu cơ sở đã được cập nhật ở thiết bị khác. Vui lòng tải lại trước khi lưu.');
       err.status = 409;
       throw err;
     }
-
-    const payload = {
-      state: body.state,
-      updatedAt: new Date().toISOString()
-    };
-
-    if (getApps().length) {
-      // Firebase mode
-      await getDatabase().ref('/ketbu_state').set(payload);
-    } else {
-      // Local mode
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-      }
-      fs.writeFileSync(KETBU_STATE_FILE, JSON.stringify(payload, null, 2));
-    }
-    
     res.json({ ok: true, updatedAt: payload.updatedAt });
   } catch (error) {
-    console.error("Lỗi khi lưu ketbu-state.json:", error);
+    console.error('Lỗi khi lưu lịch học bù:', error);
     next(error);
   }
 });
@@ -2266,6 +2297,7 @@ app.get('/api/teaching-sessions', async (req, res, next) => {
   try {
     const branchId = getBranchId(req);
     const db = await readDb();
+    resolveValidBranchId(req, db);
     if (!db.branches[branchId]) db.branches[branchId] = { teaching_sessions: [] };
     if (!db.branches[branchId].teaching_sessions) db.branches[branchId].teaching_sessions = [];
     
@@ -2302,6 +2334,7 @@ app.post('/api/teaching-sessions', async (req, res, next) => {
 
     try {
       const db = await readDb();
+      resolveValidBranchId(req, db);
       if (!db.branches[branchId]) db.branches[branchId] = { teaching_sessions: [], evaluations: [], warnings: [], students: [], absences: [] };
       if (!db.branches[branchId].teaching_sessions) db.branches[branchId].teaching_sessions = [];
       
@@ -2359,6 +2392,7 @@ app.delete('/api/teaching-sessions/:id', async (req, res, next) => {
   try {
     const branchId = getBranchId(req);
     const db = await readDb();
+    resolveValidBranchId(req, db);
     const sessionId = req.params.id;
     if (!db.branches[branchId] || !db.branches[branchId].teaching_sessions) {
       return res.status(404).json({ error: 'Sessions not found' });
@@ -2379,6 +2413,7 @@ app.put('/api/teaching-sessions/:id/submit-attendance', async (req, res, next) =
   try {
     const branchId = getBranchId(req);
     const db = await readDb();
+    resolveValidBranchId(req, db);
     const sessionId = req.params.id;
     const session = db.branches[branchId]?.teaching_sessions?.find(s => s.id === sessionId);
     if (!session) return res.status(404).json({ error: 'Session not found' });
@@ -2394,6 +2429,7 @@ app.put('/api/teaching-sessions/:id', async (req, res, next) => {
   try {
     const branchId = getBranchId(req);
     const db = await readDb();
+    resolveValidBranchId(req, db);
     const sessionId = req.params.id;
     const session = db.branches[branchId]?.teaching_sessions?.find(s => s.id === sessionId);
     if (!session) return res.status(404).json({ error: 'Session not found' });
@@ -2410,6 +2446,7 @@ app.post('/api/evaluations', async (req, res, next) => {
   try {
     const branchId = getBranchId(req);
     const db = await readDb();
+    resolveValidBranchId(req, db);
     if (!db.branches[branchId]) db.branches[branchId] = { teaching_sessions: [], evaluations: [], warnings: [], students: [], absences: [] };
     if (!db.branches[branchId].evaluations) db.branches[branchId].evaluations = [];
     if (!db.branches[branchId].warnings) db.branches[branchId].warnings = [];
@@ -2472,6 +2509,7 @@ app.delete('/api/evaluations/undo', async (req, res, next) => {
     }
 
     const db = await readDb();
+    resolveValidBranchId(req, db);
     if (!db.branches[branchId] || !db.branches[branchId].evaluations) {
       return res.status(404).json({ error: 'Không tìm thấy dữ liệu' });
     }
@@ -2513,8 +2551,9 @@ app.get('/api/ketbu/students/:id/history', async (req, res, next) => {
   try {
     const branchId = getBranchId(req);
     const db = await readDb();
+    resolveValidBranchId(req, db);
     const studentId = req.params.id;
-    const student = db.students?.find(s => s.id === studentId) || db.branches[branchId]?.students?.find(s => s.id === studentId);
+    const student = db.branches[branchId]?.students?.find(s => s.id === studentId);
     
     const absences = (db.branches[branchId]?.absences || []).filter(a => a.studentId === studentId);
     const evaluations = (db.branches[branchId]?.evaluations || []).filter(e => e.studentId === studentId);
@@ -2556,24 +2595,14 @@ app.get('/api/ketbu/students', async (req, res, next) => {
   try {
     const branchId = getBranchId(req);
     const db = await readDb();
-    let students = (db.branches[branchId]?.students && db.branches[branchId].students.length > 0) ? db.branches[branchId].students : (db.students || []);
+    resolveValidBranchId(req, db);
+    let students = db.branches[branchId]?.students || [];
     const evals = db.branches[branchId]?.evaluations || [];
     const warnings = db.branches[branchId]?.warnings || [];
     const part = req.query.part;
     const className = req.query.className;
 
-    function getValidExceptions(list) {
-      if (!list) return [];
-      const now = new Date();
-      return list.filter(e => {
-        if (e.type === 'bu_tam' && e.createdAt) {
-          const created = new Date(e.createdAt);
-          return (now - created) / (1000 * 60 * 60 * 24) <= 6;
-        }
-        return true;
-      });
-    }
-    const scheduleExceptions = getValidExceptions(db.branches[branchId]?.scheduleExceptions);
+    const scheduleExceptions = resolvedScheduleExceptions(db.branches[branchId]?.scheduleExceptions, students);
     const vnDate = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Ho_Chi_Minh"}));
     let currentDayOfWeek = vnDate.getDay() + 1;
     if (currentDayOfWeek === 1) currentDayOfWeek = 8;
@@ -2595,10 +2624,7 @@ app.get('/api/ketbu/students', async (req, res, next) => {
 
       const makeupExceptions = scheduleExceptions.filter(e => String(e.makeupClass || '').trim().toLowerCase() === String(className || '').trim().toLowerCase() && normalizeScheduleDay(e.makeupDay) === currentDayStr);
       makeupExceptions.forEach(e => {
-        let st = allBranchStudents.find(s => s.id === e.studentId);
-        if (!st && e.studentName) {
-          st = allBranchStudents.find(s => String(s.fullName || s.name || '').trim().toLowerCase() === String(e.studentName).trim().toLowerCase());
-        }
+        const st = allBranchStudents.find(s => s.id === e.studentId);
         if (st && !baseStudents.some(b => b.id === st.id)) {
           baseStudents.push({ ...st, isMakeupToday: true, makeupType: e.type || 'hoc_bu' });
         }
@@ -3266,20 +3292,7 @@ app.post('/api/import/students', upload.array('contacts', 50), async (req, res, 
 app.get('/api/schedule-exceptions', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
-    
-    function getValidExceptions(list) {
-      if (!list) return [];
-      const now = new Date();
-      return list.filter(e => {
-        if (e.type === 'bu_tam' && e.createdAt) {
-          const created = new Date(e.createdAt);
-          return (now - created) / (1000 * 60 * 60 * 24) <= 6;
-        }
-        return true;
-      });
-    }
-    
-    res.json(getValidExceptions(db.scheduleExceptions));
+    res.json(resolvedScheduleExceptions(db.scheduleExceptions, db.students || []));
   } catch (error) {
     next(error);
   }
@@ -3292,7 +3305,12 @@ app.post('/api/schedule-exceptions', async (req, res, next) => {
     if (!db.scheduleExceptions) db.scheduleExceptions = [];
     
     const student = db.students ? db.students.find(s => s.id === req.body.studentId) : null;
-    const studentName = student ? (student.fullName || student.name) : (req.body.studentName || '');
+    if (!student) {
+      const error = new Error('Không tìm thấy học sinh ở cơ sở đang chọn. Vui lòng tải lại danh sách.');
+      error.status = 404;
+      throw error;
+    }
+    const studentName = student.fullName || student.name;
 
     const exception = {
       id: id('exc'),
@@ -3506,7 +3524,32 @@ app.post('/api/absences', async (req, res, next) => {
       throw err;
     }
 
-    const duplicateIndex = db.absences.findIndex(absence => absence.date === req.body.date && absence.studentId === req.body.studentId && absence.session === req.body.session);
+    const attendanceClass = cleanText(req.body.attendanceClass) || student.className;
+    if (attendanceClass !== student.className) {
+      if (!MAKEUP_ATTENDANCE_STATUSES.has(normalizeAbsenceStatus(req.body.absenceStatus))) {
+        const error = new Error('Trạng thái này không áp dụng cho buổi học bù.');
+        error.status = 400;
+        throw error;
+      }
+      const makeupDay = scheduleDayForDate(req.body.date);
+      const hasMakeupSchedule = resolvedScheduleExceptions(db.scheduleExceptions, db.students).some(exception =>
+        exception.studentId === student.id &&
+        cleanText(exception.makeupClass) === attendanceClass &&
+        normalizeScheduleDay(exception.makeupDay) === makeupDay
+      );
+      if (!hasMakeupSchedule) {
+        const error = new Error('Học sinh không có lịch bù ở lớp và ngày đang chọn. Vui lòng tải lại trang.');
+        error.status = 409;
+        throw error;
+      }
+    }
+
+    const duplicateIndex = db.absences.findIndex(absence =>
+      absence.date === req.body.date &&
+      absence.studentId === req.body.studentId &&
+      absence.session === req.body.session &&
+      (absence.attendanceClass || student.className) === attendanceClass
+    );
     if (duplicateIndex !== -1) {
       const absenceStatus = normalizeAbsenceStatus(req.body.absenceStatus);
       db.absences[duplicateIndex].absenceStatus = absenceStatus;
@@ -3523,6 +3566,7 @@ app.post('/api/absences', async (req, res, next) => {
       id: id('abs'),
       date: cleanText(req.body.date),
       studentId: student.id,
+      attendanceClass,
       session: cleanText(req.body.session),
       absenceStatus,
       initialReason: normalizeInitialReason(req.body.initialReason, absenceStatus),
@@ -3570,6 +3614,14 @@ app.put('/api/absences/:id/status', async (req, res, next) => {
       throw err;
     }
     const absenceStatus = normalizeAbsenceStatus(req.body.absenceStatus);
+    const currentAbsence = db.absences[index];
+    const student = db.students.find(row => row.id === currentAbsence.studentId);
+    if (student && currentAbsence.attendanceClass && currentAbsence.attendanceClass !== student.className &&
+        !MAKEUP_ATTENDANCE_STATUSES.has(absenceStatus)) {
+      const error = new Error('Trạng thái này không áp dụng cho buổi học bù.');
+      error.status = 400;
+      throw error;
+    }
     const shouldAutoSend = req.body.sendZalo !== false && absenceStatus !== 'Đi trễ';
     const noticeDelayMinutes = shouldAutoSend ? delayMinutesFromSettings(db.settings || defaultSettings()) : 0;
     db.absences[index] = {
@@ -4031,7 +4083,9 @@ async function ensureAdminUser() {
     await writeDb(rootDb);
   }
 }
-setTimeout(ensureAdminUser, 2000);
+setTimeout(() => {
+  ensureAdminUser().catch(error => console.error('Không thể kiểm tra tài khoản quản trị:', error));
+}, 2000);
 
 app.get('/api/debug', (req, res) => {
   res.json({
@@ -4066,31 +4120,45 @@ app.post('/api/login', async (req, res) => {
 });
 
 const authenticateToken = (req, res, next) => {
+  const routePath = req.originalUrl.split('?')[0];
+  if (
+    (req.method === 'POST' && ['/api/login', '/api/parent/lookup'].includes(routePath)) ||
+    (req.method === 'GET' && ['/api/import/students/template', '/api/public/branches'].includes(routePath)) ||
+    routePath.startsWith('/api/webhook/')
+  ) return next();
+
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  
-  // Cho phép bỏ qua xác thực với một số đường dẫn (webhook, login...)
-  if (req.path === '/api/parent/lookup' || req.path.startsWith('/api/import') || req.path === '/api/login' || req.path.startsWith('/api/chat') || req.path.startsWith('/api/webhook') || req.path.startsWith('/api/upload-evidence')) {
-    return next();
-  }
-
   if (token == null) return res.status(401).json({ error: 'Vui lòng đăng nhập' });
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ error: 'Phiên đăng nhập hết hạn hoặc không hợp lệ' });
     req.user = user;
-    
-    // Kiểm tra quyền truy cập chi nhánh
-    const targetBranch = getBranchId(req);
-    if (user.role !== 'admin' && user.branchId !== 'all' && user.branchId !== targetBranch) {
-       // Allow fetching branch list so they can see their branch
-       if (req.path !== '/api/branches') {
-         return res.status(403).json({ error: 'Bạn không có quyền truy cập chi nhánh này' });
-       }
+    try {
+      if (routePath.startsWith('/api/branches') && req.method !== 'GET' && user.role !== 'admin') {
+        return res.status(403).json({ error: 'Chỉ quản trị viên mới được quản lý cơ sở.' });
+      }
+      if (user.role !== 'admin' && routePath !== '/api/branches' && user.branchId !== getBranchId(req)) {
+        return res.status(403).json({ error: 'Bạn không có quyền truy cập cơ sở này.' });
+      }
+      next();
+    } catch (error) {
+      next(error);
     }
-    next();
   });
 };
+
+app.get('/api/public/branches', async (req, res, next) => {
+  try {
+    const db = await readDb();
+    res.json(Object.entries(db.branches || {}).map(([id, branch]) => ({
+      id,
+      name: branch?.settings?.branchName || (id === 'main' ? 'Cơ sở chính (Main)' : id)
+    })));
+  } catch (error) {
+    next(error);
+  }
+});
 
 app.post('/api/parent/lookup', async (req, res, next) => {
   try {
@@ -4100,32 +4168,27 @@ app.post('/api/parent/lookup', async (req, res, next) => {
     }
 
     const db = await readDb();
+    const branchId = getBranchId(req);
+    const branchData = db.branches?.[branchId];
+    if (!branchData) {
+      const error = new Error('Không tìm thấy cơ sở tra cứu.');
+      error.status = 404;
+      throw error;
+    }
     const nameLower = studentName.toLowerCase().trim();
     const phoneClean = parentPhone.replace(/\D/g, '');
 
-    let matchingStudents = [];
-    let foundBranchId = null;
-
-    for (const [branchId, branchData] of Object.entries(db.branches)) {
-      if (branchData.students) {
-        const matches = branchData.students.filter(s => {
-          const sName = (s.fullName || s.name || '').toLowerCase();
-          const sPhone1 = (s.phone1 || s.phone || '').replace(/\D/g, '');
-          const sPhone2 = (s.phone2 || '').replace(/\D/g, '');
-          return sName.includes(nameLower) && (sPhone1 === phoneClean || sPhone2 === phoneClean);
-        });
-        if (matches.length > 0) {
-          matchingStudents.push(...matches);
-          foundBranchId = branchId;
-        }
-      }
-    }
+    const matchingStudents = (branchData.students || []).filter(s => {
+      const sName = (s.fullName || s.name || '').toLowerCase();
+      const sPhone1 = (s.phone1 || s.phone || '').replace(/\D/g, '');
+      const sPhone2 = (s.phone2 || '').replace(/\D/g, '');
+      return sName.includes(nameLower) && (sPhone1 === phoneClean || sPhone2 === phoneClean);
+    });
 
     if (matchingStudents.length === 0) {
       return res.status(404).json({ error: 'Không tìm thấy học sinh khớp với Tên và SĐT này.' });
     }
 
-    const branchData = db.branches[foundBranchId];
     const matchedIds = matchingStudents.map(s => s.id);
 
     const allEvals = Array.isArray(branchData.evaluations) ? branchData.evaluations : Object.values(branchData.evaluations || {});
@@ -4192,7 +4255,6 @@ app.post('/api/upload-evidence', upload.single('evidence'), async (req, res) => 
   }
 });
 
-app.use('/api', authenticateToken);
 app.get('/api/users', async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Chỉ admin mới xem được' });
   const rootDb = await readDb();
@@ -4248,25 +4310,19 @@ app.delete('/api/users/:username', async (req, res) => {
 app.get('/api/branches', async (req, res, next) => {
   try {
     const rootDb = await readDb();
-    let hasDirty = false;
     const branches = [];
     if (rootDb.branches) {
       for (const id in rootDb.branches) {
         const bObj = rootDb.branches[id] || {};
-        const stCount = (bObj.students || []).length;
         const bSettings = bObj.settings || {};
-
-        if (id.includes('branch_branch_') || id.length > 50 || (id !== 'main' && stCount === 0 && !bSettings.branchName)) {
-          delete rootDb.branches[id];
-          hasDirty = true;
-          continue;
-        }
+        if (req.user.role !== 'admin' && req.user.branchId !== id) continue;
         let bName = bSettings.branchName || (id === 'main' ? 'Cơ sở chính (Main)' : id);
         branches.push({ id, name: bName });
       }
-      if (hasDirty) await writeDb(rootDb);
     }
-    if (!branches.find(b => b.id === 'main')) branches.unshift({ id: 'main', name: 'Cơ sở chính (Main)' });
+    if (req.user.role === 'admin' && !branches.find(b => b.id === 'main')) {
+      branches.unshift({ id: 'main', name: 'Cơ sở chính (Main)' });
+    }
     res.json(branches);
   } catch (error) {
     next(error);
@@ -4300,9 +4356,11 @@ app.delete('/api/branches/:id', async (req, res, next) => {
     const branchId = req.params.id;
     if (branchId === 'main') throw new Error('Không thể xóa cơ sở chính');
     if (!rootDb.branches || !rootDb.branches[branchId]) throw new Error('Không tìm thấy chi nhánh');
-    
-    delete rootDb.branches[branchId];
-    await writeDb(rootDb);
+
+    await getDatabase().ref('/').update({
+      [`branches/${branchId}`]: null,
+      [`ketbu_state_by_branch/${branchId}`]: null
+    });
     res.json({ success: true });
   } catch (error) {
     next(error);

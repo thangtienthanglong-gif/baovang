@@ -1099,7 +1099,7 @@
             
             const res = await fetch('/api/upload-evidence', {
                 method: 'POST',
-                headers: { 'x-branch-id': getBranchId() },
+                headers: { 'x-branch-id': getBranchId(), 'Authorization': 'Bearer ' + getToken() },
                 body: formData
             });
             
@@ -1653,5 +1653,4 @@
 </div>
 </body>
 </html>
-
 

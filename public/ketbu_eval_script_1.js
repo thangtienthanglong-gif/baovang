@@ -49,25 +49,6 @@
             let rawList = Array.isArray(res) ? res : (res ? res.students : []);
             if (!Array.isArray(rawList)) rawList = [];
 
-            // If current branch has no students, fallback to main branch
-            if (rawList.length === 0) {
-                try {
-                    const fallbackRes = await fetch('/api/students', {
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'x-branch-id': 'main',
-                            'X-Branch-Id': 'main',
-                            'Authorization': 'Bearer ' + getToken()
-                        }
-                    });
-                    if (fallbackRes.ok) {
-                        const fallbackData = await fallbackRes.json();
-                        const fallbackList = Array.isArray(fallbackData) ? fallbackData : (fallbackData.students || []);
-                        if (fallbackList.length > 0) rawList = fallbackList;
-                    }
-                } catch(err) {}
-            }
-
             window.allStudentsList = rawList.filter(s => s && typeof s === 'object' && s.status !== 'Nghỉ học');
             const classNames = [...new Set(window.allStudentsList.map(s => String(s.className || '').trim()).filter(Boolean))].sort();
 
@@ -580,7 +561,7 @@
             
             const res = await fetch('/api/upload-evidence', {
                 method: 'POST',
-                headers: { 'x-branch-id': getBranchId() },
+                headers: { 'x-branch-id': getBranchId(), 'Authorization': 'Bearer ' + getToken() },
                 body: formData
             });
             

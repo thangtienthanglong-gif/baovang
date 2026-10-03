@@ -11,6 +11,16 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+const preferredBranchId = new URLSearchParams(window.location.search).get('branchId') || 'main';
+fetch('/api/public/branches')
+  .then(response => response.ok ? response.json() : Promise.reject(new Error('Không tải được cơ sở.')))
+  .then(branches => {
+    const select = $('#branchId');
+    select.replaceChildren(...branches.map(branch => new Option(branch.name, branch.id)));
+    if (branches.some(branch => branch.id === preferredBranchId)) select.value = preferredBranchId;
+  })
+  .catch(error => console.warn(error));
+
 $('#loginBtn').addEventListener('click', async () => {
     const studentName = $('#studentName').value.trim();
     const parentPhone = $('#parentPhone').value.trim();
@@ -29,7 +39,11 @@ $('#loginBtn').addEventListener('click', async () => {
         const res = await fetch('/api/parent/lookup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ studentName, parentPhone })
+            body: JSON.stringify({
+                studentName,
+                parentPhone,
+                branchId: $('#branchId').value
+            })
         });
         const data = await res.json();
         

@@ -211,9 +211,29 @@ function queryString(params) {
   return search.toString();
 }
 
-function downloadUrl(path, params = {}) {
+async function downloadUrl(path, params = {}) {
   const query = queryString(params);
-  window.location.href = query ? `${path}?${query}` : path;
+  try {
+    const response = await fetch(query ? `${path}?${query}` : path, {
+      headers: { 'X-Branch-Id': getActiveBranch(), 'Authorization': 'Bearer ' + getToken() }
+    });
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}));
+      throw new Error(detail.error || 'Không tải được file.');
+    }
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] || 'bao-cao.xlsx';
+    const objectUrl = URL.createObjectURL(await response.blob());
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+  } catch (error) {
+    toast(error.message, 'error');
+  }
 }
 
 function clientTodayISO() {
@@ -768,8 +788,10 @@ function matchesRosterKeyword(student, keyword) {
   return text.includes(keyword);
 }
 
-function absenceForStudent(studentId) {
-  return state.absences.find(row => row.studentId === studentId && row.date === selectedDate());
+function absenceForStudent(studentId, className) {
+  return state.absences.find(row =>
+    row.studentId === studentId && row.date === selectedDate() && (!className || row.className === className)
+  );
 }
 
 function selectedSession() {
@@ -788,14 +810,44 @@ function getClassGrade(className) {
   return String(className || '').trim().match(/^\d+/)?.[0] || '';
 }
 
+function attendanceRosterStudents(dateStr) {
+  const students = activeStudents();
+  const byId = new Map(students.map(student => [student.id, student]));
+  const date = new Date(`${dateStr}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return students;
+  const day = date.getUTCDay();
+  const weekday = String(day === 0 ? 8 : day + 1);
+  const seen = new Set(students.map(student => `${student.id}\u0000${student.className}`));
+  const roster = [...students];
+
+  for (const exception of state.scheduleExceptions || []) {
+    const makeupDay = String(exception.makeupDay || '').toUpperCase() === 'C'
+      ? '8' : String(exception.makeupDay || '');
+    if (makeupDay !== weekday) continue;
+    const student = byId.get(exception.studentId);
+    const makeupClass = String(exception.makeupClass || '').trim();
+    if (!student || !makeupClass || makeupClass === student.className) continue;
+    const key = `${student.id}\u0000${makeupClass}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    roster.push({
+      ...student,
+      className: makeupClass,
+      makeupOriginalClass: student.className,
+      isMakeupAttendance: true
+    });
+  }
+  return roster;
+}
+
 function renderClassDropdown() {
   const dropdown = $('#classDropdown');
   const meta = $('#classDropdownMeta');
-  const rows = activeStudents();
+  const dateStr = selectedDate();
+  const rows = attendanceRosterStudents(dateStr);
   const groups = groupByClass(rows);
   const classNames = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'vi'));
   const activeClass = selectedClass();
-  const dateStr = selectedDate();
   const activeSession = selectedSession();
   const activeDay = selectedDay();
   const gradeDropdown = $('#gradeDropdown');
@@ -867,8 +919,14 @@ function renderRoster(searchMatches) {
   const activeDay = selectedDay();
   const activeGrade = selectedGrade();
   const searchQuery = ($('#quickStudentSearchMain')?.value || '').trim();
+  const rows = attendanceRosterStudents(dateStr);
+  const searchIds = searchQuery
+    ? new Set((searchMatches || findQuickSearchStudents(searchQuery)).map(student => student.id))
+    : null;
   
-  const filtered = searchQuery ? (searchMatches || findQuickSearchStudents(searchQuery)) : activeStudents().filter(student => {
+  const filtered = searchQuery ? rows.filter(student =>
+    searchIds.has(student.id) || normalizeQuickSearch(student.className).includes(normalizeQuickSearch(searchQuery))
+  ) : rows.filter(student => {
     const studentClass = student.className || 'Chưa có lớp';
     if (activeGrade !== 'ALL' && getClassGrade(studentClass) !== activeGrade) return false;
     const info = getClassScheduleInfo(studentClass, dateStr, activeDay);
@@ -883,7 +941,7 @@ function renderRoster(searchMatches) {
   });
   const visibleStudents = searchQuery ? filtered.slice(0, QUICK_SEARCH_ROSTER_LIMIT) : filtered;
 
-  const absentCount = visibleStudents.filter(student => absenceForStudent(student.id)).length;
+  const absentCount = visibleStudents.filter(student => absenceForStudent(student.id, student.className)).length;
 
   $('#rosterTitle').textContent = className === 'ALL' ? 'Danh sách học sinh' : `Lớp ${className}`;
   $('#rosterMeta').textContent = searchQuery && filtered.length > QUICK_SEARCH_ROSTER_LIMIT
@@ -919,7 +977,7 @@ function renderRoster(searchMatches) {
 }
 
 function renderRosterStudent(student) {
-  const absence = absenceForStudent(student.id);
+  const absence = absenceForStudent(student.id, student.className);
   const currentStatus = absence ? normalizeAbsenceStatus(absence.absenceStatus) : 'Đang học';
   const phone = student.phone1 || student.phone2 || 'Chưa có SĐT';
   const statusOptions = [
@@ -927,10 +985,11 @@ function renderRosterStudent(student) {
     ['Vắng', 'Vắng'],
     ['Có phép', 'Có phép'],
     ['Đi trễ', 'Đi trễ'],
-    ['Về sớm', 'Về sớm'],
-    ['Nghỉ học', 'Nghỉ học'],
-    ['Học phí', 'Trễ học phí']
+    ['Về sớm', 'Về sớm']
   ];
+  if (!student.isMakeupAttendance) {
+    statusOptions.push(['Nghỉ học', 'Nghỉ học'], ['Học phí', 'Trễ học phí']);
+  }
   if (!statusOptions.some(([value]) => value === currentStatus)) {
     statusOptions.push([currentStatus, currentStatus]);
   }
@@ -944,12 +1003,14 @@ function renderRosterStudent(student) {
             ${student.recentAbsenceCount >= 3 ? `<span title="Vắng ${student.recentAbsenceCount} buổi trong 30 ngày qua" style="color: #ef4444; font-size: 14px; margin-left: 4px;">⚠️ (${student.recentAbsenceCount})</span>` : ''}
           </div>
           <div class="student-phone">${escapeHtml(phone)}</div>
-          ${(state.scheduleExceptions || []).filter(e => e.studentId === student.id).map(e => `<div style="font-size:12px; color:#3b82f6; margin-top:4px; font-weight:600;"><i class="fa-solid fa-repeat"></i> Kẹt ${scheduleDayLabel(e.stuckDay)} ➔ ${e.type === 'hoc_bu' ? 'Học bù' : 'Bù tạm'} ${scheduleDayLabel(e.makeupDay)} (${e.makeupClass})</div>`).join('')}
+          ${student.isMakeupAttendance
+            ? `<div style="font-size:12px; color:#0d9488; margin-top:4px; font-weight:600;"><i class="fa-solid fa-repeat"></i> Học bù từ lớp ${escapeHtml(student.makeupOriginalClass)}</div>`
+            : (state.scheduleExceptions || []).filter(e => e.studentId === student.id).map(e => `<div style="font-size:12px; color:#3b82f6; margin-top:4px; font-weight:600;"><i class="fa-solid fa-repeat"></i> Kẹt ${scheduleDayLabel(e.stuckDay)} ➔ ${e.type === 'hoc_bu' ? 'Học bù' : 'Bù tạm'} ${scheduleDayLabel(e.makeupDay)} (${escapeHtml(e.makeupClass)})</div>`).join('')}
         </div>
       </div>
       <div class="student-status-control">
-        <label for="status-${escapeHtml(student.id)}">Trạng thái</label>
-        <select id="status-${escapeHtml(student.id)}" class="roster-status-select" data-student-id="${escapeHtml(student.id)}" data-absence-id="${escapeHtml(absence?.id || '')}">
+        <label for="status-${escapeHtml(student.id)}-${escapeHtml(student.className)}">Trạng thái</label>
+        <select id="status-${escapeHtml(student.id)}-${escapeHtml(student.className)}" class="roster-status-select" data-student-id="${escapeHtml(student.id)}" data-attendance-class="${escapeHtml(student.className)}" data-absence-id="${escapeHtml(absence?.id || '')}">
           ${statusOptions.map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === currentStatus ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}
         </select>
       </div>
@@ -1329,6 +1390,7 @@ function queuedMessage(result) {
 
 async function updateRosterStatus(select) {
   const studentId = select.dataset.studentId;
+  const attendanceClass = select.dataset.attendanceClass;
   const absenceId = select.dataset.absenceId;
   const status = normalizeAbsenceStatus(select.value);
 
@@ -1356,7 +1418,7 @@ async function updateRosterStatus(select) {
   }
 
   const student = state.students.find(s => s.id === studentId);
-  const className = student?.className || '';
+  const className = attendanceClass || student?.className || '';
   const sessionInfo = getClassScheduleInfo(className, selectedDate(), selectedDay());
 
   const result = await api('/api/absences', {
@@ -1364,6 +1426,7 @@ async function updateRosterStatus(select) {
     body: JSON.stringify({
       date: selectedDate(),
       studentId,
+      attendanceClass: className,
       session: sessionInfo.sessionName,
       absenceStatus: status,
       initialReason: status,
@@ -1442,7 +1505,7 @@ async function openZaloAndPasteMessage(message, link = '') {
     try {
       const localResponse = await fetch('http://127.0.0.1:3000/api/local-zalo/open-paste', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Branch-Id': getActiveBranch(), 'Authorization': 'Bearer ' + getToken() },
         body: JSON.stringify({ message, link })
       });
       await handleResponse(localResponse);
@@ -1456,7 +1519,7 @@ async function openZaloAndPasteMessage(message, link = '') {
       try {
         const localResponse = await fetch('http://localhost:3000/api/local-zalo/open-paste', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-Branch-Id': getActiveBranch(), 'Authorization': 'Bearer ' + getToken() },
           body: JSON.stringify({ message, link })
         });
         await handleResponse(localResponse);
@@ -1470,7 +1533,7 @@ async function openZaloAndPasteMessage(message, link = '') {
     if (!success) {
       const response = await fetch('/api/local-zalo/open-paste', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Branch-Id': getActiveBranch(), 'Authorization': 'Bearer ' + getToken() },
         body: JSON.stringify({ message, link })
       });
       await handleResponse(response);
@@ -2611,6 +2674,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   initEvents();
   initChatbox();
   try {
+    await loadBranches();
     await loadBootstrap();
     setInterval(() => {
       if (activeTabId() === 'queueTab') {
@@ -2640,8 +2704,8 @@ async function loadBranches() {
     if (branches.find(b => b.id === active)) {
       branchSelector.value = active;
     } else {
-      branchSelector.value = 'main';
-      localStorage.setItem('activeBranch', 'main');
+      branchSelector.value = branches[0]?.id || 'main';
+      localStorage.setItem('activeBranch', branchSelector.value);
     }
     
     const delBtn = document.getElementById('delBranchBtn');
@@ -2656,8 +2720,6 @@ async function loadBranches() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  loadBranches();
-  
   const branchSelector = document.getElementById('branchSelector');
   if (branchSelector) {
     branchSelector.addEventListener('change', (e) => {
