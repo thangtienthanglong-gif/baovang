@@ -1,3 +1,4 @@
+(() => {
 const isBaoVang = location.hostname === 'baovang.vercel.app';
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -205,3 +206,5 @@ if (isBaoVang) {
     return true;
   });
 }
+
+})();
