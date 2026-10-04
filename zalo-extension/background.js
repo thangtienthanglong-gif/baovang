@@ -17,26 +17,39 @@ async function sendToApp(message) {
   try { await chrome.tabs.sendMessage(state.appTabId, message); } catch (_) {}
 }
 
-async function findOrOpenZaloTab() {
-  const activeTabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true, url: ['https://chat.zalo.me/*', 'https://zalo.me/*'] });
-  const tabs = activeTabs.length ? activeTabs : await chrome.tabs.query({ url: ['https://chat.zalo.me/*', 'https://zalo.me/*'] });
-  if (tabs[0]?.id != null) {
-    state.zaloTabId = tabs[0].id;
-    await chrome.tabs.update(state.zaloTabId, { active: true });
-    return state.zaloTabId;
-  }
-  const tab = await chrome.tabs.create({ url: 'https://chat.zalo.me/', active: true });
-  state.zaloTabId = tab.id;
+async function waitForTabComplete(tabId, timeoutMs = 20000) {
+  const current = await chrome.tabs.get(tabId).catch(() => null);
+  if (current?.status === 'complete') return;
   await new Promise(resolve => {
-    const listener = (tabId, info) => {
-      if (tabId === state.zaloTabId && info.status === 'complete') {
+    const listener = (updatedTabId, info) => {
+      if (updatedTabId === tabId && info.status === 'complete') {
         chrome.tabs.onUpdated.removeListener(listener);
         resolve();
       }
     };
     chrome.tabs.onUpdated.addListener(listener);
-    setTimeout(() => { chrome.tabs.onUpdated.removeListener(listener); resolve(); }, 20000);
+    setTimeout(() => {
+      chrome.tabs.onUpdated.removeListener(listener);
+      resolve();
+    }, timeoutMs);
   });
+}
+
+async function findOrOpenZaloTab() {
+  const activeTabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true, url: 'https://chat.zalo.me/*' });
+  const tabs = activeTabs.length ? activeTabs : await chrome.tabs.query({ url: 'https://chat.zalo.me/*' });
+  if (tabs[0]?.id != null) {
+    state.zaloTabId = tabs[0].id;
+    await chrome.tabs.update(state.zaloTabId, { active: true });
+    if (tabs[0].windowId != null) await chrome.windows.update(tabs[0].windowId, { focused: true });
+    // Reload so an extension update cannot leave an old content script in the tab.
+    await chrome.tabs.reload(state.zaloTabId);
+    await waitForTabComplete(state.zaloTabId);
+    return state.zaloTabId;
+  }
+  const tab = await chrome.tabs.create({ url: 'https://chat.zalo.me/', active: true });
+  state.zaloTabId = tab.id;
+  await waitForTabComplete(state.zaloTabId);
   return state.zaloTabId;
 }
 
@@ -140,6 +153,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   if (message?.type === 'BAOVANG_GET_STATUS') {
     sendResponse({ ok: true, running: state.running, index: state.index, total: state.items.length });
+    return;
   }
-  return true;
 });

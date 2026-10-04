@@ -108,18 +108,27 @@ function findSendButton(composer) {
 
 function findSearchResult(phone) {
   const normalizedPhone = String(phone || '').replace(/\D/g, '');
-  const candidates = allVisible([
+  const preferred = allVisible([
     '[role="option"]',
-    'li',
     '[class*="search"] [class*="item"]',
+    '[class*="search"] [role="button"]',
     '[class*="friend"]',
     '[class*="contact"]',
     '[class*="user-item"]'
-  ]);
-  return candidates.filter(el => {
+  ]).filter(el => textOf(el).length > 0);
+  const exact = preferred.filter(el => {
     const digits = textOf(el).replace(/\D/g, '');
     return normalizedPhone && digits.includes(normalizedPhone.slice(-8));
-  }).sort((a, b) => textOf(a).length - textOf(b).length)[0] || null;
+  }).sort((a, b) => textOf(a).length - textOf(b).length)[0];
+  if (exact) return exact;
+
+  // Khi tìm bằng số điện thoại, Zalo thường chỉ hiện tên tài khoản trong kết quả.
+  // Ưu tiên phần tử kết quả nhỏ nhất để tránh click cả khung danh sách.
+  return preferred.sort((a, b) => {
+    const ar = a.getBoundingClientRect();
+    const br = b.getBoundingClientRect();
+    return (ar.width * ar.height) - (br.width * br.height);
+  })[0] || null;
 }
 
 function skippedError(message) {
@@ -130,12 +139,13 @@ function skippedError(message) {
 
 async function openConversation(item, search) {
   emitInput(search, item.phone);
-  const result = await waitFor(() => findSearchResult(item.phone), 6000);
+  await wait(800);
+  const result = await waitFor(() => findSearchResult(item.phone), 7000);
   if (!result) throw skippedError(`Không tìm thấy kết quả Zalo khớp số ${item.phone}; chưa gửi tin.`);
   clickLike(result);
   // The previous chat's composer may still be mounted while Zalo switches chats.
   await wait(1200);
-  const composer = await waitFor(findComposer, 4500);
+  const composer = await waitFor(findComposer, 6500);
   if (!composer) throw skippedError(`Không mở được cuộc trò chuyện của số ${item.phone}.`);
   return composer;
 }
