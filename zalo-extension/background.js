@@ -17,7 +17,8 @@ async function sendToApp(message) {
 }
 
 async function findOrOpenZaloTab() {
-  const tabs = await chrome.tabs.query({ url: ['https://chat.zalo.me/*', 'https://zalo.me/*'] });
+  const activeTabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true, url: ['https://chat.zalo.me/*', 'https://zalo.me/*'] });
+  const tabs = activeTabs.length ? activeTabs : await chrome.tabs.query({ url: ['https://chat.zalo.me/*', 'https://zalo.me/*'] });
   if (tabs[0]?.id != null) {
     state.zaloTabId = tabs[0].id;
     await chrome.tabs.update(state.zaloTabId, { active: true });
