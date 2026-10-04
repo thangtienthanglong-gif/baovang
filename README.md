@@ -26,6 +26,7 @@
 - Ghi nhận vắng học theo ngày, buổi, trạng thái.
 - Tự động xếp lịch gửi Zalo OA sau số phút cấu hình.
 - Gửi lại Zalo thủ công cho từng học sinh.
+- Auto gửi tuần tự qua tiện ích Chrome/Edge khi chọn chế độ `personal-real`.
 - Gọi điện thủ công bằng nút `tel:`.
 - Lưu lịch sử gọi điện.
 - Lưu lịch sử gửi Zalo OA.
@@ -74,6 +75,17 @@ http://localhost:3000
 ```
 
 ## Cấu hình Zalo OA
+
+## Auto Zalo cá nhân qua Chrome/Edge
+
+Chế độ `personal-real` dùng tiện ích trong thư mục `zalo-extension` trên Chrome/Edge đã đăng nhập Zalo Web. Khi bấm **Gửi Zalo hàng loạt**, giao diện chuyển hàng đợi sang extension; extension mở Zalo Web, tìm theo số điện thoại, điền và gửi tuần tự từng tin, cập nhật trạng thái sau mỗi tin và tự dừng khi gặp lỗi.
+
+Trước khi chạy thật:
+
+1. Cài thư mục `zalo-extension` bằng **Load unpacked** trong `chrome://extensions` hoặc `edge://extensions`.
+2. Mở `https://chat.zalo.me/` và đăng nhập Zalo Web.
+3. Chọn chế độ `Zalo cá nhân` trong cấu hình app.
+4. Gửi thử 1 học sinh, sau đó mới gửi hàng loạt.
 
 Có hai cách cấu hình:
 
