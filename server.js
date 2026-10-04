@@ -3745,7 +3745,16 @@ app.post('/api/absences/:id/zalo/manual-sent', async (req, res, next) => {
       updatedAt: time
     };
 
-    const existingLogIndex = db.notificationLogs.findIndex(l => l.absenceId === absence.id && l.status === 'Chờ gửi thủ công');
+    const requestedLogId = String(req.body?.logId || '');
+    let existingLogIndex = requestedLogId
+      ? db.notificationLogs.findIndex(l => l.id === requestedLogId && l.absenceId === absence.id && ['Chờ gửi thủ công', 'Lỗi gửi'].includes(l.status) && l.channel === 'Zalo cá nhân')
+      : -1;
+    if (existingLogIndex === -1) {
+      existingLogIndex = db.notificationLogs.findLastIndex(l => l.absenceId === absence.id && l.status === 'Chờ gửi thủ công');
+    }
+    if (existingLogIndex === -1) {
+      existingLogIndex = db.notificationLogs.findLastIndex(l => l.absenceId === absence.id && l.status === 'Lỗi gửi' && l.channel === 'Zalo cá nhân');
+    }
     
     let log;
     if (existingLogIndex !== -1) {
@@ -3798,11 +3807,13 @@ app.post('/api/absences/:id/zalo/manual-error', async (req, res, next) => {
     const time = nowISO();
     const settings = db.settings || defaultSettings();
     const message = buildMessage(settings, absence, student);
+    const errorDetail = String(req.body?.error || '').trim().slice(0, 300);
+    const errorResult = errorDetail ? `Zalo Web: ${errorDetail}` : 'Zalo Web chưa xác nhận tin đã gửi.';
 
     db.absences[index] = {
       ...absence,
       noticeStatus: 'Lỗi gửi',
-      noticeResult: 'Lỗi: Không kết nối được ZaloHelper nội bộ.',
+      noticeResult: errorResult,
       noticeSentAt: time,
       noticeDueAt: '',
       autoNotice: false,
@@ -3815,7 +3826,7 @@ app.post('/api/absences/:id/zalo/manual-error', async (req, res, next) => {
     if (existingLogIndex !== -1) {
       log = db.notificationLogs[existingLogIndex];
       log.status = 'Lỗi gửi';
-      log.result = 'Lỗi: Không kết nối được ZaloHelper nội bộ.';
+      log.result = errorResult;
       log.time = time;
     } else {
       log = {
@@ -3834,7 +3845,7 @@ app.post('/api/absences/:id/zalo/manual-error', async (req, res, next) => {
         reason: 'personal_manual_failed',
         message,
         status: 'Lỗi gửi',
-        result: 'Lỗi: Không kết nối được ZaloHelper nội bộ.',
+        result: errorResult,
         responsePayload: { manual: true }
       };
       db.notificationLogs.push(log);

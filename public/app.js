@@ -1391,9 +1391,10 @@ async function loadNotices() {
             </button>
           ` : ''}
           ${row.status === 'Lỗi gửi' && row.absenceId ? `
-            <button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${row.absenceId}" data-logid="${row.id}" data-msg="${escapeHtml(row.message || '')}" data-link="${escapeHtml(row.responsePayload?.link || '')}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">
+            <button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${row.absenceId}" data-logid="${row.id}" data-msg="${escapeHtml(row.message || '')}" data-phone="${escapeHtml(row.responsePayload?.phone || row.phone1 || '')}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">
               Gửi lại
             </button>
+            ${row.channel === 'Zalo cá nhân' ? `<button class="btn ghost btn-sm confirm-zalo-sent-btn" type="button" data-id="${row.absenceId}" data-logid="${row.id}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Xác nhận đã gửi</button>` : ''}
           ` : ''}
         </div>
       </td>
@@ -1793,7 +1794,10 @@ function startZaloExtensionAuto(items) {
         const item = items.find(row => row.id === data.itemId);
         if (item?.absenceId) {
           updateChain = updateChain.then(() =>
-            api(`/api/absences/${item.absenceId}/zalo/${data.ok ? 'manual-sent' : 'manual-error'}`, { method: 'POST', body: '{}' })
+            api(`/api/absences/${item.absenceId}/zalo/${data.ok ? 'manual-sent' : 'manual-error'}`, {
+              method: 'POST',
+              body: JSON.stringify(data.ok ? {} : { error: data.error || '' })
+            })
           ).catch(error => console.error('Không cập nhật được trạng thái extension:', error));
         }
         if (!data.ok && data.skipped) toast(`Đã bỏ qua ${item?.phone || 'học sinh'}: ${data.error || 'không tìm thấy trên Zalo.'}`, 'error');
@@ -2557,26 +2561,36 @@ function initEvents() {
       return;
     }
 
+    const confirmBtn = event.target.closest('.confirm-zalo-sent-btn');
+    if (confirmBtn) {
+      confirmBtn.disabled = true;
+      try {
+        await api(`/api/absences/${confirmBtn.dataset.id}/zalo/manual-sent`, {
+          method: 'POST',
+          body: JSON.stringify({ logId: confirmBtn.dataset.logid })
+        });
+        toast('Đã cập nhật trạng thái: tin đã gửi trên Zalo.');
+        await Promise.all([loadNotices(), loadAbsences()]);
+      } catch (err) {
+        confirmBtn.disabled = false;
+        toast('Không cập nhật được trạng thái: ' + err.message, 'error');
+      }
+      return;
+    }
+
     const retryBtn = event.target.closest('.retry-zalo-btn');
     if (retryBtn) {
       const id = retryBtn.dataset.id;
       const logId = retryBtn.dataset.logid;
       const msg = retryBtn.dataset.msg;
-      const link = retryBtn.dataset.link;
+      const phone = retryBtn.dataset.phone;
 
       retryBtn.disabled = true;
       retryBtn.textContent = '...';
 
       if (msg) {
         try {
-          const ok = await openZaloAndPasteMessage(msg, link);
-          if (ok === 'STRANGER') {
-            await api(`/api/notification-logs/${logId}/mark-unfriended`, { method: 'POST' });
-            toast('Đã đánh dấu: Chưa kết bạn.');
-          } else if (ok) {
-            await api(`/api/absences/${id}/zalo/manual-sent`, { method: 'POST', body: '{}' });
-            toast('Đã đánh dấu gửi thành công qua Zalo cá nhân.');
-          }
+          await sendSingleViaZaloExtension({ id: logId || `retry-${id}`, absenceId: id, phone, message: msg });
         } catch (err) {
           console.error(err);
           toast('Lỗi khi thao tác Zalo: ' + err.message);
