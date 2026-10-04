@@ -1772,13 +1772,17 @@ function startZaloExtensionAuto(items) {
           api(`/api/absences/${item.absenceId}/zalo/${data.ok ? 'manual-sent' : 'manual-error'}`, { method: 'POST', body: '{}' })
             .catch(error => console.error('Không cập nhật được trạng thái extension:', error));
         }
-        if (!data.ok) toast(`Auto đã dừng: ${data.error || 'Zalo Web không gửi được tin.'}`, 'error');
+        if (!data.ok && data.skipped) toast(`Đã bỏ qua ${item?.phone || 'học sinh'}: ${data.error || 'không tìm thấy trên Zalo.'}`, 'error');
+        if (!data.ok && !data.skipped) toast(`Auto đã dừng: ${data.error || 'Zalo Web không gửi được tin.'}`, 'error');
         return;
       }
       if (data.type === 'BAOVANG_EXTENSION_STATUS' && ['completed', 'stopped', 'error'].includes(data.status)) {
         window.removeEventListener('message', onMessage);
         clearTimeout(timeout);
-        if (data.status === 'completed') toast(`Auto Zalo hoàn tất: ${data.completed || items.length}/${data.total || items.length} tin.`);
+        if (data.status === 'completed') {
+          const skipped = data.skipped ? `, bỏ qua ${data.skipped}` : '';
+          toast(`Auto Zalo hoàn tất: ${data.completed || items.length}/${data.total || items.length} tin${skipped}.`);
+        }
         resolve(data.status === 'completed');
       }
     }
