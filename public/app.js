@@ -565,7 +565,7 @@ function renderZaloModeFields() {
 
   if (note) {
     const notes = {
-      'personal-real': 'Zalo cá nhân gửi thật theo cách thủ công: hệ thống tạo tối đa 3-5 tin, giáo viên bấm Nhắn tin, kiểm tra nội dung trong Zalo rồi bấm gửi.',
+      'personal-real': 'Zalo cá nhân Auto: tiện ích Chrome/Edge mở đúng cuộc trò chuyện, điền và gửi tuần tự; sẽ dừng khi gặp lỗi.',
       'personal-test': 'Zalo cá nhân chạy thử: hệ thống chỉ tạo log và nội dung mẫu cho tối đa 3-5 học sinh, chưa gửi thật.',
       oa: 'Zalo OA gửi thật bằng endpoint và access token OA. Chỉ bật chế độ này khi token đã sẵn sàng.',
       'dry-run': 'Chạy thử chỉ ghi log nội dung tin nhắn, không gửi Zalo thật.'
@@ -1732,12 +1732,59 @@ async function sendBulkZalo(button) {
       method: 'POST',
       body: JSON.stringify({ filters: getFilters() })
     });
-    toast(bulkZaloMessage(result));
+    const manualLogs = (result.logs || []).filter(log => log.status === 'Chờ gửi thủ công');
+    if (state.settings?.zaloMode === 'personal-real' && manualLogs.length) {
+      const items = manualLogs.map(log => ({
+        id: log.id,
+        absenceId: log.absenceId,
+        phone: log.responsePayload?.phone || log.phone1 || '',
+        message: log.responsePayload?.message || log.message || ''
+      }));
+      const started = await startZaloExtensionAuto(items);
+      if (!started) toast('Chưa khởi động được extension Auto Zalo. Hãy cài và bật extension trên Chrome/Edge.', 'error');
+    } else {
+      toast(bulkZaloMessage(result));
+    }
     renderManualSendPanel(result.logs || []);
     await loadAbsences();
   } finally {
     button.disabled = false;
   }
+}
+
+function startZaloExtensionAuto(items) {
+  return new Promise(resolve => {
+    const timeout = setTimeout(() => {
+      window.removeEventListener('message', onMessage);
+      resolve(false);
+    }, 12000);
+    function onMessage(event) {
+      if (event.source !== window || event.data?.source !== 'baovang-zalo-extension') return;
+      const data = event.data;
+      if (data.type === 'BAOVANG_EXTENSION_STATUS' && data.status === 'started') {
+        clearTimeout(timeout);
+        toast(`Extension đang Auto gửi ${data.total || items.length} tin qua Zalo Web...`);
+        return;
+      }
+      if (data.type === 'BAOVANG_EXTENSION_RESULT') {
+        const item = items.find(row => row.id === data.itemId);
+        if (item?.absenceId) {
+          api(`/api/absences/${item.absenceId}/zalo/${data.ok ? 'manual-sent' : 'manual-error'}`, { method: 'POST', body: '{}' })
+            .catch(error => console.error('Không cập nhật được trạng thái extension:', error));
+        }
+        if (!data.ok) toast(`Auto đã dừng: ${data.error || 'Zalo Web không gửi được tin.'}`, 'error');
+        return;
+      }
+      if (data.type === 'BAOVANG_EXTENSION_STATUS' && ['completed', 'stopped', 'error'].includes(data.status)) {
+        window.removeEventListener('message', onMessage);
+        clearTimeout(timeout);
+        if (data.status === 'completed') toast(`Auto Zalo hoàn tất: ${data.completed || items.length}/${data.total || items.length} tin.`);
+        resolve(data.status === 'completed');
+      }
+    }
+    window.addEventListener('message', onMessage);
+    window.postMessage({ source: 'baovang-app', type: 'START_AUTO', items }, '*');
+  });
 }
 
 function exportLateAbsences(params = {}) {
