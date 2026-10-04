@@ -5,6 +5,7 @@ const state = {
   zaloTabId: null,
   items: [],
   index: 0,
+  sent: 0,
   skipped: 0,
   failed: 0
 };
@@ -41,14 +42,19 @@ async function findOrOpenZaloTab() {
 
 async function sendItemToZalo(tabId, item) {
   try {
-    return await chrome.tabs.sendMessage(tabId, { type: 'BAOVANG_ZALO_ITEM', item });
+    const response = await chrome.tabs.sendMessage(tabId, { type: 'BAOVANG_ZALO_ITEM', item });
+    if (!response?.accepted) throw new Error('Zalo Web không xác nhận đã nhận tin nhắn.');
+    return response;
   } catch (firstError) {
+    if (!/Receiving end does not exist|Could not establish connection/i.test(firstError.message || '')) throw firstError;
     // Tab Zalo có thể đã mở trước khi extension được tải. Khi đó content.js
     // chưa tồn tại trong tab; tiêm lại rồi gửi lần nữa.
     try {
       await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
       await sleep(500);
-      return await chrome.tabs.sendMessage(tabId, { type: 'BAOVANG_ZALO_ITEM', item });
+      const response = await chrome.tabs.sendMessage(tabId, { type: 'BAOVANG_ZALO_ITEM', item });
+      if (!response?.accepted) throw new Error('Zalo Web không xác nhận đã nhận tin nhắn.');
+      return response;
     } catch (secondError) {
       throw new Error(`Không kết nối được với Zalo Web: ${secondError.message || firstError.message}`);
     }
@@ -65,7 +71,10 @@ async function processQueue() {
     let response;
     try {
       response = await new Promise(async resolve => {
-        const timeout = setTimeout(() => resolve({ ok: false, error: 'Zalo Web không phản hồi trong 30 giây.' }), 30000);
+        const timeout = setTimeout(() => {
+          chrome.runtime.onMessage.removeListener(listener);
+          resolve({ ok: false, error: 'Zalo Web không phản hồi trong 45 giây.' });
+        }, 45000);
         const listener = (message, sender) => {
           if (sender.tab?.id !== zaloTabId || message?.type !== 'BAOVANG_ZALO_ITEM_RESULT' || message.itemId !== item.id) return;
           clearTimeout(timeout);
@@ -80,7 +89,8 @@ async function processQueue() {
       response = { ok: false, error: error.message };
     }
     await sendToApp({ type: 'BAOVANG_EXTENSION_RESULT', itemId: item.id, absenceId: item.absenceId, ok: Boolean(response.ok), skipped: Boolean(response.skipped), error: response.error || '' });
-    if (!response.ok) {
+    if (response.ok) state.sent += 1;
+    else {
       if (response.skipped) state.skipped += 1;
       else state.failed += 1;
       // Số không có trên Zalo/người lạ chỉ là một mục bị bỏ qua,
@@ -96,7 +106,8 @@ async function processQueue() {
   await sendToApp({
     type: 'BAOVANG_EXTENSION_STATUS',
     status: state.stopped ? 'stopped' : 'completed',
-    completed: Math.min(state.index + (state.stopped ? 0 : 1), state.items.length),
+    completed: state.sent + state.skipped + state.failed,
+    sent: state.sent,
     skipped: state.skipped,
     failed: state.failed,
     total: state.items.length
@@ -106,9 +117,14 @@ async function processQueue() {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === 'BAOVANG_START_AUTO') {
     if (state.running) { sendResponse({ ok: false, error: 'Auto đang chạy.' }); return; }
+    if (!Array.isArray(message.items) || !message.items.length) {
+      sendResponse({ ok: false, error: 'Không có tin nhắn nào để gửi.' });
+      return;
+    }
     state.appTabId = sender.tab?.id ?? message.appTabId ?? null;
-    state.items = Array.isArray(message.items) ? message.items : [];
+    state.items = message.items;
     state.index = 0;
+    state.sent = 0;
     state.skipped = 0;
     state.failed = 0;
     state.stopped = false;

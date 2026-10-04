@@ -10,7 +10,9 @@
 6. Mở `https://chat.zalo.me/` và đăng nhập Zalo Web.
 7. Trong BaoVang chọn Zalo cá nhân rồi bấm gửi hàng loạt.
 
-Extension tự mở Zalo Web, tìm theo số điện thoại, điền tin và gửi tuần tự. Khi gặp lỗi, nó dừng và trả trạng thái về BaoVang.
+Sau khi cập nhật mã extension, bấm **Reload / Tải lại** tại trang tiện ích và tải lại cả tab BaoVang lẫn Zalo Web để content script mới được nạp.
+
+Extension tự mở Zalo Web, tìm theo số điện thoại, điền tin và gửi tuần tự. Số không tìm thấy trong kết quả Zalo được bỏ qua; lỗi mở hoặc gửi tin sẽ dừng hàng đợi và báo lý do về BaoVang.
 
 ## Lưu ý
 

@@ -116,10 +116,10 @@ function findSearchResult(phone) {
     '[class*="contact"]',
     '[class*="user-item"]'
   ]);
-  return candidates.find(el => {
+  return candidates.filter(el => {
     const digits = textOf(el).replace(/\D/g, '');
     return normalizedPhone && digits.includes(normalizedPhone.slice(-8));
-  }) || null;
+  }).sort((a, b) => textOf(a).length - textOf(b).length)[0] || null;
 }
 
 function skippedError(message) {
@@ -130,25 +130,19 @@ function skippedError(message) {
 
 async function openConversation(item, search) {
   emitInput(search, item.phone);
-  await wait(700);
-  keyEnter(search);
-  await wait(1600);
-
-  let composer = await waitFor(findComposer, 4500);
-  if (composer) return composer;
-
-  // Nếu Enter chỉ mở danh sách kết quả, click đúng kết quả rồi chờ ô chat.
-  const result = findSearchResult(item.phone);
-  if (result) {
-    clickLike(result);
-    await wait(1600);
-    composer = await waitFor(findComposer, 4500);
-  }
-  if (!composer) throw skippedError(`Không tìm thấy học sinh hoặc số ${item.phone} không dùng Zalo.`);
+  const result = await waitFor(() => findSearchResult(item.phone), 6000);
+  if (!result) throw skippedError(`Không tìm thấy kết quả Zalo khớp số ${item.phone}; chưa gửi tin.`);
+  clickLike(result);
+  // The previous chat's composer may still be mounted while Zalo switches chats.
+  await wait(1200);
+  const composer = await waitFor(findComposer, 4500);
+  if (!composer) throw skippedError(`Không mở được cuộc trò chuyện của số ${item.phone}.`);
   return composer;
 }
 
 async function sendOne(item) {
+  if (!String(item?.phone || '').replace(/\D/g, '')) throw skippedError('Thiếu số điện thoại Zalo; đã bỏ qua tin này.');
+  if (!String(item?.message || '').trim()) throw skippedError('Tin nhắn trống; đã bỏ qua tin này.');
   const search = await waitFor(findSearchBox, 8000);
   if (!search) throw new Error('Không tìm thấy ô tìm kiếm Zalo Web.');
 
@@ -188,12 +182,22 @@ if (isBaoVang) {
   });
   window.addEventListener('message', event => {
     if (event.source !== window || event.data?.source !== 'baovang-app') return;
-    if (event.data.type === 'START_AUTO') chrome.runtime.sendMessage({ type: 'BAOVANG_START_AUTO', items: event.data.items });
+    if (event.data.type === 'START_AUTO') {
+      chrome.runtime.sendMessage({ type: 'BAOVANG_START_AUTO', items: event.data.items })
+        .then(response => {
+          if (response?.ok) return;
+          window.postMessage({ source: 'baovang-zalo-extension', type: 'BAOVANG_EXTENSION_STATUS', status: 'error', error: response?.error || 'Extension không khởi động được.' }, location.origin);
+        })
+        .catch(error => window.postMessage({ source: 'baovang-zalo-extension', type: 'BAOVANG_EXTENSION_STATUS', status: 'error', error: error.message }, location.origin));
+    }
     if (event.data.type === 'STOP_AUTO') chrome.runtime.sendMessage({ type: 'BAOVANG_STOP_AUTO' });
   });
 } else {
-  chrome.runtime.onMessage.addListener((message) => {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message?.type !== 'BAOVANG_ZALO_ITEM') return;
+    // Acknowledge receipt now; the completed send is reported separately below.
+    // Returning true without ever calling sendResponse leaves tabs.sendMessage pending.
+    sendResponse({ accepted: true });
     sendOne(message.item)
       .then(result => chrome.runtime.sendMessage({ type: 'BAOVANG_ZALO_ITEM_RESULT', itemId: message.item.id, ...result }))
       .catch(error => chrome.runtime.sendMessage({
@@ -203,7 +207,6 @@ if (isBaoVang) {
         skipped: Boolean(error.skipped),
         error: error.message
       }));
-    return true;
   });
 }
 

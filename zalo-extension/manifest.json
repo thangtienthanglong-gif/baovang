@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BaoVang - Auto Zalo Web",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Gửi tuần tự thông báo báo vắng từ BaoVang qua Zalo Web.",
   "permissions": ["tabs", "storage", "scripting"],
   "host_permissions": ["https://baovang.vercel.app/*", "https://chat.zalo.me/*", "https://zalo.me/*"],

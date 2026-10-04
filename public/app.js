@@ -1523,9 +1523,7 @@ async function sendSingleViaZaloExtension({ id, absenceId, phone, message, link 
     window.open(webUrl, '_blank', 'noopener');
     await new Promise(resolve => setTimeout(resolve, 1200));
   }
-  const started = await startZaloExtensionAuto([{ id, absenceId, phone, message }]);
-  if (!started) toast('Extension chưa kết nối được với Zalo Web. Hãy mở và đăng nhập Zalo Web trước.', 'error');
-  return started;
+  return startZaloExtensionAuto([{ id, absenceId, phone, message }]);
 }
 
 async function copyMessageAndOpenZalo(message, link = '') {
@@ -1767,8 +1765,7 @@ async function sendBulkZalo(button) {
         phone: log.responsePayload?.phone || log.phone1 || '',
         message: log.responsePayload?.message || log.message || ''
       }));
-      const started = await startZaloExtensionAuto(items);
-      if (!started) toast('Chưa khởi động được extension Auto Zalo. Hãy cài và bật extension trên Chrome/Edge.', 'error');
+      await startZaloExtensionAuto(items);
     } else {
       toast(bulkZaloMessage(result));
     }
@@ -1781,23 +1778,32 @@ async function sendBulkZalo(button) {
 
 function startZaloExtensionAuto(items) {
   return new Promise(resolve => {
-    const timeout = setTimeout(() => {
-      window.removeEventListener('message', onMessage);
-      resolve(false);
-    }, 12000);
+    let updateChain = Promise.resolve();
+    let timeout;
+    function expectUpdateWithin(ms) {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        window.removeEventListener('message', onMessage);
+        toast('Extension không phản hồi. Hãy kiểm tra tab Zalo Web và tải lại extension.', 'error');
+        updateChain.then(() => resolve(false));
+      }, ms);
+    }
+    expectUpdateWithin(30000);
     function onMessage(event) {
       if (event.source !== window || event.data?.source !== 'baovang-zalo-extension') return;
       const data = event.data;
       if (data.type === 'BAOVANG_EXTENSION_STATUS' && data.status === 'started') {
-        clearTimeout(timeout);
+        expectUpdateWithin(60000);
         toast(`Extension đang Auto gửi ${data.total || items.length} tin qua Zalo Web...`);
         return;
       }
       if (data.type === 'BAOVANG_EXTENSION_RESULT') {
+        expectUpdateWithin(60000);
         const item = items.find(row => row.id === data.itemId);
         if (item?.absenceId) {
-          api(`/api/absences/${item.absenceId}/zalo/${data.ok ? 'manual-sent' : 'manual-error'}`, { method: 'POST', body: '{}' })
-            .catch(error => console.error('Không cập nhật được trạng thái extension:', error));
+          updateChain = updateChain.then(() =>
+            api(`/api/absences/${item.absenceId}/zalo/${data.ok ? 'manual-sent' : 'manual-error'}`, { method: 'POST', body: '{}' })
+          ).catch(error => console.error('Không cập nhật được trạng thái extension:', error));
         }
         if (!data.ok && data.skipped) toast(`Đã bỏ qua ${item?.phone || 'học sinh'}: ${data.error || 'không tìm thấy trên Zalo.'}`, 'error');
         if (!data.ok && !data.skipped) toast(`Auto đã dừng: ${data.error || 'Zalo Web không gửi được tin.'}`, 'error');
@@ -1808,9 +1814,13 @@ function startZaloExtensionAuto(items) {
         clearTimeout(timeout);
         if (data.status === 'completed') {
           const skipped = data.skipped ? `, bỏ qua ${data.skipped}` : '';
-          toast(`Auto Zalo hoàn tất: ${data.completed || items.length}/${data.total || items.length} tin${skipped}.`);
+          toast(`Auto Zalo hoàn tất: đã gửi ${data.sent || 0}/${data.total || items.length} tin${skipped}.`);
+        } else if (data.status === 'error') {
+          toast(`Auto Zalo lỗi: ${data.error || 'Không kết nối được Zalo Web.'}`, 'error');
+        } else {
+          toast(`Auto Zalo đã dừng: ${data.sent || 0}/${data.total || items.length} tin đã gửi.`, 'error');
         }
-        resolve(data.status === 'completed');
+        updateChain.then(() => resolve(data.status === 'completed'));
       }
     }
     window.addEventListener('message', onMessage);
