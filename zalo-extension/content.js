@@ -123,12 +123,14 @@ function fillComposer(composer, message) {
 
   // Inserting text with embedded newlines can be interpreted as Enter by Zalo.
   // Insert line breaks explicitly so only the Send button submits the message.
+  // Keep a space at each boundary if Zalo flattens line breaks on delivery.
   const lines = messageLines(message);
   for (const [index, line] of lines.entries()) {
     if (index > 0 && !document.execCommand('insertLineBreak', false)) {
       throw new Error('Zalo Web không hỗ trợ điền tin nhiều dòng; chưa bấm Gửi.');
     }
-    if (line && !document.execCommand('insertText', false, line)) {
+    const text = line + (index < lines.length - 1 ? ' ' : '');
+    if (text && !document.execCommand('insertText', false, text)) {
       throw new Error('Zalo Web không nhận đủ nội dung tin nhắn; chưa bấm Gửi.');
     }
   }
@@ -223,6 +225,22 @@ function findSendButton(composer) {
   return matching[matching.length - 1] || null;
 }
 
+function matchingMessageCount(message) {
+  const compact = value => String(value || '').replace(/[\s\u00a0\u200b]+/g, '');
+  const expected = compact(message);
+  if (!expected) return 0;
+  const composer = findComposer();
+  const matches = Array.from(document.querySelectorAll('div, span, p, li'))
+    .filter(el => {
+      return compact(el.textContent) === expected
+        && visible(el)
+        && !(composer && (composer.contains(el) || el.contains(composer)));
+    })
+    .filter(el => compact(textOf(el)) === expected);
+  // A message can have several nested wrappers with the same text.
+  return matches.filter(el => !matches.some(child => child !== el && el.contains(child))).length;
+}
+
 function searchResultCandidates() {
   return [...new Set(allVisible([
     '[role="option"]',
@@ -308,6 +326,7 @@ async function sendOne(item) {
   if (!hasFullMessage(composer, item.message)) {
     throw new Error('Nội dung trong ô chat đã thay đổi; chưa bấm Gửi.');
   }
+  const previousMessages = matchingMessageCount(item.message);
   const sendButton = findSendButton(composer);
   if (sendButton) {
     clickLike(sendButton);
@@ -317,9 +336,9 @@ async function sendOne(item) {
   }
 
   const sent = await waitFor(() => {
-    return composerLines(composer).every(line => line === '') ? true : null;
-  }, 6000);
-  if (!sent) throw new Error('Đã điền tin nhưng Zalo Web chưa xác nhận gửi.');
+    return matchingMessageCount(item.message) > previousMessages ? true : null;
+  }, 10000);
+  if (!sent) throw new Error('Chưa thấy toàn bộ tin nhắn mới trong cuộc trò chuyện Zalo; cần kiểm tra trước khi gửi tiếp.');
   await wait(900);
   showZaloStatus('BaoVang: đã gửi tin nhắn qua Zalo Web.');
   return { ok: true };
