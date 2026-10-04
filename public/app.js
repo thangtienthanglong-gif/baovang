@@ -1507,10 +1507,16 @@ function manualPayload(log) {
   return log?.responsePayload || {};
 }
 
-async function sendSingleViaZaloExtension({ id, absenceId, phone, message }) {
+async function sendSingleViaZaloExtension({ id, absenceId, phone, message, link = '' }) {
   if (!phone) {
     toast('Học sinh này chưa có số điện thoại, không thể tìm trên Zalo.', 'error');
     return false;
+  }
+  // Mở đúng cuộc trò chuyện ngay trong thao tác click của người dùng.
+  // Background sẽ ưu tiên tab Zalo đang active để tiếp tục tự động dán tin.
+  if (link) {
+    window.open(link, '_blank', 'noopener');
+    await new Promise(resolve => setTimeout(resolve, 1200));
   }
   const started = await startZaloExtensionAuto([{ id, absenceId, phone, message }]);
   if (!started) toast('Extension chưa kết nối được với Zalo Web. Hãy mở và đăng nhập Zalo Web trước.', 'error');
@@ -1699,7 +1705,8 @@ function renderManualSendChatCards(logs = []) {
         id: `single-${log.absenceId}`,
         absenceId: log.absenceId,
         phone: payload.phone || log.phone1 || '',
-        message: textarea.value || ''
+        message: textarea.value || '',
+        link: payload.link || ''
       }));
       actions.appendChild(openBtn);
     }
@@ -2492,7 +2499,8 @@ function initEvents() {
         id: `single-${card.dataset.absenceId}`,
         absenceId: card.dataset.absenceId,
         phone: card.dataset.phone || '',
-        message: text
+        message: text,
+        link: event.target.getAttribute('href') || ''
       });
     }
 
