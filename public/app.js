@@ -1515,7 +1515,12 @@ async function sendSingleViaZaloExtension({ id, absenceId, phone, message, link 
   // Mở đúng cuộc trò chuyện ngay trong thao tác click của người dùng.
   // Background sẽ ưu tiên tab Zalo đang active để tiếp tục tự động dán tin.
   if (link) {
-    window.open(link, '_blank', 'noopener');
+    // Link zalo:// sẽ gọi ứng dụng Zalo PC, nơi Chrome Extension không thể
+    // chèn tin nhắn. Luôn mở Zalo Web để extension có thể điều khiển tab.
+    const webUrl = /^https:\/\/chat\.zalo\.me\//i.test(link)
+      ? link
+      : 'https://chat.zalo.me/';
+    window.open(webUrl, '_blank', 'noopener');
     await new Promise(resolve => setTimeout(resolve, 1200));
   }
   const started = await startZaloExtensionAuto([{ id, absenceId, phone, message }]);
