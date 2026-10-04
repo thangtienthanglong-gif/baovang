@@ -87,6 +87,53 @@ function clickLike(el) {
   el.click();
 }
 
+function messageLines(value) {
+  return String(value || '').replace(/\r\n?/g, '\n').split('\n');
+}
+
+function composerLines(composer) {
+  const value = composer.isContentEditable
+    ? (composer.innerText || composer.textContent || '')
+    : composer.value || '';
+  return messageLines(value).map(line => line.replace(/\u00a0/g, ' ').replace(/\u200b/g, '').trim());
+}
+
+function hasFullMessage(composer, message) {
+  const expected = messageLines(message).map(line => line.replace(/\u00a0/g, ' ').replace(/\u200b/g, '').trim());
+  const actual = composerLines(composer);
+  // Rich editors may add an empty trailing line after a <br>.
+  while (actual.at(-1) === '') actual.pop();
+  while (expected.at(-1) === '') expected.pop();
+  return actual.length === expected.length && actual.every((line, index) => line === expected[index]);
+}
+
+function fillComposer(composer, message) {
+  if (!composer.isContentEditable) {
+    emitInput(composer, message);
+    return;
+  }
+
+  composer.focus();
+  const selection = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(composer);
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+  document.execCommand('delete', false);
+
+  // Inserting text with embedded newlines can be interpreted as Enter by Zalo.
+  // Insert line breaks explicitly so only the Send button submits the message.
+  const lines = messageLines(message);
+  for (const [index, line] of lines.entries()) {
+    if (index > 0 && !document.execCommand('insertLineBreak', false)) {
+      throw new Error('Zalo Web không hỗ trợ điền tin nhiều dòng; chưa bấm Gửi.');
+    }
+    if (line && !document.execCommand('insertText', false, line)) {
+      throw new Error('Zalo Web không nhận đủ nội dung tin nhắn; chưa bấm Gửi.');
+    }
+  }
+}
+
 function inSearchArea(el) {
   const rect = el.getBoundingClientRect();
   return rect.width > 0 && rect.height > 0
@@ -251,14 +298,16 @@ async function sendOne(item) {
   if (!composer) throw skippedError(`Không mở được cuộc trò chuyện của số ${item.phone}.`);
 
   showZaloStatus('BaoVang: đã mở cuộc trò chuyện, đang điền tin nhắn...');
-  emitInput(composer, item.message);
+  fillComposer(composer, item.message);
   const filled = await waitFor(() => {
-    const value = composer.isContentEditable ? textOf(composer) : composer.value;
-    return value.includes(String(item.message).slice(0, 20)) ? composer : null;
+    return hasFullMessage(composer, item.message) ? composer : null;
   }, 2500);
-  if (!filled) throw new Error('Zalo Web không nhận được nội dung tin nhắn.');
+  if (!filled) throw new Error('Zalo Web chưa nhận đủ nội dung tin nhắn; chưa bấm Gửi.');
 
   await wait(500);
+  if (!hasFullMessage(composer, item.message)) {
+    throw new Error('Nội dung trong ô chat đã thay đổi; chưa bấm Gửi.');
+  }
   const sendButton = findSendButton(composer);
   if (sendButton) {
     clickLike(sendButton);
@@ -268,8 +317,7 @@ async function sendOne(item) {
   }
 
   const sent = await waitFor(() => {
-    const value = composer.isContentEditable ? textOf(composer) : composer.value;
-    return !value || value.trim() === '' ? true : null;
+    return composerLines(composer).every(line => line === '') ? true : null;
   }, 6000);
   if (!sent) throw new Error('Đã điền tin nhưng Zalo Web chưa xác nhận gửi.');
   await wait(900);
