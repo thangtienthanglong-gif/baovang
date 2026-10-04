@@ -4,7 +4,9 @@ const state = {
   appTabId: null,
   zaloTabId: null,
   items: [],
-  index: 0
+  index: 0,
+  skipped: 0,
+  failed: 0
 };
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -60,15 +62,28 @@ async function processQueue() {
     } catch (error) {
       response = { ok: false, error: error.message };
     }
-    await sendToApp({ type: 'BAOVANG_EXTENSION_RESULT', itemId: item.id, absenceId: item.absenceId, ok: Boolean(response.ok), error: response.error || '' });
+    await sendToApp({ type: 'BAOVANG_EXTENSION_RESULT', itemId: item.id, absenceId: item.absenceId, ok: Boolean(response.ok), skipped: Boolean(response.skipped), error: response.error || '' });
     if (!response.ok) {
-      state.stopped = true;
-      break;
+      if (response.skipped) state.skipped += 1;
+      else state.failed += 1;
+      // Số không có trên Zalo/người lạ chỉ là một mục bị bỏ qua,
+      // không được làm dừng cả hàng đợi.
+      if (!response.skipped) {
+        state.stopped = true;
+        break;
+      }
     }
-    await sleep(3000);
+    await sleep(response.ok ? 3000 : 1200);
   }
   state.running = false;
-  await sendToApp({ type: 'BAOVANG_EXTENSION_STATUS', status: state.stopped ? 'stopped' : 'completed', completed: state.index, total: state.items.length });
+  await sendToApp({
+    type: 'BAOVANG_EXTENSION_STATUS',
+    status: state.stopped ? 'stopped' : 'completed',
+    completed: Math.min(state.index + (state.stopped ? 0 : 1), state.items.length),
+    skipped: state.skipped,
+    failed: state.failed,
+    total: state.items.length
+  });
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -77,6 +92,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     state.appTabId = sender.tab?.id ?? message.appTabId ?? null;
     state.items = Array.isArray(message.items) ? message.items : [];
     state.index = 0;
+    state.skipped = 0;
+    state.failed = 0;
     state.stopped = false;
     state.running = true;
     processQueue().catch(error => { state.running = false; sendToApp({ type: 'BAOVANG_EXTENSION_STATUS', status: 'error', error: error.message }); });

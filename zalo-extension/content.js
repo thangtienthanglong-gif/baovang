@@ -118,7 +118,13 @@ function findSearchResult(phone) {
   return candidates.find(el => {
     const digits = textOf(el).replace(/\D/g, '');
     return normalizedPhone && digits.includes(normalizedPhone.slice(-8));
-  }) || candidates.find(el => textOf(el).length > 0) || null;
+  }) || null;
+}
+
+function skippedError(message) {
+  const error = new Error(message);
+  error.skipped = true;
+  return error;
 }
 
 async function openConversation(item, search) {
@@ -137,6 +143,7 @@ async function openConversation(item, search) {
     await wait(1600);
     composer = await waitFor(findComposer, 4500);
   }
+  if (!composer) throw skippedError(`Không tìm thấy học sinh hoặc số ${item.phone} không dùng Zalo.`);
   return composer;
 }
 
@@ -145,7 +152,7 @@ async function sendOne(item) {
   if (!search) throw new Error('Không tìm thấy ô tìm kiếm Zalo Web.');
 
   const composer = await openConversation(item, search);
-  if (!composer) throw new Error('Không mở được cuộc trò chuyện của học sinh.');
+  if (!composer) throw skippedError(`Không mở được cuộc trò chuyện của số ${item.phone}.`);
 
   emitInput(composer, item.message);
   const filled = await waitFor(() => {
@@ -188,7 +195,13 @@ if (isBaoVang) {
     if (message?.type !== 'BAOVANG_ZALO_ITEM') return;
     sendOne(message.item)
       .then(result => chrome.runtime.sendMessage({ type: 'BAOVANG_ZALO_ITEM_RESULT', itemId: message.item.id, ...result }))
-      .catch(error => chrome.runtime.sendMessage({ type: 'BAOVANG_ZALO_ITEM_RESULT', itemId: message.item.id, ok: false, error: error.message }));
+      .catch(error => chrome.runtime.sendMessage({
+        type: 'BAOVANG_ZALO_ITEM_RESULT',
+        itemId: message.item.id,
+        ok: false,
+        skipped: Boolean(error.skipped),
+        error: error.message
+      }));
     return true;
   });
 }
