@@ -1507,6 +1507,16 @@ function manualPayload(log) {
   return log?.responsePayload || {};
 }
 
+async function sendSingleViaZaloExtension({ id, absenceId, phone, message }) {
+  if (!phone) {
+    toast('Học sinh này chưa có số điện thoại, không thể tìm trên Zalo.', 'error');
+    return false;
+  }
+  const started = await startZaloExtensionAuto([{ id, absenceId, phone, message }]);
+  if (!started) toast('Extension chưa kết nối được với Zalo Web. Hãy mở và đăng nhập Zalo Web trước.', 'error');
+  return started;
+}
+
 async function copyMessageAndOpenZalo(message, link = '') {
   let popup = null;
   if (link) {
@@ -1632,7 +1642,7 @@ function renderManualSendPanel(logs = []) {
       ${rows.map(log => {
         const payload = manualPayload(log);
         return `
-          <article class="manual-send-card" data-absence-id="${escapeHtml(log.absenceId)}">
+          <article class="manual-send-card" data-absence-id="${escapeHtml(log.absenceId)}" data-phone="${escapeHtml(payload.phone || log.phone1 || '')}">
             <div>
               <strong>${escapeHtml(log.studentName)}</strong>
               <span>${escapeHtml(payload.phone || log.phone1 || 'Chưa có SĐT')}</span>
@@ -1685,7 +1695,12 @@ function renderManualSendChatCards(logs = []) {
       openBtn.className = 'btn small blue';
       openBtn.type = 'button';
       openBtn.textContent = 'Nhắn tin';
-      openBtn.addEventListener('click', () => openZaloAndPasteMessage(textarea.value || '', payload.link));
+      openBtn.addEventListener('click', () => sendSingleViaZaloExtension({
+        id: `single-${log.absenceId}`,
+        absenceId: log.absenceId,
+        phone: payload.phone || log.phone1 || '',
+        message: textarea.value || ''
+      }));
       actions.appendChild(openBtn);
     }
 
@@ -2473,8 +2488,12 @@ function initEvents() {
     if (event.target.classList.contains('open-manual-zalo')) {
       event.preventDefault();
       const text = card.querySelector('textarea')?.value || '';
-      const link = event.target.getAttribute('href') || '';
-      await openZaloAndPasteMessage(text, link);
+      await sendSingleViaZaloExtension({
+        id: `single-${card.dataset.absenceId}`,
+        absenceId: card.dataset.absenceId,
+        phone: card.dataset.phone || '',
+        message: text
+      });
     }
 
     if (event.target.classList.contains('copy-manual-message')) {
