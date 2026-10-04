@@ -4,6 +4,28 @@ const isBaoVang = location.hostname === 'baovang.vercel.app';
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const visible = el => Boolean(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
 const textOf = el => String(el?.innerText || el?.textContent || '').trim();
+const phoneForSearch = value => {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.startsWith('84') && digits.length >= 11 ? `0${digits.slice(2)}` : digits;
+};
+
+function showZaloStatus(message, isError = false) {
+  let banner = document.getElementById('baovang-zalo-status');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'baovang-zalo-status';
+    Object.assign(banner.style, {
+      position: 'fixed', right: '16px', top: '16px', zIndex: '2147483647',
+      maxWidth: '420px', padding: '12px 16px', borderRadius: '10px',
+      boxShadow: '0 6px 24px rgba(0,0,0,.2)', font: '600 14px/1.5 sans-serif'
+    });
+    document.body.appendChild(banner);
+  }
+  banner.textContent = message;
+  banner.style.background = isError ? '#fff1f2' : '#eff6ff';
+  banner.style.color = isError ? '#9f1239' : '#1e3a8a';
+  banner.style.border = isError ? '1px solid #fda4af' : '1px solid #93c5fd';
+}
 
 function allVisible(selectors) {
   return selectors.flatMap(selector => Array.from(document.querySelectorAll(selector))).filter(visible);
@@ -12,7 +34,7 @@ function allVisible(selectors) {
 async function waitFor(getter, timeout = 8000, interval = 150) {
   const end = Date.now() + timeout;
   while (Date.now() < end) {
-    const result = getter();
+    const result = await getter();
     if (result) return result;
     await wait(interval);
   }
@@ -65,15 +87,59 @@ function clickLike(el) {
   el.click();
 }
 
+function inSearchArea(el) {
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0
+    && rect.top < Math.min(260, window.innerHeight * 0.3)
+    && rect.left < window.innerWidth * 0.45;
+}
+
+function isEditableField(el) {
+  return Boolean(el?.matches?.('input:not([type="hidden"]), textarea, [contenteditable="true"]'));
+}
+
 function findSearchBox() {
-  return allVisible([
+  const named = allVisible([
     'input[placeholder*="Tìm kiếm"]',
     'input[placeholder*="tìm kiếm"]',
     'input[placeholder*="Tìm bạn"]',
     'input[placeholder*="Search"]',
     'input[aria-label*="Tìm"]',
-    'input[aria-label*="Search"]'
-  ]).find(el => el.type !== 'hidden') || null;
+    'input[aria-label*="Search"]',
+    '[role="searchbox"]',
+    '[contenteditable="true"][data-placeholder*="Tìm"]',
+    '[contenteditable="true"][aria-label*="Tìm"]'
+  ]).find(el => isEditableField(el) && inSearchArea(el));
+  if (named) return named;
+  return allVisible(['input[type="search"]', 'input[type="text"]', 'input:not([type])'])
+    .filter(inSearchArea)
+    .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)[0] || null;
+}
+
+async function activateSearchBox() {
+  const existing = findSearchBox();
+  if (existing) {
+    clickLike(existing);
+    await wait(120);
+    const focused = document.activeElement;
+    if (isEditableField(focused) && visible(focused) && inSearchArea(focused)) return focused;
+    return findSearchBox();
+  }
+
+  // Zalo may render the visible "Tìm kiếm" as a clickable wrapper first.
+  const trigger = Array.from(document.querySelectorAll('span, div, button, [role="button"], [role="searchbox"]'))
+    .filter(el => visible(el) && inSearchArea(el) && (el.getAttribute('role') === 'searchbox' || /^tìm kiếm$/i.test(textOf(el))))
+    .sort((a, b) => {
+      const ar = a.getBoundingClientRect();
+      const br = b.getBoundingClientRect();
+      return ar.width * ar.height - br.width * br.height;
+    })[0];
+  if (trigger) clickLike(trigger);
+  return waitFor(() => {
+    const focused = document.activeElement;
+    if (isEditableField(focused) && visible(focused) && inSearchArea(focused)) return focused;
+    return findSearchBox();
+  }, 2500);
 }
 
 function findComposer() {
@@ -89,6 +155,10 @@ function findComposer() {
   // Zalo có thể có nhiều contenteditable; ô chat thường nằm thấp nhất trong cửa sổ.
   return candidates
     .filter(el => !/tìm kiếm|search/i.test(el.getAttribute('placeholder') || el.getAttribute('aria-label') || ''))
+    .filter(el => {
+      const rect = el.getBoundingClientRect();
+      return rect.left > window.innerWidth * 0.28 && rect.top > window.innerHeight * 0.3;
+    })
     .sort((a, b) => {
       const ar = a.getBoundingClientRect();
       const br = b.getBoundingClientRect();
@@ -106,29 +176,35 @@ function findSendButton(composer) {
   return matching[matching.length - 1] || null;
 }
 
-function findSearchResult(phone) {
-  const normalizedPhone = String(phone || '').replace(/\D/g, '');
-  const preferred = allVisible([
+function searchResultCandidates() {
+  return [...new Set(allVisible([
     '[role="option"]',
+    '[role="listbox"] li',
     '[class*="search"] [class*="item"]',
     '[class*="search"] [role="button"]',
+    '[class*="search"] li',
     '[class*="friend"]',
     '[class*="contact"]',
     '[class*="user-item"]'
-  ]).filter(el => textOf(el).length > 0);
-  const exact = preferred.filter(el => {
+  ]))].filter(el => textOf(el).length > 0);
+}
+
+function findSearchResult(phone, previousResults) {
+  const normalizedPhone = phoneForSearch(phone);
+  const candidates = searchResultCandidates();
+  const exact = candidates.filter(el => {
     const digits = textOf(el).replace(/\D/g, '');
     return normalizedPhone && digits.includes(normalizedPhone.slice(-8));
   }).sort((a, b) => textOf(a).length - textOf(b).length)[0];
   if (exact) return exact;
 
-  // Khi tìm bằng số điện thoại, Zalo thường chỉ hiện tên tài khoản trong kết quả.
-  // Ưu tiên phần tử kết quả nhỏ nhất để tránh click cả khung danh sách.
-  return preferred.sort((a, b) => {
-    const ar = a.getBoundingClientRect();
-    const br = b.getBoundingClientRect();
-    return (ar.width * ar.height) - (br.width * br.height);
-  })[0] || null;
+  // Search results may show only the account name. Accept a single newly
+  // rendered result, never an unchanged chat from the left-hand history.
+  const fresh = candidates.filter(el => previousResults.get(el) !== textOf(el))
+    .filter(el => el.matches?.('[role="option"]') || el.closest?.('[role="listbox"], [class*="search"], [class*="Search"]'))
+    .filter(el => !/không tìm thấy|không có kết quả|no results|tìm tất cả/i.test(textOf(el)));
+  const leaves = fresh.filter(el => !fresh.some(other => other !== el && el.contains(other)));
+  return leaves.length === 1 ? leaves[0] : null;
 }
 
 function skippedError(message) {
@@ -138,14 +214,28 @@ function skippedError(message) {
 }
 
 async function openConversation(item, search) {
-  emitInput(search, item.phone);
+  const previousResults = new Map(searchResultCandidates().map(el => [el, textOf(el)]));
+  const searchedPhone = phoneForSearch(item.phone);
+  emitInput(search, searchedPhone);
+  const enteredPhone = String(search.isContentEditable ? textOf(search) : search.value || '').replace(/\D/g, '');
+  if (!enteredPhone.endsWith(searchedPhone.slice(-8))) {
+    throw new Error('Zalo Web không nhận số điện thoại trong ô Tìm kiếm.');
+  }
   await wait(800);
-  const result = await waitFor(() => findSearchResult(item.phone), 7000);
-  if (!result) throw skippedError(`Không tìm thấy kết quả Zalo khớp số ${item.phone}; chưa gửi tin.`);
+  const result = await waitFor(() => findSearchResult(item.phone, previousResults), 7000);
+  if (!result) throw skippedError(`Không tìm thấy kết quả tìm kiếm rõ ràng cho số ${item.phone}; chưa gửi tin.`);
   clickLike(result);
   // The previous chat's composer may still be mounted while Zalo switches chats.
   await wait(1200);
-  const composer = await waitFor(findComposer, 6500);
+  let composer = await waitFor(findComposer, 3500);
+  if (!composer) {
+    const chatButton = allVisible(['button', '[role="button"]'])
+      .find(el => /^nhắn tin$/i.test(textOf(el)));
+    if (chatButton) {
+      clickLike(chatButton);
+      composer = await waitFor(findComposer, 4000);
+    }
+  }
   if (!composer) throw skippedError(`Không mở được cuộc trò chuyện của số ${item.phone}.`);
   return composer;
 }
@@ -153,12 +243,14 @@ async function openConversation(item, search) {
 async function sendOne(item) {
   if (!String(item?.phone || '').replace(/\D/g, '')) throw skippedError('Thiếu số điện thoại Zalo; đã bỏ qua tin này.');
   if (!String(item?.message || '').trim()) throw skippedError('Tin nhắn trống; đã bỏ qua tin này.');
-  const search = await waitFor(findSearchBox, 8000);
+  showZaloStatus(`BaoVang: đang tìm số ${String(item.phone).slice(-4)} trên Zalo...`);
+  const search = await waitFor(activateSearchBox, 8000);
   if (!search) throw new Error('Không tìm thấy ô tìm kiếm Zalo Web.');
 
   const composer = await openConversation(item, search);
   if (!composer) throw skippedError(`Không mở được cuộc trò chuyện của số ${item.phone}.`);
 
+  showZaloStatus('BaoVang: đã mở cuộc trò chuyện, đang điền tin nhắn...');
   emitInput(composer, item.message);
   const filled = await waitFor(() => {
     const value = composer.isContentEditable ? textOf(composer) : composer.value;
@@ -181,6 +273,7 @@ async function sendOne(item) {
   }, 6000);
   if (!sent) throw new Error('Đã điền tin nhưng Zalo Web chưa xác nhận gửi.');
   await wait(900);
+  showZaloStatus('BaoVang: đã gửi tin nhắn qua Zalo Web.');
   return { ok: true };
 }
 
@@ -210,13 +303,16 @@ if (isBaoVang) {
     sendResponse({ accepted: true });
     sendOne(message.item)
       .then(result => chrome.runtime.sendMessage({ type: 'BAOVANG_ZALO_ITEM_RESULT', itemId: message.item.id, ...result }))
-      .catch(error => chrome.runtime.sendMessage({
-        type: 'BAOVANG_ZALO_ITEM_RESULT',
-        itemId: message.item.id,
-        ok: false,
-        skipped: Boolean(error.skipped),
-        error: error.message
-      }));
+      .catch(error => {
+        showZaloStatus(`BaoVang: ${error.message}`, true);
+        return chrome.runtime.sendMessage({
+          type: 'BAOVANG_ZALO_ITEM_RESULT',
+          itemId: message.item.id,
+          ok: false,
+          skipped: Boolean(error.skipped),
+          error: error.message
+        });
+      });
   });
 }
 

@@ -14,6 +14,8 @@ Sau khi cập nhật mã extension, bấm **Reload / Tải lại** tại trang t
 
 Extension tự mở Zalo Web, tìm theo số điện thoại, điền tin và gửi tuần tự. Số không tìm thấy trong kết quả Zalo được bỏ qua; lỗi mở hoặc gửi tin sẽ dừng hàng đợi và báo lý do về BaoVang.
 
+Khi extension đang chạy, trạng thái sẽ hiện ở góc trên bên phải tab Zalo Web. Nếu dừng ở màn hình chào mừng, xem dòng trạng thái này để biết bước nào chưa thực hiện được.
+
 ## Lưu ý
 
 - Đây là prototype dựa trên DOM của Zalo Web; nếu Zalo đổi giao diện, cần cập nhật selector trong `content.js`.
