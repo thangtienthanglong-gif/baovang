@@ -38,6 +38,22 @@ async function findOrOpenZaloTab() {
   return state.zaloTabId;
 }
 
+async function sendItemToZalo(tabId, item) {
+  try {
+    return await chrome.tabs.sendMessage(tabId, { type: 'BAOVANG_ZALO_ITEM', item });
+  } catch (firstError) {
+    // Tab Zalo có thể đã mở trước khi extension được tải. Khi đó content.js
+    // chưa tồn tại trong tab; tiêm lại rồi gửi lần nữa.
+    try {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+      await sleep(500);
+      return await chrome.tabs.sendMessage(tabId, { type: 'BAOVANG_ZALO_ITEM', item });
+    } catch (secondError) {
+      throw new Error(`Không kết nối được với Zalo Web: ${secondError.message || firstError.message}`);
+    }
+  }
+}
+
 async function processQueue() {
   const zaloTabId = await findOrOpenZaloTab();
   await sendToApp({ type: 'BAOVANG_EXTENSION_STATUS', status: 'started', total: state.items.length });
@@ -56,7 +72,7 @@ async function processQueue() {
           resolve(message);
         };
         chrome.runtime.onMessage.addListener(listener);
-        try { await chrome.tabs.sendMessage(zaloTabId, { type: 'BAOVANG_ZALO_ITEM', item }); }
+        try { await sendItemToZalo(zaloTabId, item); }
         catch (error) { clearTimeout(timeout); chrome.runtime.onMessage.removeListener(listener); resolve({ ok: false, error: error.message }); }
       });
     } catch (error) {
