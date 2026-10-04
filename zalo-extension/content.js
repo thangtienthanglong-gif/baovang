@@ -1,8 +1,176 @@
 const isBaoVang = location.hostname === 'baovang.vercel.app';
 
-function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
-function first(selectors) { return selectors.map(s => document.querySelector(s)).find(Boolean) || null; }
-function visible(el) { return el && !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length); }
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+const visible = el => Boolean(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
+const textOf = el => String(el?.innerText || el?.textContent || '').trim();
+
+function allVisible(selectors) {
+  return selectors.flatMap(selector => Array.from(document.querySelectorAll(selector))).filter(visible);
+}
+
+async function waitFor(getter, timeout = 8000, interval = 150) {
+  const end = Date.now() + timeout;
+  while (Date.now() < end) {
+    const result = getter();
+    if (result) return result;
+    await wait(interval);
+  }
+  return null;
+}
+
+function emitInput(el, value) {
+  const isEditable = el.isContentEditable || el.getAttribute('contenteditable') === 'true';
+  el.focus();
+
+  if (isEditable) {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    document.execCommand('delete', false);
+    document.execCommand('insertText', false, value);
+    if (textOf(el) !== value) {
+      el.textContent = value;
+    }
+    el.dispatchEvent(new InputEvent('input', {
+      bubbles: true,
+      inputType: 'insertText',
+      data: value
+    }));
+  } else {
+    const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value');
+    if (descriptor?.set) descriptor.set.call(el, value);
+    else el.value = value;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+}
+
+function keyEnter(el) {
+  for (const type of ['keydown', 'keypress', 'keyup']) {
+    el.dispatchEvent(new KeyboardEvent(type, {
+      key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
+      bubbles: true, cancelable: true
+    }));
+  }
+}
+
+function clickLike(el) {
+  el.focus?.();
+  for (const type of ['mousedown', 'mouseup']) {
+    el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+  }
+  el.click();
+}
+
+function findSearchBox() {
+  return allVisible([
+    'input[placeholder*="Tìm kiếm"]',
+    'input[placeholder*="tìm kiếm"]',
+    'input[placeholder*="Tìm bạn"]',
+    'input[placeholder*="Search"]',
+    'input[aria-label*="Tìm"]',
+    'input[aria-label*="Search"]'
+  ]).find(el => el.type !== 'hidden') || null;
+}
+
+function findComposer() {
+  const candidates = allVisible([
+    '[contenteditable="true"]',
+    'div[role="textbox"]',
+    'textarea[placeholder*="Nhập"]',
+    'textarea[placeholder*="Tin nhắn"]',
+    'textarea[aria-label*="tin nhắn"]'
+  ]);
+  if (!candidates.length) return null;
+
+  // Zalo có thể có nhiều contenteditable; ô chat thường nằm thấp nhất trong cửa sổ.
+  return candidates
+    .filter(el => !/tìm kiếm|search/i.test(el.getAttribute('placeholder') || el.getAttribute('aria-label') || ''))
+    .sort((a, b) => {
+      const ar = a.getBoundingClientRect();
+      const br = b.getBoundingClientRect();
+      return (br.top + br.height) - (ar.top + ar.height);
+    })[0] || null;
+}
+
+function findSendButton(composer) {
+  const root = composer?.closest('form, [class*="footer"], [class*="composer"], [class*="input"]') || document;
+  const candidates = Array.from(root.querySelectorAll('button, [role="button"], [aria-label], [title]')).filter(visible);
+  const matching = candidates.filter(el => {
+    const label = `${el.getAttribute('aria-label') || ''} ${el.getAttribute('title') || ''} ${textOf(el)}`;
+    return /(^|\s)(gửi|send)(\s|$)/i.test(label) || /send|gửi/i.test(el.className || '');
+  });
+  return matching[matching.length - 1] || null;
+}
+
+function findSearchResult(phone) {
+  const normalizedPhone = String(phone || '').replace(/\D/g, '');
+  const candidates = allVisible([
+    '[role="option"]',
+    'li',
+    '[class*="search"] [class*="item"]',
+    '[class*="friend"]',
+    '[class*="contact"]',
+    '[class*="user-item"]'
+  ]);
+  return candidates.find(el => {
+    const digits = textOf(el).replace(/\D/g, '');
+    return normalizedPhone && digits.includes(normalizedPhone.slice(-8));
+  }) || candidates.find(el => textOf(el).length > 0) || null;
+}
+
+async function openConversation(item, search) {
+  emitInput(search, item.phone);
+  await wait(700);
+  keyEnter(search);
+  await wait(1600);
+
+  let composer = await waitFor(findComposer, 4500);
+  if (composer) return composer;
+
+  // Nếu Enter chỉ mở danh sách kết quả, click đúng kết quả rồi chờ ô chat.
+  const result = findSearchResult(item.phone);
+  if (result) {
+    clickLike(result);
+    await wait(1600);
+    composer = await waitFor(findComposer, 4500);
+  }
+  return composer;
+}
+
+async function sendOne(item) {
+  const search = await waitFor(findSearchBox, 8000);
+  if (!search) throw new Error('Không tìm thấy ô tìm kiếm Zalo Web.');
+
+  const composer = await openConversation(item, search);
+  if (!composer) throw new Error('Không mở được cuộc trò chuyện của học sinh.');
+
+  emitInput(composer, item.message);
+  const filled = await waitFor(() => {
+    const value = composer.isContentEditable ? textOf(composer) : composer.value;
+    return value.includes(String(item.message).slice(0, 20)) ? composer : null;
+  }, 2500);
+  if (!filled) throw new Error('Zalo Web không nhận được nội dung tin nhắn.');
+
+  await wait(500);
+  const sendButton = findSendButton(composer);
+  if (sendButton) {
+    clickLike(sendButton);
+  } else {
+    // Một số phiên bản Zalo ẩn nút Gửi; Enter là phương án dự phòng.
+    keyEnter(composer);
+  }
+
+  const sent = await waitFor(() => {
+    const value = composer.isContentEditable ? textOf(composer) : composer.value;
+    return !value || value.trim() === '' ? true : null;
+  }, 6000);
+  if (!sent) throw new Error('Đã điền tin nhưng Zalo Web chưa xác nhận gửi.');
+  await wait(900);
+  return { ok: true };
+}
 
 if (isBaoVang) {
   chrome.runtime.onMessage.addListener(message => {
@@ -16,48 +184,10 @@ if (isBaoVang) {
     if (event.data.type === 'STOP_AUTO') chrome.runtime.sendMessage({ type: 'BAOVANG_STOP_AUTO' });
   });
 } else {
-  async function runItem(item) {
-    const search = first([
-      'input[placeholder*="Tìm kiếm"]', 'input[placeholder*="tìm kiếm"]',
-      'input[placeholder*="Search"]', 'input[aria-label*="Tìm"]',
-      'input[aria-label*="Search"]'
-    ]);
-    if (!visible(search)) throw new Error('Không tìm thấy ô tìm kiếm Zalo Web.');
-    search.focus();
-    search.select();
-    document.execCommand('insertText', false, item.phone);
-    search.dispatchEvent(new Event('input', { bubbles: true }));
-    await wait(1000);
-    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
-    search.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true }));
-    await wait(1800);
-
-    const input = first([
-      '[contenteditable="true"]',
-      'div[role="textbox"]',
-      'textarea[placeholder*="Nhập"]',
-      'textarea[placeholder*="Tin nhắn"]'
-    ]);
-    if (!visible(input)) throw new Error('Không tìm thấy ô nhập tin nhắn.');
-    input.focus();
-    if (input.isContentEditable || input.getAttribute('contenteditable') === 'true') {
-      document.execCommand('selectAll', false);
-      document.execCommand('insertText', false, item.message);
-      input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: item.message }));
-    } else {
-      input.value = item.message;
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    await wait(400);
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
-    input.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true }));
-    await wait(700);
-    return { ok: true };
-  }
-
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((message) => {
     if (message?.type !== 'BAOVANG_ZALO_ITEM') return;
-    runItem(message.item).then(result => chrome.runtime.sendMessage({ type: 'BAOVANG_ZALO_ITEM_RESULT', itemId: message.item.id, ...result }))
+    sendOne(message.item)
+      .then(result => chrome.runtime.sendMessage({ type: 'BAOVANG_ZALO_ITEM_RESULT', itemId: message.item.id, ...result }))
       .catch(error => chrome.runtime.sendMessage({ type: 'BAOVANG_ZALO_ITEM_RESULT', itemId: message.item.id, ok: false, error: error.message }));
     return true;
   });
