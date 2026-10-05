@@ -17,6 +17,7 @@ let classBarChart = null;
 let quickSearchIndex = [];
 let quickSearchTimer = null;
 let renderedQueueSession = '';
+let queueSessionAuto = true;
 const QUICK_SEARCH_ROSTER_LIMIT = 80;
 
 function normalizeQuickSearch(value) {
@@ -258,8 +259,7 @@ function currentSessionForTime() {
 }
 
 function selectedQueueSession() {
-  const value = $('#filterSession')?.value || 'AUTO';
-  return value === 'AUTO' ? currentSessionForTime() : value;
+  return queueSessionAuto ? currentSessionForTime() : ($('#filterSession')?.value || 'ALL');
 }
 
 function selectedClass() {
@@ -418,8 +418,7 @@ function scheduleDayLabel(day) {
 function renderFilters() {
   const dateStr = selectedDate();
   const queueSession = selectedQueueSession();
-  const autoSessionOption = $('#filterSession option[value="AUTO"]');
-  if (autoSessionOption) autoSessionOption.textContent = `Tự động (Buổi ${currentSessionForTime()})`;
+  if (queueSessionAuto && $('#filterSession')) $('#filterSession').value = queueSession;
   const sessionGroups = { 'Sáng': [], 'Chiều': [], 'Tối': [], 'Khác': [] };
   state.classes.forEach(className => {
     const info = getClassScheduleInfo(className, dateStr);
@@ -2633,6 +2632,7 @@ function initEvents() {
   });
   $('#filterClass').addEventListener('change', loadAbsences);
   $('#filterSession')?.addEventListener('change', async () => {
+    queueSessionAuto = false;
     renderFilters();
     await loadAbsences();
   });
@@ -2839,6 +2839,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (sessionDropdown) {
     sessionDropdown.value = currentSessionForTime();
   }
+  const queueSessionDropdown = document.getElementById('filterSession');
+  if (queueSessionDropdown) queueSessionDropdown.value = currentSessionForTime();
 
   initEvents();
   try {
