@@ -277,7 +277,6 @@ async function loadBootstrap() {
   renderFilters();
   renderSettings();
   await loadStudents();
-  updateChatboxStatus();
   renderSummary();
   renderAbsences();
 }
@@ -308,7 +307,6 @@ async function loadAbsences() {
   renderAbsences();
   renderClassDropdown();
   renderRoster();
-  updateChatboxStatus();
 }
 
 async function loadAttendanceAbsences() {
@@ -318,7 +316,6 @@ async function loadAttendanceAbsences() {
   renderSummary();
   renderClassDropdown();
   renderRoster();
-  updateChatboxStatus();
 }
 
 async function loadStudents(q = '') {
@@ -2465,7 +2462,6 @@ function initChatbox() {
   });
 
   addChatMessage('bot', 'Chào thầy/cô, mình đã sẵn sàng. Có thể hỏi nhanh về báo vắng, Zalo, học sinh hoặc lớp.');
-  updateChatboxStatus();
 }
 
 function initEvents() {
@@ -2487,10 +2483,6 @@ function initEvents() {
 
   $('#refreshBtn').addEventListener('click', event => refreshCurrentView(event.currentTarget));
   $('#applyFilterBtn').addEventListener('click', loadAbsences);
-  $('#bulkSendTuitionBtn')?.addEventListener('click', () => {
-    setChatboxOpen(true);
-    sendChatPrompt('Gửi nhắc trễ học phí');
-  });
   $('#bulkSendZaloBtn')?.addEventListener('click', async event => {
     try {
       await sendBulkZalo(event.currentTarget);
@@ -2821,7 +2813,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   initEvents();
-  initChatbox();
   try {
     await loadBranches();
     await loadBootstrap();

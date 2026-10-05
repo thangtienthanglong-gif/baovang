@@ -108,7 +108,6 @@
       </nav>
 
       <div class="side-extra">
-        <button class="side-link" data-tab="cozeTab" type="button"><span class="nav-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span> Trợ lý AI</button>
         <button class="side-link" data-tab="guideTab" type="button"><span class="nav-icon"><i class="fa-solid fa-circle-question"></i></span> Hướng dẫn</button>
       </div>
 
@@ -247,7 +246,6 @@
             <p>Theo dõi trạng thái gửi Zalo theo danh sách báo vắng trong ngày.</p>
           </div>
           <div class="section-actions">
-            <button class="btn blue" id="bulkSendTuitionBtn" type="button">Nhắc trễ học phí</button>
             <button class="btn blue" id="bulkSendZaloBtn" type="button">Gửi Zalo hàng loạt</button>
           </div>
         </div>
@@ -422,47 +420,6 @@
       </section>
     </section>
 
-    <section id="cozeTab" class="tab-panel">
-      <section class="card coze-card">
-        <form id="cozeSettingsForm" class="coze-settings-form">
-          <div class="coze-title-row">
-            <h2>Trợ lý AI</h2>
-            <p>Chọn nguồn AI cho chatbox. API key chỉ được gọi qua server của app.</p>
-          </div>
-
-          <div class="coze-quickstart">
-            <a class="btn ghost" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Lấy Gemini key</a>
-            <button class="btn blue" id="copyCozePromptBtn" type="button" style="display: none;">Copy prompt bot</button>
-            <button class="btn success" id="testAiBtn" type="button">Kiểm tra AI</button>
-            <span>Nhập API Key của Gemini để kích hoạt trợ lý AI thông minh.</span>
-          </div>
-
-          <div class="coze-control-grid">
-            <div class="field" style="display: none;">
-              <label for="aiProvider">Nguồn chatbox</label>
-              <select id="aiProvider">
-                <option value="gemini" selected>Gemini</option>
-              </select>
-            </div>
-            <div class="field ai-provider ai-provider-gemini">
-              <label for="geminiModel">Gemini model</label>
-              <input id="geminiModel" placeholder="gemini-3.5-flash">
-            </div>
-            <div class="field coze-token-field ai-provider ai-provider-gemini">
-              <label for="geminiApiKey">Gemini API key</label>
-              <input id="geminiApiKey" type="password" placeholder="Để trống nếu không muốn thay key hiện tại">
-            </div>
-            <div id="aiModeNote" class="mode-note coze-status-note"></div>
-          </div>
-
-          <div class="actions coze-actions">
-            <button class="btn" type="submit">Lưu trợ lý AI</button>
-          </div>
-        </form>
-      </section>
-    </section>
-
-    <!-- TAB TIẾN ĐỘ PHÂN PHỐI -->
     <section id="logTab" class="tab-panel">
       <section class="card filters" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
         <div class="field" style="margin: 0;">
@@ -738,31 +695,6 @@
     </div>
   </div>
 
-  <section id="chatbox" class="chatbox" data-open="false" aria-label="Trợ lý chat">
-    <button id="chatboxToggle" class="chatbox-toggle" type="button" aria-label="Mở trợ lý chat" aria-expanded="false">
-      <span><i class="fa-solid fa-comment-dots"></i></span>
-    </button>
-    <div class="chatbox-panel" role="dialog" aria-modal="false" aria-labelledby="chatboxTitle">
-      <header class="chatbox-header">
-        <div>
-          <h2 id="chatboxTitle">Trợ lý báo vắng</h2>
-          <span id="chatboxStatus">Đang trực</span>
-        </div>
-        <button id="chatboxClose" class="chatbox-close" type="button" aria-label="Đóng chatbox">×</button>
-      </header>
-      <div id="chatboxMessages" class="chatbox-messages" role="log" aria-live="polite"></div>
-      <div class="chatbox-suggestions" aria-label="Câu hỏi gợi ý">
-        <button type="button" data-chat-prompt="Gửi báo vắng hôm nay">Gửi báo vắng</button>
-        <button type="button" data-chat-prompt="Gửi nhắc trễ học phí">Gửi nhắc học phí</button>
-        <button type="button" data-chat-prompt="Gửi thông báo chung">Gửi thông báo</button>
-      </div>
-      <form id="chatboxForm" class="chatbox-form">
-        <input id="chatboxInput" type="text" autocomplete="off" placeholder="Nhập câu hỏi..." aria-label="Nhập câu hỏi cho trợ lý">
-        <button type="submit" aria-label="Gửi tin nhắn">Gửi</button>
-      </form>
-    </div>
-  </section>
-
   <div id="toastContainer" class="toast-container" role="status"></div>
   
   <div class="drawer-backdrop" id="studentDrawerBackdrop"></div>
@@ -863,7 +795,7 @@
     </div>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="/app.js?v=20261005-3"></script>
+  <script src="/app.js?v=20261005-4"></script>
   <script src="/exams.js"></script>
   <nav class="bottom-nav">
     <button class="bottom-tab active" data-tab="absenceTab" type="button"><i class="fa-solid fa-clipboard-user"></i><span>Điểm danh</span></button>
