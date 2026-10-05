@@ -1097,13 +1097,14 @@ function noticeTimeLine(row) {
 
 function renderAbsences() {
   const container = $('#absenceRows');
+  const queueAbsences = state.absences.filter(row => row.noticeStatus !== 'Đã gửi');
 
-  if (!state.absences.length) {
-    container.innerHTML = '<div class="empty">Không có học sinh phù hợp với bộ lọc.</div>';
+  if (!queueAbsences.length) {
+    container.innerHTML = '<div class="empty">Hàng xử lý trống. Học sinh đã gửi được lưu trong Lịch sử liên hệ.</div>';
     return;
   }
 
-  container.innerHTML = state.absences.map(row => {
+  container.innerHTML = queueAbsences.map(row => {
     const phone = row.phone1 || row.phone2 || 'Chưa có SĐT';
     return `
     <article class="absence-item" data-id="${row.id}">
