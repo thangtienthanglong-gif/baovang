@@ -783,6 +783,17 @@ function groupByClass(students) {
   }, {});
 }
 
+const studentNameCollator = new Intl.Collator('vi');
+
+function compareStudentsByGivenName(a, b) {
+  const nameA = String(a.fullName || a.name || '').trim();
+  const nameB = String(b.fullName || b.name || '').trim();
+  const givenName = name => name.replace(/(?:\s*\([^)]*\))+\s*$/, '').split(/\s+/).pop() || '';
+  return studentNameCollator.compare(givenName(nameA), givenName(nameB))
+    || studentNameCollator.compare(nameA, nameB)
+    || String(a.id || '').localeCompare(String(b.id || ''));
+}
+
 function matchesRosterKeyword(student, keyword) {
   if (!keyword) return true;
   const text = `${student.code} ${student.fullName} ${student.className} ${student.parentName} ${student.phone1} ${student.phone2} ${student.zaloUserId}`.toLowerCase();
@@ -987,7 +998,8 @@ function renderRoster(searchMatches) {
     }
     return studentClass === className;
   });
-  const visibleStudents = searchQuery ? filtered.slice(0, QUICK_SEARCH_ROSTER_LIMIT) : filtered;
+  const sortedStudents = [...filtered].sort(compareStudentsByGivenName);
+  const visibleStudents = searchQuery ? sortedStudents.slice(0, QUICK_SEARCH_ROSTER_LIMIT) : sortedStudents;
 
   const absentCount = visibleStudents.filter(student => absenceForStudent(student.id, student.className)).length;
 
