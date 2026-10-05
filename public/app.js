@@ -3669,15 +3669,16 @@ async function openMakeupModal(studentId, studentName, originalClass) {
 }
 
 async function reloadMakeupList(studentId) {
+  const listDiv = document.getElementById('makeupModalCurrentList');
   try {
-    const listDiv = document.getElementById('makeupModalCurrentList');
-    listDiv.innerHTML = 'Đang tải...';
+    listDiv.textContent = 'Đang tải...';
     const exceptions = await api('/api/schedule-exceptions');
     state.scheduleExceptions = exceptions; // update global cache
+    const student = state.students.find(s => s.id === studentId);
     const fallbackStudent = {
       id: studentId,
-      fullName: studentName,
-      className: originalClass
+      fullName: student?.fullName || student?.name || '',
+      className: document.getElementById('makeupModalOriginalClass').value || student?.className || ''
     };
     const myExceptions = exceptions.filter(e => scheduleExceptionMatchesStudent(e, fallbackStudent));
     if (myExceptions.length === 0) {
@@ -3692,6 +3693,7 @@ async function reloadMakeupList(studentId) {
     `).join('');
   } catch (error) {
     console.error(error);
+    listDiv.textContent = 'Không tải được lịch học bù. Vui lòng thử lại.';
   }
 }
 
@@ -3709,7 +3711,6 @@ async function saveMakeupSchedule() {
       body: JSON.stringify({ studentId, originalClass, stuckDay, makeupClass, makeupDay, type })
     });
     toast('Đã lưu lịch kẹt bù thành công!');
-    try { state.scheduleExceptions = await api('/api/schedule-exceptions'); } catch(e) {}
     await reloadMakeupList(studentId);
     renderClassDropdown();
     renderRoster(); // re-render roster to show badges
@@ -3723,7 +3724,6 @@ async function deleteMakeupSchedule(id, studentId) {
   try {
     await api(`/api/schedule-exceptions/${id}`, { method: 'DELETE' });
     toast('Đã xóa lịch bù.');
-    try { state.scheduleExceptions = await api('/api/schedule-exceptions'); } catch(e) {}
     await reloadMakeupList(studentId);
     renderClassDropdown();
     renderRoster(); // re-render roster to hide badges
