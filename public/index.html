@@ -227,8 +227,11 @@
                 <h2 id="rosterTitle">Danh sách học sinh</h2>
                 <p id="rosterMeta">Chọn lớp ở cây bên trái để thao tác nhanh.</p>
               </div>
-              <button class="btn primary btn-exam" id="openExamSelectBtn" type="button" style="margin-right: 8px;"><i class="fa-solid fa-star"></i> Nhập điểm thi</button>
-          <button class="btn secondary" id="exportExamBtn" type="button" style="margin-right: 8px; background: #e2e8f0; color: #475569; border: none; padding: 6px 12px; border-radius: 4px;"><i class="fa-solid fa-file-excel"></i> Xuất Điểm</button>
+              <div class="section-actions">
+                <button class="btn primary" id="addStudentBtn" type="button"><i class="fa-solid fa-user-plus"></i> Thêm học sinh</button>
+                <button class="btn primary btn-exam" id="openExamSelectBtn" type="button"><i class="fa-solid fa-star"></i> Nhập điểm thi</button>
+                <button class="btn secondary" id="exportExamBtn" type="button" style="background: #e2e8f0; color: #475569; border: none; padding: 6px 12px; border-radius: 4px;"><i class="fa-solid fa-file-excel"></i> Xuất Điểm</button>
+              </div>
               
             </div>
             <div id="studentRoster" class="student-roster"></div>
@@ -795,7 +798,7 @@
     </div>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="/app.js?v=20261005-10"></script>
+  <script src="/app.js?v=20261005-11"></script>
   <script src="/exams.js"></script>
   <nav class="bottom-nav">
     <button class="bottom-tab active" data-tab="absenceTab" type="button"><i class="fa-solid fa-clipboard-user"></i><span>Điểm danh</span></button>
@@ -919,6 +922,36 @@
         <button type="button" class="btn primary" id="btnSaveExam">Lưu Bảng Điểm</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Add Student Modal -->
+<div id="addStudentModal" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+  <div style="background:#fff; padding:20px; border-radius:8px; width:440px; max-width:90%; max-height:90vh; overflow-y:auto; position:relative;">
+    <button type="button" id="closeAddStudentBtn" aria-label="Đóng" style="position:absolute; top:15px; right:15px; background:none; border:none; font-size:24px; cursor:pointer; color:#94a3b8; line-height:1;">&times;</button>
+    <h3 style="margin-top:0;">Thêm học sinh vào lớp</h3>
+    <form id="addStudentForm">
+      <div class="form-group" style="margin-bottom:10px;">
+        <label for="addStudentClass">Lớp</label>
+        <input type="text" id="addStudentClass" readonly style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; background:#f1f5f9;">
+      </div>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label for="addStudentName">Họ tên học sinh</label>
+        <input type="text" id="addStudentName" required autocomplete="name" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+      </div>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label for="addStudentParent">Trường chính</label>
+        <input type="text" id="addStudentParent" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+      </div>
+      <div class="form-group" style="margin-bottom:15px;">
+        <label for="addStudentPhone">Số điện thoại phụ huynh</label>
+        <input type="tel" id="addStudentPhone" required autocomplete="tel" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" class="btn ghost" id="cancelAddStudentBtn">Hủy</button>
+        <button type="submit" class="btn primary">Lưu học sinh</button>
+      </div>
+    </form>
   </div>
 </div>
 

@@ -3022,9 +3022,29 @@ app.get('/api/students', async (req, res, next) => {
 
 app.post('/api/students', async (req, res, next) => {
   try {
-    requireFields(req.body, ['code', 'fullName', 'className', 'parentName', 'phone1']);
+    requireFields(req.body, ['fullName', 'className', 'parentName', 'phone1']);
     const db = await getBranchDb(req);
     const student = sanitizeStudent(req.body);
+    if (!student.phone1) {
+      const err = new Error('Số điện thoại phụ huynh không hợp lệ.');
+      err.status = 400;
+      throw err;
+    }
+    const sameStudent = db.students.some(row =>
+      cleanText(row.fullName).toLocaleLowerCase('vi') === student.fullName.toLocaleLowerCase('vi') &&
+      cleanText(row.className).toLocaleLowerCase('vi') === student.className.toLocaleLowerCase('vi') &&
+      normalizePhone(row.phone1) === student.phone1
+    );
+    if (sameStudent) {
+      const err = new Error('Học sinh này đã có trong lớp. Vui lòng tìm và sửa hồ sơ hiện có.');
+      err.status = 409;
+      throw err;
+    }
+    if (!student.code) {
+      do {
+        student.code = `AUTO-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
+      } while (db.students.some(row => row.code.toLowerCase() === student.code.toLowerCase()));
+    }
 
     if (db.students.some(row => row.code.toLowerCase() === student.code.toLowerCase())) {
       const err = new Error('Mã học sinh đã tồn tại.');

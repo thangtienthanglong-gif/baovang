@@ -1054,6 +1054,60 @@ function renderRoster(searchMatches) {
   }).join('');
 }
 
+function openAddStudentModal() {
+  const className = $('#classDropdown')?.value || '';
+  if (!className || className === 'ALL' || !state.classes.includes(className)) {
+    toast('Vui lòng chọn một lớp trước khi thêm học sinh.', 'error');
+    return;
+  }
+  $('#addStudentForm').reset();
+  $('#addStudentClass').value = className;
+  $('#addStudentModal').style.display = 'flex';
+  $('#addStudentName').focus();
+}
+
+function closeAddStudentModal() {
+  $('#addStudentModal').style.display = 'none';
+}
+
+async function createStudentFromAttendance(event) {
+  event.preventDefault();
+  const className = $('#addStudentClass').value;
+  if (!state.classes.includes(className)) {
+    toast('Lớp đã thay đổi. Vui lòng chọn lại lớp.', 'error');
+    return;
+  }
+  const form = event.currentTarget;
+  const saveButton = form.querySelector('button[type="submit"]');
+  saveButton.disabled = true;
+  let student;
+  try {
+    student = await api('/api/students', {
+      method: 'POST',
+      body: JSON.stringify({
+        fullName: $('#addStudentName').value.trim(),
+        className,
+        parentName: $('#addStudentParent').value.trim(),
+        phone1: $('#addStudentPhone').value.trim()
+      })
+    });
+  } catch (error) {
+    toast(error.message, 'error');
+    return;
+  } finally {
+    saveButton.disabled = false;
+  }
+  closeAddStudentModal();
+  toast(`Đã thêm ${student.fullName} vào lớp ${className}.`);
+  if ($('#quickStudentSearchMain')) $('#quickStudentSearchMain').value = '';
+  if ($('#quickSearchResultsMain')) $('#quickSearchResultsMain').style.display = 'none';
+  try {
+    await loadBootstrap();
+  } catch (error) {
+    toast('Đã lưu học sinh, nhưng chưa tải lại được danh sách. Vui lòng bấm Tải lại.', 'error');
+  }
+}
+
 function renderRosterStudent(student) {
   const absence = absenceForStudent(student.id, student.className);
   const currentStatus = absence ? normalizeAbsenceStatus(absence.absenceStatus) : 'Đang học';
@@ -2492,6 +2546,10 @@ function initChatbox() {
 }
 
 function initEvents() {
+  $('#addStudentBtn')?.addEventListener('click', openAddStudentModal);
+  $('#closeAddStudentBtn')?.addEventListener('click', closeAddStudentModal);
+  $('#cancelAddStudentBtn')?.addEventListener('click', closeAddStudentModal);
+  $('#addStudentForm')?.addEventListener('submit', createStudentFromAttendance);
   $$('.tab').forEach(button => {
     if (button.dataset.tab) {
       button.addEventListener('click', async () => activateTab(button.dataset.tab));
