@@ -16,6 +16,7 @@ let absencePieChart = null;
 let classBarChart = null;
 let quickSearchIndex = [];
 let quickSearchTimer = null;
+let renderedQueueSession = '';
 const QUICK_SEARCH_ROSTER_LIMIT = 80;
 
 function normalizeQuickSearch(value) {
@@ -250,6 +251,17 @@ function selectedDate() {
   return $('#filterDate')?.value || state.today || clientTodayISO();
 }
 
+function currentSessionForTime() {
+  const now = new Date();
+  const time = now.getHours() + now.getMinutes() / 60;
+  return time < 12 ? 'Sáng' : time < 16.5 ? 'Chiều' : 'Tối';
+}
+
+function selectedQueueSession() {
+  const value = $('#filterSession')?.value || 'AUTO';
+  return value === 'AUTO' ? currentSessionForTime() : value;
+}
+
 function selectedClass() {
   const cd = $('#classDropdown')?.value;
   if (cd) return cd;
@@ -259,7 +271,7 @@ function selectedClass() {
 function getFilters() {
   return {
     date: selectedDate(),
-    session: $('#filterSession')?.value || 'ALL',
+    session: selectedQueueSession(),
     className: $('#filterClass')?.value || 'ALL',
     absenceStatus: $('#filterAbsenceStatus')?.value || 'ALL',
     status: $('#filterStatus')?.value || 'ALL',
@@ -307,6 +319,7 @@ async function refreshCurrentView(button) {
 }
 
 async function loadAbsences() {
+  if (selectedQueueSession() !== renderedQueueSession) renderFilters();
   const data = await api('/api/absences?' + queryString(getFilters()));
   state.absences = data.absences;
   state.summary = data.summary;
@@ -404,12 +417,18 @@ function scheduleDayLabel(day) {
 
 function renderFilters() {
   const dateStr = selectedDate();
+  const queueSession = selectedQueueSession();
+  const autoSessionOption = $('#filterSession option[value="AUTO"]');
+  if (autoSessionOption) autoSessionOption.textContent = `Tự động (Buổi ${currentSessionForTime()})`;
   const sessionGroups = { 'Sáng': [], 'Chiều': [], 'Tối': [], 'Khác': [] };
   state.classes.forEach(className => {
     const info = getClassScheduleInfo(className, dateStr);
-    if (info.matchesDate) sessionGroups[info.sessionName].push(className);
+    if (info.matchesDate && (queueSession === 'ALL' || info.sessionName === queueSession)) {
+      sessionGroups[info.sessionName].push(className);
+    }
   });
   const validClasses = Object.values(sessionGroups).flat();
+  renderedQueueSession = queueSession;
 
   if ($('#logFilterClass')) {
     const currentLogClass = $('#logFilterClass').value;
@@ -420,9 +439,9 @@ function renderFilters() {
   const currentClass = $('#filterClass')?.value || 'ALL';
   if ($('#filterClass')) {
     const optionsHtml = ['<option value="ALL">Tất cả lớp</option>'];
-  ['Sáng', 'Chiều', 'Tối', 'Khác'].forEach(session => {
+    ['Sáng', 'Chiều', 'Tối', 'Khác'].forEach(session => {
       if (sessionGroups[session].length > 0) {
-      optionsHtml.push(`<optgroup label="Buổi ${session}">`);
+        optionsHtml.push(`<optgroup label="Buổi ${session}">`);
         sessionGroups[session].forEach(className => {
           optionsHtml.push(`<option value="${escapeHtml(className)}">${escapeHtml(className)}</option>`);
         });
@@ -2613,10 +2632,15 @@ function initEvents() {
     }
   });
   $('#filterClass').addEventListener('change', loadAbsences);
+  $('#filterSession')?.addEventListener('change', async () => {
+    renderFilters();
+    await loadAbsences();
+  });
   $('#filterAbsenceStatus')?.addEventListener('change', loadAbsences);
   $('#filterStatus')?.addEventListener('change', loadAbsences);
   $('#filterNoticeStatus')?.addEventListener('change', loadAbsences);
   $('#filterDate').addEventListener('change', async () => {
+    renderFilters();
     await loadAbsences();
   });
   $('#filterKeyword').addEventListener('keydown', event => {
@@ -2813,12 +2837,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
   const sessionDropdown = document.getElementById('sessionDropdown');
   if (sessionDropdown) {
-    const h = new Date().getHours();
-    const m = new Date().getMinutes();
-    const time = h + m / 60;
-    if (time < 12) sessionDropdown.value = "Sáng";
-    else if (time < 16.5) sessionDropdown.value = "Chiều";
-    else sessionDropdown.value = "Tối";
+    sessionDropdown.value = currentSessionForTime();
   }
 
   initEvents();
