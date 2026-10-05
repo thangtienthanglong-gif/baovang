@@ -1031,8 +1031,8 @@ function renderRosterStudent(student) {
   const hasStuckNote = !student.isMakeupAttendance && isStuckToday;
   const statusOptions = [
     ['Đang học', 'Đang học'],
-    ['Vắng', 'Vắng'],
-    ['Có phép', 'Có phép'],
+    ['Vắng', 'Vắng không phép'],
+    ['Có phép', 'Vắng có phép'],
     ['Đi trễ', 'Đi trễ'],
     ['Về sớm', 'Về sớm']
   ];
