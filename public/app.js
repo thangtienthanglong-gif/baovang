@@ -1097,24 +1097,13 @@ function noticeTimeLine(row) {
 
 function renderAbsences() {
   const container = $('#absenceRows');
-  
-  // Filter out processed items if the user is viewing "ALL"
-  const currentNoticeFilter = $('#filterNoticeStatus')?.value || 'ALL';
-  const displayAbsences = state.absences.filter(row => {
-    if (currentNoticeFilter !== 'ALL') return true; // Show whatever they filtered for
-    // In ALL mode, hide processed items
-    if (['Đã gửi', 'Chưa kết bạn - Cần gọi', 'Không gửi', 'Lỗi gửi', 'Chờ gửi thủ công'].includes(row.noticeStatus)) {
-      return false;
-    }
-    return true;
-  });
 
-  if (!displayAbsences.length) {
-    container.innerHTML = '<div class="empty">Hàng xử lý trống. Mọi học sinh đã được xử lý xong.</div>';
+  if (!state.absences.length) {
+    container.innerHTML = '<div class="empty">Không có học sinh phù hợp với bộ lọc.</div>';
     return;
   }
 
-  container.innerHTML = displayAbsences.map(row => {
+  container.innerHTML = state.absences.map(row => {
     const phone = row.phone1 || row.phone2 || 'Chưa có SĐT';
     return `
     <article class="absence-item" data-id="${row.id}">
