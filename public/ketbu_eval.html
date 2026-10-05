@@ -275,6 +275,13 @@
     let currentPart = ''; 
     let currentShift = '';
 
+    function absenceStatusLabel(value) {
+        const status = String(value || '').trim().replace(/\s*\(Cả ngày\)/gi, '');
+        if (status === 'Vắng' || status === 'Vắng không phép' || status === 'Không phép') return 'Vắng không phép';
+        if (status === 'Có phép' || status === 'Vắng có phép') return 'Vắng có phép';
+        return status;
+    }
+
     function getBranchId() {
         let b = localStorage.getItem('activeBranch') || localStorage.getItem('selectedBranchId') || 'main';
         if (b && b.indexOf('branch_') !== -1) {
@@ -686,11 +693,11 @@
         }
 
         if (absentUnexcusedCount > 0) {
-            html += `<span style="background:#fee2e2; color:#b91c1c; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-user-xmark"></i> Vắng KP: <b>-${absentUnexcusedCount}</b></span>`;
+            html += `<span style="background:#fee2e2; color:#b91c1c; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-user-xmark"></i> Vắng không phép: <b>-${absentUnexcusedCount}</b></span>`;
         }
 
         if (absentExcusedCount > 0) {
-            html += `<span style="background:#e0e7ff; color:#4338ca; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-clipboard-check"></i> Vắng CP: <b>-${absentExcusedCount}</b></span>`;
+            html += `<span style="background:#e0e7ff; color:#4338ca; padding:4px 12px; border-radius:20px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-clipboard-check"></i> Vắng có phép: <b>-${absentExcusedCount}</b></span>`;
         }
 
         if (earlyCount > 0) {
@@ -736,9 +743,9 @@
             } else if (isEarly) {
                 statusBadgeHtml = `<span class="status-badge" style="display:inline-block; background:#10b981;">VỀ SỚM</span>`;
             } else if (isAbsent) {
-                statusBadgeHtml = `<span class="status-badge" style="display:inline-block; background:#ef4444;">VẮNG</span>`;
+                statusBadgeHtml = `<span class="status-badge" style="display:inline-block; background:#ef4444;">VẮNG KHÔNG PHÉP</span>`;
             } else {
-                statusBadgeHtml = `<span class="status-badge" style="display:none; background:#ef4444;">VẮNG</span>`;
+                statusBadgeHtml = `<span class="status-badge" style="display:none; background:#ef4444;">VẮNG KHÔNG PHÉP</span>`;
             }
             let makeupBadgeHtml = st.isMakeupToday ? `<span class="makeup-badge">${st.makeupType === 'bu_tam' ? 'BÙ TẠM' : 'HỌC BÙ'}</span>` : '';
             let stuckSubText = '';
@@ -760,7 +767,7 @@
                 </div>
                 <div class="actions">
                     <button class="icon-btn absent-toggle ${isAbsent ? 'active' : ''}" onclick="toggleAbsent('${st.id}', this)" ${(isEarly || isExcused || st.isStuckToday) ? 'disabled' : ''}>
-                        <i class="fa-solid fa-user-xmark"></i> Vắng
+                        <i class="fa-solid fa-user-xmark"></i> Vắng không phép
                     </button>
                     <button class="icon-btn early-toggle ${isEarly ? 'active' : ''}" onclick="toggleEarly('${st.id}', this)" ${(isAbsent || isExcused || st.isStuckToday) ? 'disabled' : ''}>
                         <i class="fa-solid fa-person-walking-arrow-right"></i> Về sớm
@@ -859,7 +866,7 @@
         btn.classList.toggle('active');
         const badge = row.querySelector('.status-badge');
         badge.style.display = isAbsent ? 'inline-block' : 'none';
-        badge.textContent = 'VẮNG';
+        badge.textContent = 'VẮNG KHÔNG PHÉP';
         badge.style.background = '#ef4444';
         
         const evalBtns = row.querySelector('.eval-buttons');
@@ -1407,7 +1414,7 @@
                         <div class="history-title" style="color: #991b1b;">Trạng thái: ${
                             ((a.absenceStatus === 'Về sớm' || a.absenceStatus === 'Đi trễ') && a.initialReason && (a.initialReason.startsWith('Về sớm lúc') || a.initialReason.startsWith('Đi trễ lúc'))) 
                             ? `<b>${a.initialReason}</b>` 
-                            : `<b>${a.absenceStatus || 'Không rõ'}</b>${(a.initialReason && a.initialReason !== a.absenceStatus) ? ' (' + a.initialReason + ')' : ''}`
+                            : `<b>${absenceStatusLabel(a.absenceStatus) || 'Không rõ'}</b>${(a.initialReason && absenceStatusLabel(a.initialReason) !== absenceStatusLabel(a.absenceStatus)) ? ' (' + a.initialReason + ')' : ''}`
                         }${evLink}</div>
                     </div>
                 `}).join('');
@@ -1502,7 +1509,7 @@
                             <div class="history-title" style="color: #991b1b; font-size:12px;">Trạng thái: ${
                                 ((a.absenceStatus === 'Về sớm' || a.absenceStatus === 'Đi trễ') && a.initialReason && (a.initialReason.startsWith('Về sớm lúc') || a.initialReason.startsWith('Đi trễ lúc'))) 
                                 ? `<b>${a.initialReason}</b>` 
-                                : `<b>${a.absenceStatus || 'Không rõ'}</b>${(a.initialReason && a.initialReason !== a.absenceStatus) ? ' (' + a.initialReason + ')' : ''}`
+                                : `<b>${absenceStatusLabel(a.absenceStatus) || 'Không rõ'}</b>${(a.initialReason && absenceStatusLabel(a.initialReason) !== absenceStatusLabel(a.absenceStatus)) ? ' (' + a.initialReason + ')' : ''}`
                             }${evLink}</div>
                         </div>`;
                     }).join('');

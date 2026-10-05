@@ -126,6 +126,13 @@ function normalizeAbsenceStatus(value) {
   return aliases[status] || status;
 }
 
+function absenceStatusLabel(value) {
+  const status = String(value || '').trim().replace(/\s*\(Cả ngày\)/gi, '');
+  if (status === 'Vắng' || status === 'Vắng không phép' || status === 'Không phép') return 'Vắng không phép';
+  if (status === 'Có phép' || status === 'Vắng có phép') return 'Vắng có phép';
+  return status;
+}
+
 
 function getToken() {
   const t = localStorage.getItem('token');
@@ -430,7 +437,7 @@ function renderFilters() {
   if ($('#filterAbsenceStatus')) {
     $('#filterAbsenceStatus').innerHTML = [
       '<option value="ALL">Tất cả trạng thái vắng</option>',
-      ...state.absenceStatuses.filter(s => s !== 'Cả ngày').map(status => `<option value="${escapeHtml(status)}">${escapeHtml(status.replace(/\s*\(Cả ngày\)/gi, ''))}</option>`)
+      ...state.absenceStatuses.filter(s => s !== 'Cả ngày').map(status => `<option value="${escapeHtml(status)}">${escapeHtml(absenceStatusLabel(status))}</option>`)
     ].join('');
     $('#filterAbsenceStatus').value = state.absenceStatuses.includes(currentAbsenceStatus) ? currentAbsenceStatus : 'ALL';
   }
@@ -452,7 +459,7 @@ function renderFilters() {
   $('#filterNoticeStatus').value = state.noticeStatuses.includes(currentNotice) ? currentNotice : 'ALL';
 
   if ($('#absenceStatus')) {
-    $('#absenceStatus').innerHTML = state.absenceStatuses.filter(s => s !== 'Cả ngày').map(status => `<option>${escapeHtml(status)}</option>`).join('');
+    $('#absenceStatus').innerHTML = state.absenceStatuses.filter(s => s !== 'Cả ngày').map(status => `<option value="${escapeHtml(status)}">${escapeHtml(absenceStatusLabel(status))}</option>`).join('');
   }
 }
 
@@ -1028,8 +1035,8 @@ function renderRosterStudent(student) {
   const hasStuckNote = !student.isMakeupAttendance && isStuckToday;
   const statusOptions = [
     ['Đang học', 'Đang học'],
-    ['Vắng', 'Vắng không phép'],
-    ['Có phép', 'Vắng có phép'],
+    ['Vắng', absenceStatusLabel('Vắng')],
+    ['Có phép', absenceStatusLabel('Có phép')],
     ['Đi trễ', 'Đi trễ'],
     ['Về sớm', 'Về sớm']
   ];
@@ -1106,8 +1113,8 @@ function renderAbsences() {
 
       <div class="absence-controls">
         <label>Trạng thái vắng</label>
-        <span class="absence-status-pill">${escapeHtml(normalizeAbsenceStatus(row.absenceStatus))}</span>
-        ${row.initialReason && row.initialReason !== row.absenceStatus ? `<span class="muted">${escapeHtml(row.initialReason)}</span>` : ''}
+        <span class="absence-status-pill">${escapeHtml(absenceStatusLabel(row.absenceStatus) || 'Không rõ')}</span>
+        ${row.initialReason && absenceStatusLabel(row.initialReason) !== absenceStatusLabel(row.absenceStatus) ? `<span class="muted">${escapeHtml(row.initialReason)}</span>` : ''}
         ${row.evidenceUrl ? `<a href="${row.evidenceUrl}" target="_blank" style="font-size: 11px; display: inline-block; margin-top: 4px; color: #3b82f6; text-decoration: none;"><i class="fa-solid fa-image"></i> Xem ảnh</a>` : ''}
         <button class="btn primary btn-sm schedule-makeup-btn" type="button" 
           onclick="window.open('/ketbu/index.html?class=' + encodeURIComponent('${escapeHtml(row.className)}') + '&student=' + encodeURIComponent('${escapeHtml(row.studentName)}'), '_blank')"
@@ -1380,7 +1387,7 @@ async function loadNotices() {
       <td>${escapeHtml(row.phone1 || '')}</td>
       <td>
         <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-          <span style="font-weight: 500;">${escapeHtml(row.absenceStatus || 'Khác')}</span>
+          <span style="font-weight: 500;">${escapeHtml(absenceStatusLabel(row.absenceStatus) || 'Khác')}</span>
           <span class="badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span>
           ${row.status === 'Chờ gửi thủ công' && row.message ? `
             <button class="btn ghost btn-sm copy-log-msg-btn" type="button" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;" data-msg="${escapeHtml(row.message)}">
@@ -3453,7 +3460,7 @@ window.openHistoryPanel = async function(studentId) {
                     <div class="history-title" style="color: #991b1b;">Trạng thái: ${
                         ((a.absenceStatus === 'Về sớm' || a.absenceStatus === 'Đi trễ') && a.initialReason && (a.initialReason.startsWith('Về sớm lúc') || a.initialReason.startsWith('Đi trễ lúc'))) 
                         ? `<b>${a.initialReason}</b>` 
-                        : `<b>${a.absenceStatus || 'Không rõ'}</b>${(a.initialReason && a.initialReason !== a.absenceStatus) ? ' (' + a.initialReason + ')' : ''}`
+                        : `<b>${escapeHtml(absenceStatusLabel(a.absenceStatus) || 'Không rõ')}</b>${(a.initialReason && absenceStatusLabel(a.initialReason) !== absenceStatusLabel(a.absenceStatus)) ? ' (' + escapeHtml(a.initialReason) + ')' : ''}`
                     }${evLink}</div>
                 </div>
             `}).join('');
@@ -3548,7 +3555,7 @@ window.openHistoryPanel = async function(studentId) {
                         <div class="history-title" style="color: #991b1b; font-size:12px;">Trạng thái: ${
                             ((a.absenceStatus === 'Về sớm' || a.absenceStatus === 'Đi trễ') && a.initialReason && (a.initialReason.startsWith('Về sớm lúc') || a.initialReason.startsWith('Đi trễ lúc'))) 
                             ? `<b>${a.initialReason}</b>` 
-                            : `<b>${a.absenceStatus || 'Không rõ'}</b>${(a.initialReason && a.initialReason !== a.absenceStatus) ? ' (' + a.initialReason + ')' : ''}`
+                            : `<b>${escapeHtml(absenceStatusLabel(a.absenceStatus) || 'Không rõ')}</b>${(a.initialReason && absenceStatusLabel(a.initialReason) !== absenceStatusLabel(a.absenceStatus)) ? ' (' + escapeHtml(a.initialReason) + ')' : ''}`
                         }${evLink}</div>
                     </div>`;
                 }).join('');
