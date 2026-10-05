@@ -854,13 +854,13 @@ function scheduleExceptionAppliesToDate(exception, dateStr, selectedDayCode = 'A
   return normalizeScheduleDayCode(exception.stuckDay) === targetDay;
 }
 
-function attendanceRosterStudents(dateStr) {
+function attendanceRosterStudents(dateStr, selectedDayCode = 'ALL') {
   const students = activeStudents();
   const byId = new Map(students.map(student => [student.id, student]));
-  const date = new Date(`${dateStr}T00:00:00Z`);
-  if (Number.isNaN(date.getTime())) return students;
-  const day = date.getUTCDay();
-  const weekday = String(day === 0 ? 8 : day + 1);
+  const weekday = selectedDayCode === 'ALL'
+    ? scheduleDayForDate(dateStr)
+    : normalizeScheduleDayCode(selectedDayCode);
+  if (!weekday) return students;
   const seen = new Set(students.map(student => `${student.id}\u0000${student.className}`));
   const roster = [...students];
 
@@ -888,12 +888,12 @@ function renderClassDropdown() {
   const dropdown = $('#classDropdown');
   const meta = $('#classDropdownMeta');
   const dateStr = selectedDate();
-  const rows = attendanceRosterStudents(dateStr);
+  const activeDay = selectedDay();
+  const rows = attendanceRosterStudents(dateStr, activeDay);
   const groups = groupByClass(rows);
   const classNames = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'vi'));
   const activeClass = selectedClass();
   const activeSession = selectedSession();
-  const activeDay = selectedDay();
   const gradeDropdown = $('#gradeDropdown');
   const currentGrade = gradeDropdown?.value || 'ALL';
   const grades = [...new Set(classNames.map(getClassGrade).filter(Boolean))]
@@ -963,7 +963,7 @@ function renderRoster(searchMatches) {
   const activeDay = selectedDay();
   const activeGrade = selectedGrade();
   const searchQuery = ($('#quickStudentSearchMain')?.value || '').trim();
-  const rows = attendanceRosterStudents(dateStr);
+  const rows = attendanceRosterStudents(dateStr, activeDay);
   const searchIds = searchQuery
     ? new Set((searchMatches || findQuickSearchStudents(searchQuery)).map(student => student.id))
     : null;
