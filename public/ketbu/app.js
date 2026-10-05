@@ -1573,13 +1573,29 @@ function initials(name) {
     .toUpperCase();
 }
 
-function createGroupRegex(suffixesString) {
-  const parts = suffixesString
-    .split(",")
-    .map(s => s.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    .filter(Boolean)
-    .sort((a, b) => b.length - a.length);
-  return parts.length ? new RegExp(`(?:${parts.join('|')})$`, "i") : /(?!)/;
+function configuredMathGroup(details) {
+  const groups = [data.group1Suffixes || emptyData.group1Suffixes, data.group2Suffixes || emptyData.group2Suffixes]
+    .map((value) => value.split(",").map((token) => token.trim().toUpperCase()).filter(Boolean));
+  const prefix = String(details.code || "").toUpperCase().match(/^[0-9]{1,2}(N[SCT])/)?.[1] || "";
+  const levelCode = String(details.levelCode || "").toUpperCase();
+
+  for (const matches of [
+    (token) => prefix && token === prefix,
+    (token) => levelCode.endsWith(token)
+  ]) {
+    let group = 0;
+    let longest = 0;
+    groups.forEach((tokens, index) => {
+      tokens.forEach((token) => {
+        if (matches(token) && token.length > longest) {
+          group = index + 1;
+          longest = token.length;
+        }
+      });
+    });
+    if (group) return group;
+  }
+  return 0;
 }
 
 function getClassSessions(classCode) {
@@ -1598,16 +1614,12 @@ function defaultLessonFor(details, index, weekday = null) {
   const options = lessonOptionsForDetails(details);
   if (details.subjectCode !== "TOAN") return options[0];
 
-  const group1Regex = createGroupRegex(data.group1Suffixes || emptyData.group1Suffixes);
-  const group2Regex = createGroupRegex(data.group2Suffixes || emptyData.group2Suffixes);
-
-  const isGroup1 = group1Regex.test(details.code);
-  const isGroup2 = group2Regex.test(details.code);
+  const configuredGroup = configuredMathGroup(details);
 
   let shiftDefaults;
-  if (isGroup1) {
+  if (configuredGroup === 1) {
     shiftDefaults = ["H1-D2-H2", "H3-D3-TH", "D1-H4-D4"];
-  } else if (isGroup2) {
+  } else if (configuredGroup === 2) {
     shiftDefaults = ["H3-D3-TH", "H1-D2-H2", "D1-H4-D4"];
   } else {
     const shift = weekday === null ? details.shift : shiftForWeekday(details, weekday);
