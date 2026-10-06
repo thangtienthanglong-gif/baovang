@@ -120,6 +120,7 @@ function normalizeAbsenceStatus(value) {
   status = status.replace(/\s*\(Cả ngày\)/gi, '');
   const aliases = {
     'Vắng chưa rõ lý do': 'Vắng',
+    'Không phép': 'Vắng',
     'Vắng không phép': 'Vắng',
     'Vắng có phép': 'Có phép',
     'Nghỉ bệnh': 'Nghỉ học',
@@ -527,6 +528,8 @@ function renderSettings() {
 
 function renderMessagePreview() {
   const previewType = $('#previewTypeSelect')?.value || 'absence';
+  const previewStatusSelect = $('#previewAbsenceStatusSelect');
+  if (previewStatusSelect) previewStatusSelect.hidden = previewType !== 'absence';
   let templateId = 'messageTemplate';
   if (previewType === 'tuition') templateId = 'tuitionTemplate';
   if (previewType === 'periodic') templateId = 'periodicTemplate';
@@ -542,15 +545,17 @@ function renderMessagePreview() {
 
   const dummyClass = '6CT1(3-5)';
   const dummySession = getClassScheduleInfo(dummyClass, selectedDate(), selectedDay()).sessionName;
+  const dateParts = selectedDate().split('-');
+  const displayDate = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : selectedDate();
 
   const dummyData = {
     schoolName: $('#schoolName')?.value || 'Trường Thăng Long',
-    date: selectedDate(),
+    date: displayDate,
     studentCode: 'HS001',
     studentName: 'Vũ Phương Hướng Nam',
     className: dummyClass,
     session: dummySession !== 'Khác' ? dummySession : 'Sáng',
-    absenceStatus: 'Vắng không phép',
+    absenceStatus: previewStatusSelect?.value || 'Vắng không phép',
     reason: 'Không có lý do',
     parentName: 'Phụ huynh HS',
     phone: '0901234567',
@@ -1469,7 +1474,7 @@ async function loadNotices() {
             </button>
           ` : ''}
           ${row.status === 'Lỗi gửi' && row.absenceId ? `
-            <button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${row.absenceId}" data-logid="${row.id}" data-msg="${escapeHtml(row.message || '')}" data-phone="${escapeHtml(row.responsePayload?.phone || row.phone1 || '')}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">
+            <button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${row.absenceId}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">
               Gửi lại
             </button>
             ${row.channel === 'Zalo cá nhân' ? `<button class="btn ghost btn-sm confirm-zalo-sent-btn" type="button" data-id="${row.absenceId}" data-logid="${row.id}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Xác nhận đã gửi</button>` : ''}
@@ -1874,7 +1879,7 @@ function startZaloExtensionAuto(items) {
           updateChain = updateChain.then(() =>
             api(`/api/absences/${item.absenceId}/zalo/${data.ok ? 'manual-sent' : 'manual-error'}`, {
               method: 'POST',
-              body: JSON.stringify(data.ok ? {} : { error: data.error || '' })
+              body: JSON.stringify(data.ok ? { formattingWarning: data.formattingWarning || '' } : { error: data.error || '' })
             })
           ).catch(error => console.error('Không cập nhật được trạng thái extension:', error));
         }
@@ -1891,7 +1896,7 @@ function startZaloExtensionAuto(items) {
         } else if (data.status === 'error') {
           toast(`Auto Zalo lỗi: ${data.error || 'Không kết nối được Zalo Web.'}`, 'error');
         } else {
-          toast(`Auto Zalo đã dừng: ${data.sent || 0}/${data.total || items.length} tin đã gửi.`, 'error');
+          toast(data.error || `Auto Zalo đã dừng: ${data.sent || 0}/${data.total || items.length} tin đã gửi.`, 'error');
         }
         updateChain.then(() => resolve(data.status === 'completed'));
       }
@@ -2658,33 +2663,27 @@ function initEvents() {
     const retryBtn = event.target.closest('.retry-zalo-btn');
     if (retryBtn) {
       const id = retryBtn.dataset.id;
-      const logId = retryBtn.dataset.logid;
-      const msg = retryBtn.dataset.msg;
-      const phone = retryBtn.dataset.phone;
 
       retryBtn.disabled = true;
       retryBtn.textContent = '...';
 
-      if (msg) {
-        try {
-          await sendSingleViaZaloExtension({ id: logId || `retry-${id}`, absenceId: id, phone, message: msg });
-        } catch (err) {
-          console.error(err);
-          toast('Lỗi khi thao tác Zalo: ' + err.message);
-        }
-        await loadNotices();
-        await loadAbsences();
-      } else {
-        try {
-          await api(`/api/absences/${id}/zalo`, { method: 'POST', body: '{}' });
+      try {
+        const log = await api(`/api/absences/${id}/zalo`, { method: 'POST', body: '{}' });
+        if (log.status === 'Chờ gửi thủ công' && state.settings?.zaloMode === 'personal-real') {
+          await sendSingleViaZaloExtension({
+            id: log.id,
+            absenceId: id,
+            phone: log.responsePayload?.phone || log.phone1 || '',
+            message: log.message || ''
+          });
+        } else {
           toast('Đã đưa vào tiến trình gửi Zalo.');
-        } catch (err) {
-          console.error(err);
-          toast('Lỗi khi gửi lại Zalo: ' + err.message);
         }
-        await loadNotices();
-        await loadAbsences();
+      } catch (err) {
+        console.error(err);
+        toast('Lỗi khi gửi lại Zalo: ' + err.message, 'error');
       }
+      await Promise.all([loadNotices(), loadAbsences()]);
       return;
     }
   });
@@ -2709,6 +2708,7 @@ function initEvents() {
   $('#tuitionTemplate')?.addEventListener('input', renderMessagePreview);
   $('#periodicTemplate')?.addEventListener('input', renderMessagePreview);
   $('#previewTypeSelect')?.addEventListener('change', renderMessagePreview);
+  $('#previewAbsenceStatusSelect')?.addEventListener('change', renderMessagePreview);
   $('#schoolName')?.addEventListener('input', renderMessagePreview);
 
   $('#sessionDropdown')?.addEventListener('change', () => {

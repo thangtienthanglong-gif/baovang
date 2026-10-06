@@ -92,6 +92,8 @@ const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
 const DEFAULT_GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 const ABSENCE_STATUSES = ['Vắng', 'Có phép', 'Đi trễ', 'Về sớm', 'Cả ngày', 'Nghỉ học', 'Học phí', 'Trễ học phí'];
 const MAKEUP_ATTENDANCE_STATUSES = new Set(['Vắng', 'Có phép', 'Đi trễ', 'Về sớm']);
+const DEFAULT_ABSENCE_MESSAGE_TEMPLATE = 'Kính gửi Quý phụ huynh, {schoolName} thông báo học sinh {studentName}, lớp {className}.\nHọc sinh: {absenceStatus} - {session} ngày {date}.\nPhụ huynh vui lòng phản hồi với nhà trường nếu cần bổ sung thông tin.';
+const OLD_ABSENCE_MESSAGE_TEMPLATE = 'Kính gửi Quý phụ huynh, {schoolName} thông báo học sinh {studentName}, lớp {className}.\nVắng học {session} ngày {date}.\nHọc sinh: {absenceStatus}.\nPhụ huynh vui lòng phản hồi với nhà trường nếu cần bổ sung thông tin.';
 const pendingAiActions = new Map();
 
 app.use(express.json({ limit: '5mb' }));
@@ -344,7 +346,7 @@ function defaultSettings() {
     cozeBotId: '',
     cozeAccessToken: '',
     cozeUserId: 'bao-vang-teacher',
-    messageTemplate: 'Kính gửi Quý phụ huynh, {schoolName} thông báo học sinh {studentName}, lớp {className}.\nVắng học {session} ngày {date}.\nHọc sinh: {absenceStatus}.\nPhụ huynh vui lòng phản hồi với nhà trường nếu cần bổ sung thông tin.',
+    messageTemplate: DEFAULT_ABSENCE_MESSAGE_TEMPLATE,
     tuitionTemplate: 'Kính gửi Quý phụ huynh, {schoolName} thông báo học phí/tiền nợ của em {studentName}, lớp {className} hiện tại là: {tuitionDebt}.\nVui lòng hoàn thành sớm. Trân trọng!',
     periodicTemplate: 'Kính gửi Quý phụ huynh, {schoolName} gửi thông báo định kì/khóa mới cho em {studentName}, lớp {className}.',
     periodicImageBase64: ''
@@ -384,7 +386,7 @@ function publicSettings(settings) {
     cozeBotId: cozeConfig.botId,
     cozeUserId: cozeConfig.userId,
     hasCozeAccessToken: Boolean(cozeConfig.accessToken),
-    messageTemplate: settings.messageTemplate || defaultSettings().messageTemplate,
+    messageTemplate: resolveAbsenceMessageTemplate(settings.messageTemplate),
     tuitionTemplate: settings.tuitionTemplate || defaultSettings().tuitionTemplate,
     periodicTemplate: settings.periodicTemplate || defaultSettings().periodicTemplate,
     periodicImageBase64: settings.periodicImageBase64 || ''
@@ -408,11 +410,30 @@ function cleanMultilineText(value) {
   return String(value ?? '').trim();
 }
 
+function resolveAbsenceMessageTemplate(value) {
+  const template = cleanMultilineText(value);
+  const normalized = text => text.replace(/\r\n?/g, '\n')
+    .replace(/[ \t]*\n[ \t]*/g, '\n')
+    .replace(/Học sinh\s*:/, 'Học sinh:')
+    .trim();
+  return !template || normalized(template) === OLD_ABSENCE_MESSAGE_TEMPLATE
+    ? DEFAULT_ABSENCE_MESSAGE_TEMPLATE
+    : template;
+}
+
+function absenceStatusForMessage(value) {
+  const status = normalizeAbsenceStatus(value);
+  if (status === 'Vắng') return 'Vắng không phép';
+  if (status === 'Có phép') return 'Vắng có phép';
+  return status;
+}
+
 function normalizeAbsenceStatus(value) {
   const status = cleanText(value);
   const aliases = {
     '': 'Vắng',
     'Vắng chưa rõ lý do': 'Vắng',
+    'Không phép': 'Vắng',
     'Vắng không phép': 'Vắng',
     'Vắng có phép': 'Có phép',
     'Nghỉ bệnh': 'Nghỉ học',
@@ -647,7 +668,7 @@ function buildMessage(settings, absence, student) {
     studentName: student.fullName || '',
     className: absence.attendanceClass || student.className || '',
     session: absence.session || '',
-    absenceStatus: normalizeAbsenceStatus(absence.absenceStatus),
+    absenceStatus: absenceStatusForMessage(absence.absenceStatus),
     reason: normalizeInitialReason(absence.initialReason, normalizeAbsenceStatus(absence.absenceStatus)),
     parentName: student.parentName || '',
     phone: student.phone1 || '',
@@ -656,7 +677,7 @@ function buildMessage(settings, absence, student) {
   };
   
   const status = normalizeAbsenceStatus(absence.absenceStatus);
-  let template = settings.messageTemplate || 'Kính gửi Quý phụ huynh, {schoolName} thông báo học sinh {studentName}, lớp {className}.\nVắng học {session} ngày {date}.\nHọc sinh: {absenceStatus}.\nPhụ huynh vui lòng phản hồi với nhà trường nếu cần bổ sung thông tin.';
+  let template = resolveAbsenceMessageTemplate(settings.messageTemplate);
   if (status === 'Học phí' || status === 'Trễ học phí') {
     template = settings.tuitionTemplate || 'Kính gửi Quý phụ huynh, {schoolName} thông báo học phí/tiền nợ của em {studentName}, lớp {className} hiện tại là: {tuitionDebt}.\nVui lòng hoàn thành sớm. Trân trọng!';
   } else if (['Định kỳ', 'Định kì', 'Khóa mới', 'Thông báo chung'].includes(status)) {
@@ -3754,11 +3775,15 @@ app.post('/api/absences/:id/zalo/manual-sent', async (req, res, next) => {
     const time = nowISO();
     const settings = db.settings || defaultSettings();
     const message = buildMessage(settings, absence, student);
+    const formattingWarning = cleanText(req.body?.formattingWarning).slice(0, 300);
+    const sentResult = formattingWarning
+      ? `Đã gửi qua Zalo cá nhân nhưng sai định dạng: ${formattingWarning}`
+      : 'Đã gửi qua Zalo cá nhân, giáo viên đánh dấu thủ công.';
 
     db.absences[index] = {
       ...absence,
       noticeStatus: 'Đã gửi',
-      noticeResult: 'Đã gửi qua Zalo cá nhân, giáo viên đánh dấu thủ công.',
+      noticeResult: sentResult,
       noticeSentAt: time,
       noticeDueAt: '',
       autoNotice: false,
@@ -3780,7 +3805,7 @@ app.post('/api/absences/:id/zalo/manual-sent', async (req, res, next) => {
     if (existingLogIndex !== -1) {
       log = db.notificationLogs[existingLogIndex];
       log.status = 'Đã gửi';
-      log.result = 'Đã gửi qua Zalo cá nhân, giáo viên đánh dấu thủ công.';
+      log.result = sentResult;
       log.time = time;
     } else {
       log = {
@@ -3799,7 +3824,7 @@ app.post('/api/absences/:id/zalo/manual-sent', async (req, res, next) => {
         reason: 'personal_manual_confirmed',
         message,
         status: 'Đã gửi',
-        result: 'Đã gửi qua Zalo cá nhân, giáo viên đánh dấu thủ công.',
+        result: sentResult,
         responsePayload: { manual: true }
       };
       db.notificationLogs.push(log);
