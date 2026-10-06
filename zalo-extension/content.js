@@ -9,6 +9,31 @@ const phoneForSearch = value => {
   return digits.startsWith('84') && digits.length >= 11 ? `0${digits.slice(2)}` : digits;
 };
 
+function contextInvalidatedError() {
+  const error = new Error('Tiện ích BaoVang đã được tải lại. Hãy tải lại tab BaoVang và Zalo để kết nối phiên bản mới.');
+  error.contextInvalidated = true;
+  return error;
+}
+
+function requireActiveExtension() {
+  try {
+    if (chrome.runtime.id) return;
+  } catch (_) {}
+  throw contextInvalidatedError();
+}
+
+async function sendRuntimeMessage(message) {
+  try {
+    requireActiveExtension();
+    return await chrome.runtime.sendMessage(message);
+  } catch (error) {
+    if (error.contextInvalidated || /Extension context invalidated/i.test(error.message || '')) {
+      throw contextInvalidatedError();
+    }
+    throw error;
+  }
+}
+
 function showZaloStatus(message, isError = false) {
   let banner = document.getElementById('baovang-zalo-status');
   if (!banner) {
@@ -336,6 +361,7 @@ async function openConversation(item, search) {
 }
 
 async function sendOne(item) {
+  requireActiveExtension();
   if (!String(item?.phone || '').replace(/\D/g, '')) throw skippedError('Thiếu số điện thoại Zalo; đã bỏ qua tin này.');
   if (!String(item?.message || '').trim()) throw skippedError('Tin nhắn trống; đã bỏ qua tin này.');
   showZaloStatus(`BaoVang: đang tìm số ${String(item.phone).slice(-4)} trên Zalo...`);
@@ -366,6 +392,7 @@ async function sendOne(item) {
   };
 
   showZaloStatus('BaoVang: đã mở cuộc trò chuyện, đang dán tin nhắn...');
+  requireActiveExtension();
   await fillComposer(composer, item.message);
   await wait(500);
   const sentDuringInput = deliveryState();
@@ -388,6 +415,7 @@ async function sendOne(item) {
   }
   const sendButton = await waitFor(() => findSendButton(composer), 2000);
   if (!sendButton) throw new Error('Zalo chưa hiện nút Gửi; tin vẫn ở trong ô soạn. Hãy kiểm tra và gửi thủ công.');
+  requireActiveExtension();
   clickLike(sendButton);
 
   const sent = await waitFor(deliveryState, 10000);
@@ -398,43 +426,69 @@ async function sendOne(item) {
   return finishSent(sent);
 }
 
+async function handleZaloItem(item) {
+  let result;
+  try {
+    result = await sendOne(item);
+  } catch (error) {
+    result = { ok: false, skipped: Boolean(error.skipped), error: error.message };
+    showZaloStatus(`BaoVang: ${error.message}`, true);
+  }
+  // A reporting failure after a successful send is a connection failure,
+  // not a failed send. Do not send a second, contradictory failure result.
+  try {
+    await sendRuntimeMessage({ type: 'BAOVANG_ZALO_ITEM_RESULT', itemId: item.id, ...result });
+  } catch (error) {
+    showZaloStatus(result.ok
+      ? `BaoVang: tin đã gửi, nhưng chưa báo kết quả về BaoVang. ${error.message} Kiểm tra trạng thái trước khi gửi lại.`
+      : `BaoVang: ${result.error} Chưa báo được kết quả về BaoVang. ${error.message}`, true);
+  }
+  return result;
+}
+
+// Remove listeners from an earlier injection of this script in the same tab.
+window.__baovangZaloDispose?.();
+
 if (isBaoVang) {
-  chrome.runtime.onMessage.addListener(message => {
+  const onRuntimeMessage = message => {
     if (message?.type === 'BAOVANG_EXTENSION_RESULT' || message?.type === 'BAOVANG_EXTENSION_STATUS') {
       window.postMessage({ source: 'baovang-zalo-extension', ...message }, '*');
     }
-  });
-  window.addEventListener('message', event => {
+  };
+  const reportConnectionError = error => {
+    if (error.contextInvalidated) window.removeEventListener('message', onAppMessage);
+    window.postMessage({ source: 'baovang-zalo-extension', type: 'BAOVANG_EXTENSION_STATUS', status: 'error', error: error.message }, location.origin);
+  };
+  const onAppMessage = event => {
     if (event.source !== window || event.data?.source !== 'baovang-app') return;
     if (event.data.type === 'START_AUTO') {
-      chrome.runtime.sendMessage({ type: 'BAOVANG_START_AUTO', items: event.data.items })
+      sendRuntimeMessage({ type: 'BAOVANG_START_AUTO', items: event.data.items })
         .then(response => {
           if (response?.ok) return;
           window.postMessage({ source: 'baovang-zalo-extension', type: 'BAOVANG_EXTENSION_STATUS', status: 'error', error: response?.error || 'Extension không khởi động được.' }, location.origin);
         })
-        .catch(error => window.postMessage({ source: 'baovang-zalo-extension', type: 'BAOVANG_EXTENSION_STATUS', status: 'error', error: error.message }, location.origin));
+        .catch(reportConnectionError);
     }
-    if (event.data.type === 'STOP_AUTO') chrome.runtime.sendMessage({ type: 'BAOVANG_STOP_AUTO' });
-  });
+    if (event.data.type === 'STOP_AUTO') sendRuntimeMessage({ type: 'BAOVANG_STOP_AUTO' }).catch(reportConnectionError);
+  };
+  chrome.runtime.onMessage.addListener(onRuntimeMessage);
+  window.addEventListener('message', onAppMessage);
+  window.__baovangZaloDispose = () => {
+    window.removeEventListener('message', onAppMessage);
+    try { chrome.runtime.onMessage.removeListener(onRuntimeMessage); } catch (_) {}
+  };
 } else {
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  const onRuntimeMessage = (message, sender, sendResponse) => {
     if (message?.type !== 'BAOVANG_ZALO_ITEM') return;
     // Acknowledge receipt now; the completed send is reported separately below.
     // Returning true without ever calling sendResponse leaves tabs.sendMessage pending.
     sendResponse({ accepted: true });
-    sendOne(message.item)
-      .then(result => chrome.runtime.sendMessage({ type: 'BAOVANG_ZALO_ITEM_RESULT', itemId: message.item.id, ...result }))
-      .catch(error => {
-        showZaloStatus(`BaoVang: ${error.message}`, true);
-        return chrome.runtime.sendMessage({
-          type: 'BAOVANG_ZALO_ITEM_RESULT',
-          itemId: message.item.id,
-          ok: false,
-          skipped: Boolean(error.skipped),
-          error: error.message
-        });
-      });
-  });
+    handleZaloItem(message.item);
+  };
+  chrome.runtime.onMessage.addListener(onRuntimeMessage);
+  window.__baovangZaloDispose = () => {
+    try { chrome.runtime.onMessage.removeListener(onRuntimeMessage); } catch (_) {}
+  };
 }
 
 })();

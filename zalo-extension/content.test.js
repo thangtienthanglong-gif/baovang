@@ -141,7 +141,7 @@ test('sends automatically after paste replaces the editor node', async () => {
     } },
     setTimeout(callback) { callback(); },
     MouseEvent: function () {},
-    chrome: { runtime: { onMessage: { addListener() {} } } }
+    chrome: { runtime: { id: 'test-extension', onMessage: { addListener() {} } } }
   };
   vm.runInNewContext(source, context);
   context.configureSend({ status() {}, search: () => ({}), open: () => oldDraft,

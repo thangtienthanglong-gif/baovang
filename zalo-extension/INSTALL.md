@@ -14,6 +14,8 @@ Sau khi cập nhật mã extension, bấm **Reload / Tải lại** tại trang t
 
 Bản 1.2.0 cần quyền **clipboardRead** để dán tin nhiều dòng. Chấp nhận quyền Chrome yêu cầu khi tải lại extension.
 
+Nếu Chrome ghi lỗi **Extension context invalidated** sau khi bấm Reload, tải lại cả tab BaoVang và Zalo. Đây là kết nối của mã cũ đã bị ngắt khi tiện ích cập nhật. Nút thùng rác trong màn hình lỗi của Chrome xóa bản ghi lỗi cũ; tin đã gửi không cần gửi lại.
+
 Nếu một tin đã xuất hiện trong cuộc trò chuyện nhưng extension báo lỗi xuống dòng, **không bấm Gửi lại** cho tin đó. Kiểm tra nội dung trong Zalo rồi đánh dấu đã gửi trong BaoVang để tránh phụ huynh nhận tin trùng.
 
 Extension tự mở Zalo Web, tìm theo số điện thoại, dán toàn bộ nội dung và bấm Gửi. Với tin nhiều dòng, extension dùng clipboard của Chrome rồi kiểm tra đủ nội dung trong ô chat trước khi bấm Gửi. Nếu nội dung không được dán đầy đủ hoặc không thấy tin mới trong cuộc trò chuyện, extension dừng và BaoVang báo lỗi.
