@@ -1473,6 +1473,9 @@ async function loadNotices() {
               Copy tin nhắn
             </button>
           ` : ''}
+          ${row.status === 'Chờ gửi thủ công' && row.absenceId && row.channel === 'Zalo cá nhân' ? `
+            <button class="btn ghost btn-sm confirm-zalo-sent-btn" type="button" data-id="${escapeHtml(row.absenceId)}" data-logid="${escapeHtml(row.id)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Đánh dấu đã gửi</button>
+          ` : ''}
           ${row.status === 'Lỗi gửi' && row.absenceId ? `
             ${/Đã bấm Gửi|gửi một phần|chưa xác nhận được nội dung/i.test(row.result || '')
               ? '<span class="muted">Kiểm tra tin trong Zalo trước khi thao tác tiếp</span>'
