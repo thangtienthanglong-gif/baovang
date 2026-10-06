@@ -174,13 +174,21 @@ window.toast = toast;
 window.showToast = toast;
 
 async function api(path, options = {}) {
+  const headers = new Headers({
+    'Content-Type': 'application/json',
+    'X-Branch-Id': getActiveBranch(),
+    'Authorization': 'Bearer ' + getToken()
+  });
+  new Headers(options.headers).forEach((value, key) => headers.set(key, value));
   const response = await fetch(path, {
-    headers: { 'Content-Type': 'application/json', 'X-Branch-Id': getActiveBranch(), 'Authorization': 'Bearer ' + getToken() },
-    ...options
+    ...options,
+    headers
   });
   const data = await response.json().catch(() => ({}));
   
-  if (response.status === 401 || response.status === 403) {
+  const invalidSession = response.status === 401 || (response.status === 403
+    && data.error === 'Phiên đăng nhập hết hạn hoặc không hợp lệ');
+  if (invalidSession) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('activeBranch');
