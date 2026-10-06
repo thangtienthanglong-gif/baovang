@@ -70,15 +70,6 @@ function emitInput(el, value) {
   }
 }
 
-function keyEnter(el) {
-  for (const type of ['keydown', 'keypress', 'keyup']) {
-    el.dispatchEvent(new KeyboardEvent(type, {
-      key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
-      bubbles: true, cancelable: true
-    }));
-  }
-}
-
 function clickLike(el) {
   el.focus?.();
   for (const type of ['mousedown', 'mouseup']) {
@@ -91,6 +82,17 @@ function messageLines(value) {
   return String(value || '').replace(/\r\n?/g, '\n').split('\n');
 }
 
+function sameMessageLines(actual, expected) {
+  const normalize = value => messageLines(value)
+    .map(line => line.replace(/\u00a0/g, ' ').replace(/\u200b/g, '').trim());
+  const actualLines = normalize(actual);
+  const expectedLines = normalize(expected);
+  while (actualLines.at(-1) === '') actualLines.pop();
+  while (expectedLines.at(-1) === '') expectedLines.pop();
+  return actualLines.length === expectedLines.length
+    && actualLines.every((line, index) => line === expectedLines[index]);
+}
+
 function composerLines(composer) {
   const value = composer.isContentEditable
     ? (composer.innerText || composer.textContent || '')
@@ -99,15 +101,13 @@ function composerLines(composer) {
 }
 
 function hasFullMessage(composer, message) {
-  const expected = messageLines(message).map(line => line.replace(/\u00a0/g, ' ').replace(/\u200b/g, '').trim());
-  const actual = composerLines(composer);
-  // Rich editors may add an empty trailing line after a <br>.
-  while (actual.at(-1) === '') actual.pop();
-  while (expected.at(-1) === '') expected.pop();
-  return actual.length === expected.length && actual.every((line, index) => line === expected[index]);
+  return sameMessageLines(composerLines(composer).join('\n'), message);
 }
 
 function fillComposer(composer, message) {
+  if (messageLines(message).length > 1) {
+    throw new Error('Tin nhiều dòng cần được kiểm tra và gửi thủ công trong Zalo.');
+  }
   if (!composer.isContentEditable) {
     emitInput(composer, message);
     return;
@@ -121,18 +121,8 @@ function fillComposer(composer, message) {
   selection?.addRange(range);
   document.execCommand('delete', false);
 
-  // Inserting text with embedded newlines can be interpreted as Enter by Zalo.
-  // Insert line breaks explicitly so only the Send button submits the message.
-  // Keep a space at each boundary if Zalo flattens line breaks on delivery.
-  const lines = messageLines(message);
-  for (const [index, line] of lines.entries()) {
-    if (index > 0 && !document.execCommand('insertLineBreak', false)) {
-      throw new Error('Zalo Web không hỗ trợ điền tin nhiều dòng; chưa bấm Gửi.');
-    }
-    const text = line + (index < lines.length - 1 ? ' ' : '');
-    if (text && !document.execCommand('insertText', false, text)) {
-      throw new Error('Zalo Web không nhận đủ nội dung tin nhắn; chưa bấm Gửi.');
-    }
+  if (message && !document.execCommand('insertText', false, message)) {
+    throw new Error('Zalo Web không nhận đủ nội dung tin nhắn; chưa bấm Gửi.');
   }
 }
 
@@ -201,12 +191,19 @@ function findComposer() {
   ]);
   if (!candidates.length) return null;
 
+  // The chat panel starts after the search box in Zalo's left sidebar. A
+  // viewport percentage can move past the composer on wider screens.
+  const searchBox = findSearchBox();
+  const chatLeft = searchBox
+    ? searchBox.getBoundingClientRect().right
+    : Math.min(320, window.innerWidth * 0.28);
+
   // Zalo có thể có nhiều contenteditable; ô chat thường nằm thấp nhất trong cửa sổ.
   return candidates
     .filter(el => !/tìm kiếm|search/i.test(el.getAttribute('placeholder') || el.getAttribute('aria-label') || ''))
     .filter(el => {
       const rect = el.getBoundingClientRect();
-      return rect.left > window.innerWidth * 0.28 && rect.top > window.innerHeight * 0.3;
+      return rect.left > chatLeft && rect.top > window.innerHeight * 0.3;
     })
     .sort((a, b) => {
       const ar = a.getBoundingClientRect();
@@ -216,16 +213,27 @@ function findComposer() {
 }
 
 function findSendButton(composer) {
-  const root = composer?.closest('form, [class*="footer"], [class*="composer"], [class*="input"]') || document;
-  const candidates = Array.from(root.querySelectorAll('button, [role="button"], [aria-label], [title]')).filter(visible);
-  const matching = candidates.filter(el => {
-    const label = `${el.getAttribute('aria-label') || ''} ${el.getAttribute('title') || ''} ${textOf(el)}`;
-    return /(^|\s)(gửi|send)(\s|$)/i.test(label) || /send|gửi/i.test(el.className || '');
-  });
-  return matching[matching.length - 1] || null;
+  const root = composer?.closest('form, [class*="footer"], [class*="composer"], [class*="input"]');
+  const composerRect = composer?.getBoundingClientRect();
+  for (const scope of [root, document]) {
+    if (!scope) continue;
+    const matching = Array.from(scope.querySelectorAll('button, [role="button"], [aria-label], [title]'))
+      .filter(visible)
+      .filter(el => {
+        const labels = [el.getAttribute('aria-label'), el.getAttribute('title'), textOf(el)].filter(Boolean);
+        const isSend = labels.some(label => /^(gửi( tin nhắn)?|send( message)?)(\s*\(.*\))?$/i.test(label.trim()))
+          || /(?:^|[\s_-])(send|gửi)(?:$|[\s_-](?:btn|button|message|msg))(?![a-z])/i.test(el.className || '');
+        const rect = el.getBoundingClientRect();
+        return isSend
+          && !el.disabled
+          && (!composerRect || (rect.left >= composerRect.left && rect.top >= composerRect.top - 80));
+      });
+    if (matching.length) return matching[matching.length - 1];
+  }
+  return null;
 }
 
-function matchingMessageCount(message) {
+function matchingMessageCount(message, requireLines = true) {
   const compact = value => String(value || '').replace(/[\s\u00a0\u200b]+/g, '');
   const expected = compact(message);
   if (!expected) return 0;
@@ -236,7 +244,7 @@ function matchingMessageCount(message) {
         && visible(el)
         && !(composer && (composer.contains(el) || el.contains(composer)));
     })
-    .filter(el => compact(textOf(el)) === expected);
+    .filter(el => compact(textOf(el)) === expected && (!requireLines || sameMessageLines(textOf(el), message)));
   // A message can have several nested wrappers with the same text.
   return matches.filter(el => !matches.some(child => child !== el && el.contains(child))).length;
 }
@@ -315,33 +323,65 @@ async function sendOne(item) {
   const composer = await openConversation(item, search);
   if (!composer) throw skippedError(`Không mở được cuộc trò chuyện của số ${item.phone}.`);
 
+  if (messageLines(item.message).length > 1) {
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(messageLines(item.message).join('\n'));
+      copied = true;
+    } catch (_) {}
+    const instruction = copied
+      ? 'Đã mở cuộc trò chuyện và copy tin nhiều dòng. Nhấn Ctrl+V, kiểm tra đủ nội dung rồi tự bấm Gửi; extension chưa gửi tin này.'
+      : 'Đã mở cuộc trò chuyện nhưng chưa copy được tin. Dùng nút Copy tin trong BaoVang, dán vào Zalo và tự bấm Gửi; extension chưa gửi tin này.';
+    showZaloStatus(`BaoVang: ${instruction}`);
+    return { ok: false, manual: true, error: instruction };
+  }
+
+  const previousMessages = matchingMessageCount(item.message);
+  const previousTextMatches = matchingMessageCount(item.message, false);
+  const lines = messageLines(item.message).filter(line => line.trim());
+  const previousLineCounts = lines.map(line => matchingMessageCount(line, false));
+  const deliveryState = () => {
+    if (matchingMessageCount(item.message) > previousMessages) return 'formatted';
+    if (matchingMessageCount(item.message, false) > previousTextMatches) return 'flat';
+    return null;
+  };
+  const finishSent = async state => {
+    if (state === 'flat') {
+      const warning = 'Tin đã gửi nhưng Zalo làm mất dấu xuống dòng; đã dừng hàng đợi. Không gửi lại tin này.';
+      showZaloStatus(`BaoVang: ${warning}`, true);
+      return { ok: true, formattingWarning: warning };
+    }
+    await wait(900);
+    showZaloStatus('BaoVang: đã gửi tin nhắn qua Zalo Web.');
+    return { ok: true };
+  };
+
   showZaloStatus('BaoVang: đã mở cuộc trò chuyện, đang điền tin nhắn...');
   fillComposer(composer, item.message);
+  await wait(500);
+  const sentDuringInput = deliveryState();
+  if (sentDuringInput) return finishSent(sentDuringInput);
+  if (lines.some((line, index) => matchingMessageCount(line, false) > previousLineCounts[index])) {
+    throw new Error('Zalo có thể đã gửi một phần tin khi điền nội dung; hãy kiểm tra cuộc trò chuyện trước khi gửi lại.');
+  }
   const filled = await waitFor(() => {
     return hasFullMessage(composer, item.message) ? composer : null;
   }, 2500);
   if (!filled) throw new Error('Zalo Web chưa nhận đủ nội dung tin nhắn; chưa bấm Gửi.');
 
-  await wait(500);
   if (!hasFullMessage(composer, item.message)) {
     throw new Error('Nội dung trong ô chat đã thay đổi; chưa bấm Gửi.');
   }
-  const previousMessages = matchingMessageCount(item.message);
-  const sendButton = findSendButton(composer);
-  if (sendButton) {
-    clickLike(sendButton);
-  } else {
-    // Một số phiên bản Zalo ẩn nút Gửi; Enter là phương án dự phòng.
-    keyEnter(composer);
-  }
+  const sendButton = await waitFor(() => findSendButton(composer), 2000);
+  if (!sendButton) throw new Error('Zalo chưa hiện nút Gửi; tin vẫn ở trong ô soạn. Hãy kiểm tra và gửi thủ công.');
+  clickLike(sendButton);
 
-  const sent = await waitFor(() => {
-    return matchingMessageCount(item.message) > previousMessages ? true : null;
-  }, 10000);
-  if (!sent) throw new Error('Chưa thấy toàn bộ tin nhắn mới trong cuộc trò chuyện Zalo; cần kiểm tra trước khi gửi tiếp.');
-  await wait(900);
-  showZaloStatus('BaoVang: đã gửi tin nhắn qua Zalo Web.');
-  return { ok: true };
+  const sent = await waitFor(deliveryState, 10000);
+  if (!sent) {
+    const detail = hasFullMessage(composer, item.message) ? 'Tin vẫn ở trong ô soạn.' : 'Hãy kiểm tra tin trong cuộc trò chuyện.';
+    throw new Error(`Đã bấm Gửi nhưng chưa xác nhận được nội dung và dấu xuống dòng trên Zalo. ${detail} Kiểm tra trước khi gửi lại.`);
+  }
+  return finishSent(sent);
 }
 
 if (isBaoVang) {

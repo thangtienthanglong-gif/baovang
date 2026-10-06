@@ -12,7 +12,9 @@
 
 Sau khi cập nhật mã extension, bấm **Reload / Tải lại** tại trang tiện ích rồi tải lại tab BaoVang. Khi gửi, extension sẽ tự mở hoặc tải lại tab Zalo Web để nạp đúng phiên bản mới.
 
-Extension tự mở Zalo Web, tìm theo số điện thoại, điền tin và gửi tuần tự. Số không tìm thấy trong kết quả Zalo được bỏ qua; lỗi mở hoặc gửi tin sẽ dừng hàng đợi và báo lý do về BaoVang.
+Nếu một tin đã xuất hiện trong cuộc trò chuyện nhưng extension báo lỗi xuống dòng, **không bấm Gửi lại** cho tin đó. Kiểm tra nội dung trong Zalo rồi đánh dấu đã gửi trong BaoVang để tránh phụ huynh nhận tin trùng.
+
+Extension tự mở Zalo Web và tìm theo số điện thoại. Tin một dòng có thể được điền và gửi tự động. Với tin nhiều dòng, extension mở cuộc trò chuyện và copy nội dung; thầy/cô nhấn Ctrl+V, kiểm tra đủ nội dung rồi tự bấm Gửi. Hàng đợi tạm dừng để tránh Zalo tự gửi sớm một phần tin. Nếu không copy tự động được, dùng nút **Copy tin** trong BaoVang.
 
 Khi extension đang chạy, trạng thái sẽ hiện ở góc trên bên phải tab Zalo Web. Nếu dừng ở màn hình chào mừng, xem dòng trạng thái này để biết bước nào chưa thực hiện được.
 

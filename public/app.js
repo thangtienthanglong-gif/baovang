@@ -1474,9 +1474,9 @@ async function loadNotices() {
             </button>
           ` : ''}
           ${row.status === 'Lỗi gửi' && row.absenceId ? `
-            <button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${row.absenceId}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">
-              Gửi lại
-            </button>
+            ${/Đã bấm Gửi|gửi một phần|chưa xác nhận được nội dung/i.test(row.result || '')
+              ? '<span class="muted">Kiểm tra tin trong Zalo trước khi thao tác tiếp</span>'
+              : `<button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${row.absenceId}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Gửi lại</button>`}
             ${row.channel === 'Zalo cá nhân' ? `<button class="btn ghost btn-sm confirm-zalo-sent-btn" type="button" data-id="${row.absenceId}" data-logid="${row.id}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Xác nhận đã gửi</button>` : ''}
           ` : ''}
         </div>
@@ -1718,7 +1718,7 @@ function renderManualSendPanel(logs = []) {
     <div class="manual-send-heading">
       <div>
         <h3>Tin nhắn Zalo cá nhân cần gửi</h3>
-        <p>Bấm Nhắn tin để mở Zalo và đưa nội dung vào khung chat, sau đó kiểm tra và bấm gửi trong Zalo.</p>
+        <p>Với tin nhiều dòng, extension mở cuộc trò chuyện và copy nội dung. Nhấn Ctrl+V trong Zalo, kiểm tra đủ nội dung rồi tự bấm Gửi. Nếu cần, bấm Copy tin bên dưới.</p>
       </div>
       <span>${rows.length} học sinh</span>
     </div>
@@ -1875,7 +1875,7 @@ function startZaloExtensionAuto(items) {
       if (data.type === 'BAOVANG_EXTENSION_RESULT') {
         expectUpdateWithin(60000);
         const item = items.find(row => row.id === data.itemId);
-        if (item?.absenceId) {
+        if (item?.absenceId && !data.manual) {
           updateChain = updateChain.then(() =>
             api(`/api/absences/${item.absenceId}/zalo/${data.ok ? 'manual-sent' : 'manual-error'}`, {
               method: 'POST',
@@ -1884,7 +1884,7 @@ function startZaloExtensionAuto(items) {
           ).catch(error => console.error('Không cập nhật được trạng thái extension:', error));
         }
         if (!data.ok && data.skipped) toast(`Đã bỏ qua ${item?.phone || 'học sinh'}: ${data.error || 'không tìm thấy trên Zalo.'}`, 'error');
-        if (!data.ok && !data.skipped) toast(`Auto đã dừng: ${data.error || 'Zalo Web không gửi được tin.'}`, 'error');
+        if (!data.ok && !data.skipped && !data.manual) toast(`Auto đã dừng: ${data.error || 'Zalo Web không gửi được tin.'}`, 'error');
         return;
       }
       if (data.type === 'BAOVANG_EXTENSION_STATUS' && ['completed', 'stopped', 'error'].includes(data.status)) {
@@ -1896,7 +1896,7 @@ function startZaloExtensionAuto(items) {
         } else if (data.status === 'error') {
           toast(`Auto Zalo lỗi: ${data.error || 'Không kết nối được Zalo Web.'}`, 'error');
         } else {
-          toast(data.error || `Auto Zalo đã dừng: ${data.sent || 0}/${data.total || items.length} tin đã gửi.`, 'error');
+          toast(data.error || `Auto Zalo đã dừng: ${data.sent || 0}/${data.total || items.length} tin đã gửi.`, data.manual ? undefined : 'error');
         }
         updateChain.then(() => resolve(data.status === 'completed'));
       }
