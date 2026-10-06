@@ -323,17 +323,38 @@ async function sendOne(item) {
   const composer = await openConversation(item, search);
   if (!composer) throw skippedError(`Không mở được cuộc trò chuyện của số ${item.phone}.`);
 
+  const finishManualSend = async state => {
+    if (state === 'flat') {
+      const warning = 'Tin đã gửi nhưng Zalo làm mất dấu xuống dòng.';
+      showZaloStatus(`BaoVang: ${warning}`, true);
+      return { ok: true, formattingWarning: warning };
+    }
+    showZaloStatus('BaoVang: đã xác nhận tin gửi thành công.');
+    return { ok: true };
+  };
+
   if (messageLines(item.message).length > 1) {
+    const previousMessages = matchingMessageCount(item.message);
+    const previousTextMatches = matchingMessageCount(item.message, false);
+    const deliveryState = () => {
+      if (matchingMessageCount(item.message) > previousMessages) return 'formatted';
+      if (matchingMessageCount(item.message, false) > previousTextMatches) return 'flat';
+      return null;
+    };
     let copied = false;
     try {
       await navigator.clipboard.writeText(messageLines(item.message).join('\n'));
       copied = true;
     } catch (_) {}
     const instruction = copied
-      ? 'Đã mở cuộc trò chuyện và copy tin nhiều dòng. Nhấn Ctrl+V, kiểm tra đủ nội dung rồi tự bấm Gửi; extension chưa gửi tin này.'
-      : 'Đã mở cuộc trò chuyện nhưng chưa copy được tin. Dùng nút Copy tin trong BaoVang, dán vào Zalo và tự bấm Gửi; extension chưa gửi tin này.';
+      ? 'Đã copy tin nhiều dòng. Nhấn Ctrl+V, kiểm tra đủ nội dung rồi tự bấm Gửi; BaoVang sẽ xác nhận trạng thái sau khi thấy tin trong cuộc trò chuyện.'
+      : 'Dùng nút Copy tin trong BaoVang, dán vào Zalo rồi tự bấm Gửi; BaoVang sẽ xác nhận trạng thái sau khi thấy tin trong cuộc trò chuyện.';
     showZaloStatus(`BaoVang: ${instruction}`);
-    return { ok: false, manual: true, error: instruction };
+    const sent = await waitFor(deliveryState, 120000);
+    if (!sent) {
+      throw new Error('Không xác nhận được tin đã gửi trên Zalo sau 2 phút. Kiểm tra cuộc trò chuyện; trạng thái đã chuyển sang lỗi gửi.');
+    }
+    return finishManualSend(sent);
   }
 
   const previousMessages = matchingMessageCount(item.message);

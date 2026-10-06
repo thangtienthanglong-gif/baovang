@@ -88,8 +88,8 @@ async function processQueue() {
       response = await new Promise(async resolve => {
         const timeout = setTimeout(() => {
           chrome.runtime.onMessage.removeListener(listener);
-          resolve({ ok: false, error: 'Zalo Web không phản hồi trong 45 giây.' });
-        }, 45000);
+          resolve({ ok: false, error: 'Không xác nhận được tin đã gửi trên Zalo sau 2 phút.' });
+        }, 150000);
         const listener = (message, sender) => {
           if (sender.tab?.id !== zaloTabId || message?.type !== 'BAOVANG_ZALO_ITEM_RESULT' || message.itemId !== item.id) return;
           clearTimeout(timeout);

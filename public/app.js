@@ -1844,6 +1844,9 @@ async function sendBulkZalo(button) {
         message: log.responsePayload?.message || log.message || ''
       }));
       await startZaloExtensionAuto(items);
+      const latestLogs = await api('/api/notification-logs?' + queryString({ date: selectedDate() }));
+      const latestById = new Map(latestLogs.map(log => [log.id, log]));
+      result.logs = result.logs.map(log => latestById.get(log.id) || log);
     } else {
       toast(bulkZaloMessage(result));
     }
@@ -1871,12 +1874,12 @@ function startZaloExtensionAuto(items) {
       if (event.source !== window || event.data?.source !== 'baovang-zalo-extension') return;
       const data = event.data;
       if (data.type === 'BAOVANG_EXTENSION_STATUS' && data.status === 'started') {
-        expectUpdateWithin(60000);
-        toast(`Extension đang Auto gửi ${data.total || items.length} tin qua Zalo Web...`);
+        expectUpdateWithin(180000);
+        toast(`Extension đang xử lý ${data.total || items.length} tin trên Zalo Web. Hãy dán và gửi các tin nhiều dòng khi được yêu cầu.`);
         return;
       }
       if (data.type === 'BAOVANG_EXTENSION_RESULT') {
-        expectUpdateWithin(60000);
+        expectUpdateWithin(180000);
         const item = items.find(row => row.id === data.itemId);
         if (item?.absenceId && !data.manual) {
           updateChain = updateChain.then(() =>
