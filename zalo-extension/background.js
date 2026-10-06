@@ -19,6 +19,23 @@ async function sendToApp(message) {
   try { await chrome.tabs.sendMessage(state.appTabId, message); } catch (_) {}
 }
 
+async function refreshAppTabsAfterUpdate() {
+  // Reloading the extension invalidates content scripts in existing pages.
+  // Reload BaoVang itself so the old, possibly unguarded message bridge is
+  // removed; injecting a new listener does not remove the old page listener.
+  const tabs = await chrome.tabs.query({ url: 'https://baovang.vercel.app/*' });
+  const appTabs = tabs.filter(tab => tab.id != null && /^https:\/\/baovang\.vercel\.app(?:\/|$)/i.test(tab.url || ''));
+  const results = await Promise.allSettled(appTabs.map(tab => chrome.tabs.reload(tab.id)));
+  for (const result of results) {
+    if (result.status === 'rejected') console.warn('Không tải lại được tab BaoVang sau khi cập nhật tiện ích:', result.reason?.message || result.reason);
+  }
+}
+
+chrome.runtime.onInstalled.addListener(details => {
+  if (!['install', 'update'].includes(details.reason)) return;
+  return refreshAppTabsAfterUpdate().catch(error => console.warn('Không kết nối lại được tab BaoVang:', error.message));
+});
+
 async function waitForTabComplete(tabId, timeoutMs = 20000) {
   const current = await chrome.tabs.get(tabId).catch(() => null);
   if (current?.status === 'complete') return;

@@ -10,7 +10,7 @@
 6. Mở `https://chat.zalo.me/` và đăng nhập Zalo Web.
 7. Trong BaoVang chọn Zalo cá nhân rồi bấm gửi hàng loạt.
 
-Sau khi cập nhật mã extension, bấm **Reload / Tải lại** tại trang tiện ích rồi tải lại tab BaoVang. Khi gửi, extension sẽ tự mở hoặc tải lại tab Zalo Web để nạp đúng phiên bản mới.
+Sau khi cập nhật mã extension, bấm **Reload / Tải lại** tại trang tiện ích. Từ bản **1.2.3**, extension tự tải lại các tab BaoVang đang mở để thay kết nối cũ. Khi gửi, extension sẽ tự mở hoặc tải lại tab Zalo Web để nạp đúng phiên bản mới. Hoàn tất lưu thông tin đang sửa trước khi cập nhật tiện ích.
 
 Bản 1.2.0 cần quyền **clipboardRead** để dán tin nhiều dòng. Chấp nhận quyền Chrome yêu cầu khi tải lại extension.
 
