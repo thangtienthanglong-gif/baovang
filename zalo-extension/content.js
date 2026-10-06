@@ -84,24 +84,37 @@ function messageLines(value) {
 
 function sameMessageLines(actual, expected) {
   const normalize = value => messageLines(value)
-    .map(line => line.replace(/\u00a0/g, ' ').replace(/\u200b/g, '').trim());
+    .map(line => line.normalize('NFC').replace(/[\u200b\ufeff]/g, '').replace(/[^\S\n]+/g, ' ').trim())
+    .filter(Boolean);
   const actualLines = normalize(actual);
   const expectedLines = normalize(expected);
-  while (actualLines.at(-1) === '') actualLines.pop();
-  while (expectedLines.at(-1) === '') expectedLines.pop();
   return actualLines.length === expectedLines.length
     && actualLines.every((line, index) => line === expectedLines[index]);
 }
 
-function composerLines(composer) {
-  const value = composer.isContentEditable
-    ? (composer.innerText || composer.textContent || '')
-    : composer.value || '';
-  return messageLines(value).map(line => line.replace(/\u00a0/g, ' ').replace(/\u200b/g, '').trim());
+function editableText(node) {
+  if (node.nodeType === 3) return node.nodeValue || '';
+  if (node.nodeType !== 1) return '';
+  const tag = node.tagName?.toUpperCase() || '';
+  const block = /^(DIV|P|LI|SECTION|ARTICLE|ASIDE|BLOCKQUOTE)$/.test(tag);
+  // Zalo can mount a contact/link preview alongside the draft. Read text
+  // paragraphs and inline links, excluding controls and noneditable cards.
+  if (/^(BUTTON|SCRIPT|STYLE|SVG|IMG)$/.test(tag)
+      || node.hidden || node.getAttribute?.('aria-hidden') === 'true'
+      || node.getAttribute?.('role') === 'button'
+      || (block && node.getAttribute?.('contenteditable') === 'false')) return '';
+  if (tag === 'BR') return '\n';
+  const text = Array.from(node.childNodes || []).map(editableText).join('');
+  return block ? `\n${text}\n` : text;
 }
 
 function hasFullMessage(composer, message) {
-  return sameMessageLines(composerLines(composer).join('\n'), message);
+  if (!composer) return false;
+  if (!composer.isContentEditable && typeof composer.value === 'string') {
+    return sameMessageLines(composer.value, message);
+  }
+  return [composer.innerText, editableText(composer)]
+    .some(value => typeof value === 'string' && sameMessageLines(value, message));
 }
 
 async function fillComposer(composer, message) {
@@ -224,15 +237,17 @@ function findSendButton(composer) {
   const composerRect = composer?.getBoundingClientRect();
   for (const scope of [root, document]) {
     if (!scope) continue;
-    const matching = Array.from(scope.querySelectorAll('button, [role="button"], [aria-label], [title]'))
+    const matching = Array.from(scope.querySelectorAll('button, [role="button"], [aria-label], [title], [class*="send"], [class*="Send"], [id*="send"], [id*="Send"]'))
       .filter(visible)
       .filter(el => {
         const labels = [el.getAttribute('aria-label'), el.getAttribute('title'), textOf(el)].filter(Boolean);
         const isSend = labels.some(label => /^(gửi( tin nhắn)?|send( message)?)(\s*\(.*\))?$/i.test(label.trim()))
+          || /^send[-_]?(btn|button|message)$/i.test(el.id || '')
           || /(?:^|[\s_-])(send|gửi)(?:$|[\s_-](?:btn|button|message|msg))(?![a-z])/i.test(el.className || '');
         const rect = el.getBoundingClientRect();
         return isSend
           && !el.disabled
+          && !el.closest?.('button:disabled, [aria-disabled="true"]')
           && (!composerRect || (rect.left >= composerRect.left && rect.top >= composerRect.top - 80));
       });
     if (matching.length) return matching[matching.length - 1];
@@ -327,7 +342,7 @@ async function sendOne(item) {
   const search = await waitFor(activateSearchBox, 8000);
   if (!search) throw new Error('Không tìm thấy ô tìm kiếm Zalo Web.');
 
-  const composer = await openConversation(item, search);
+  let composer = await openConversation(item, search);
   if (!composer) throw skippedError(`Không mở được cuộc trò chuyện của số ${item.phone}.`);
 
   const previousMessages = matchingMessageCount(item.message);
@@ -359,7 +374,12 @@ async function sendOne(item) {
     throw new Error('Zalo có thể đã gửi một phần tin khi điền nội dung; hãy kiểm tra cuộc trò chuyện trước khi gửi lại.');
   }
   const filled = await waitFor(() => {
-    return hasFullMessage(composer, item.message) ? composer : null;
+    // Pasting can replace the editor node. Validate the current draft rather
+    // than the detached node used to initiate the paste.
+    const current = findComposer();
+    if (!hasFullMessage(current, item.message)) return null;
+    composer = current;
+    return current;
   }, 2500);
   if (!filled) throw new Error('Zalo Web chưa nhận đủ nội dung tin nhắn; chưa bấm Gửi.');
 
