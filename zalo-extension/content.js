@@ -104,14 +104,14 @@ function hasFullMessage(composer, message) {
   return sameMessageLines(composerLines(composer).join('\n'), message);
 }
 
-function fillComposer(composer, message) {
-  if (messageLines(message).length > 1) {
-    throw new Error('Tin nhiều dòng cần được kiểm tra và gửi thủ công trong Zalo.');
-  }
+async function fillComposer(composer, message) {
   if (!composer.isContentEditable) {
     emitInput(composer, message);
     return;
   }
+
+  const isMultiline = messageLines(message).length > 1;
+  if (isMultiline) await navigator.clipboard.writeText(message);
 
   composer.focus();
   const selection = window.getSelection();
@@ -119,8 +119,15 @@ function fillComposer(composer, message) {
   range.selectNodeContents(composer);
   selection?.removeAllRanges();
   selection?.addRange(range);
-  document.execCommand('delete', false);
 
+  if (isMultiline) {
+    if (!document.execCommand('paste', false)) {
+      throw new Error('Chrome không cho phép dán tin nhiều dòng vào Zalo; chưa bấm Gửi.');
+    }
+    return;
+  }
+
+  document.execCommand('delete', false);
   if (message && !document.execCommand('insertText', false, message)) {
     throw new Error('Zalo Web không nhận đủ nội dung tin nhắn; chưa bấm Gửi.');
   }
@@ -323,40 +330,6 @@ async function sendOne(item) {
   const composer = await openConversation(item, search);
   if (!composer) throw skippedError(`Không mở được cuộc trò chuyện của số ${item.phone}.`);
 
-  const finishManualSend = async state => {
-    if (state === 'flat') {
-      const warning = 'Tin đã gửi nhưng Zalo làm mất dấu xuống dòng.';
-      showZaloStatus(`BaoVang: ${warning}`, true);
-      return { ok: true, formattingWarning: warning };
-    }
-    showZaloStatus('BaoVang: đã xác nhận tin gửi thành công.');
-    return { ok: true };
-  };
-
-  if (messageLines(item.message).length > 1) {
-    const previousMessages = matchingMessageCount(item.message);
-    const previousTextMatches = matchingMessageCount(item.message, false);
-    const deliveryState = () => {
-      if (matchingMessageCount(item.message) > previousMessages) return 'formatted';
-      if (matchingMessageCount(item.message, false) > previousTextMatches) return 'flat';
-      return null;
-    };
-    let copied = false;
-    try {
-      await navigator.clipboard.writeText(messageLines(item.message).join('\n'));
-      copied = true;
-    } catch (_) {}
-    const instruction = copied
-      ? 'Đã copy tin nhiều dòng. Nhấn Ctrl+V, kiểm tra đủ nội dung rồi tự bấm Gửi; BaoVang sẽ xác nhận trạng thái sau khi thấy tin trong cuộc trò chuyện.'
-      : 'Dùng nút Copy tin trong BaoVang, dán vào Zalo rồi tự bấm Gửi; BaoVang sẽ xác nhận trạng thái sau khi thấy tin trong cuộc trò chuyện.';
-    showZaloStatus(`BaoVang: ${instruction}`);
-    const sent = await waitFor(deliveryState, 120000);
-    if (!sent) {
-      throw new Error('Không xác nhận được tin đã gửi trên Zalo sau 2 phút. Kiểm tra cuộc trò chuyện; trạng thái đã chuyển sang lỗi gửi.');
-    }
-    return finishManualSend(sent);
-  }
-
   const previousMessages = matchingMessageCount(item.message);
   const previousTextMatches = matchingMessageCount(item.message, false);
   const lines = messageLines(item.message).filter(line => line.trim());
@@ -377,8 +350,8 @@ async function sendOne(item) {
     return { ok: true };
   };
 
-  showZaloStatus('BaoVang: đã mở cuộc trò chuyện, đang điền tin nhắn...');
-  fillComposer(composer, item.message);
+  showZaloStatus('BaoVang: đã mở cuộc trò chuyện, đang dán tin nhắn...');
+  await fillComposer(composer, item.message);
   await wait(500);
   const sentDuringInput = deliveryState();
   if (sentDuringInput) return finishSent(sentDuringInput);

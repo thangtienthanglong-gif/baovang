@@ -12,9 +12,11 @@
 
 Sau khi cập nhật mã extension, bấm **Reload / Tải lại** tại trang tiện ích rồi tải lại tab BaoVang. Khi gửi, extension sẽ tự mở hoặc tải lại tab Zalo Web để nạp đúng phiên bản mới.
 
+Bản 1.2.0 cần quyền **clipboardRead** để dán tin nhiều dòng. Chấp nhận quyền Chrome yêu cầu khi tải lại extension.
+
 Nếu một tin đã xuất hiện trong cuộc trò chuyện nhưng extension báo lỗi xuống dòng, **không bấm Gửi lại** cho tin đó. Kiểm tra nội dung trong Zalo rồi đánh dấu đã gửi trong BaoVang để tránh phụ huynh nhận tin trùng.
 
-Extension tự mở Zalo Web và tìm theo số điện thoại. Tin một dòng có thể được điền và gửi tự động. Với tin nhiều dòng, extension mở cuộc trò chuyện và copy nội dung; thầy/cô nhấn Ctrl+V, kiểm tra đủ nội dung rồi tự bấm Gửi. Hàng đợi tạm dừng để tránh Zalo tự gửi sớm một phần tin. Nếu không copy tự động được, dùng nút **Copy tin** trong BaoVang.
+Extension tự mở Zalo Web, tìm theo số điện thoại, dán toàn bộ nội dung và bấm Gửi. Với tin nhiều dòng, extension dùng clipboard của Chrome rồi kiểm tra đủ nội dung trong ô chat trước khi bấm Gửi. Nếu nội dung không được dán đầy đủ hoặc không thấy tin mới trong cuộc trò chuyện, extension dừng và BaoVang báo lỗi.
 
 Khi extension đang chạy, trạng thái sẽ hiện ở góc trên bên phải tab Zalo Web. Nếu dừng ở màn hình chào mừng, xem dòng trạng thái này để biết bước nào chưa thực hiện được.
 

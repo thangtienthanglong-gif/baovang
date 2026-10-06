@@ -1861,12 +1861,27 @@ function startZaloExtensionAuto(items) {
   return new Promise(resolve => {
     let updateChain = Promise.resolve();
     let timeout;
+    const reportedItems = new Set();
+    function failUnreportedItems(reason) {
+      for (const item of items) {
+        if (!item.absenceId || reportedItems.has(item.id)) continue;
+        reportedItems.add(item.id);
+        updateChain = updateChain.then(() => api(`/api/absences/${item.absenceId}/zalo/manual-error`, {
+          method: 'POST',
+          body: JSON.stringify({ error: reason || 'Extension không xác nhận được kết quả gửi.' })
+        })).catch(error => console.error('Không cập nhật được trạng thái lỗi extension:', error));
+      }
+      return updateChain;
+    }
     function expectUpdateWithin(ms) {
       clearTimeout(timeout);
       timeout = setTimeout(() => {
         window.removeEventListener('message', onMessage);
-        toast('Extension không phản hồi. Hãy kiểm tra tab Zalo Web và tải lại extension.', 'error');
-        updateChain.then(() => resolve(false));
+        failUnreportedItems('Extension không phản hồi; không xác nhận được tin đã gửi.')
+          .then(() => {
+            toast('Extension không phản hồi. Các tin chưa xác nhận đã chuyển sang Lỗi gửi; hãy kiểm tra tab Zalo Web.', 'error');
+            resolve(false);
+          });
       }, ms);
     }
     expectUpdateWithin(30000);
@@ -1875,13 +1890,14 @@ function startZaloExtensionAuto(items) {
       const data = event.data;
       if (data.type === 'BAOVANG_EXTENSION_STATUS' && data.status === 'started') {
         expectUpdateWithin(180000);
-        toast(`Extension đang xử lý ${data.total || items.length} tin trên Zalo Web. Hãy dán và gửi các tin nhiều dòng khi được yêu cầu.`);
+        toast(`Extension đang tự động gửi ${data.total || items.length} tin qua Zalo Web...`);
         return;
       }
       if (data.type === 'BAOVANG_EXTENSION_RESULT') {
         expectUpdateWithin(180000);
         const item = items.find(row => row.id === data.itemId);
-        if (item?.absenceId && !data.manual) {
+        if (item?.absenceId) {
+          reportedItems.add(item.id);
           updateChain = updateChain.then(() =>
             api(`/api/absences/${item.absenceId}/zalo/${data.ok ? 'manual-sent' : 'manual-error'}`, {
               method: 'POST',
@@ -1896,6 +1912,8 @@ function startZaloExtensionAuto(items) {
       if (data.type === 'BAOVANG_EXTENSION_STATUS' && ['completed', 'stopped', 'error'].includes(data.status)) {
         window.removeEventListener('message', onMessage);
         clearTimeout(timeout);
+        const unfinished = data.status === 'completed' ? '' : (data.error || 'Extension dừng trước khi gửi hoặc xác nhận tin này.');
+        if (unfinished) failUnreportedItems(unfinished);
         if (data.status === 'completed') {
           const skipped = data.skipped ? `, bỏ qua ${data.skipped}` : '';
           toast(`Auto Zalo hoàn tất: đã gửi ${data.sent || 0}/${data.total || items.length} tin${skipped}.`);
