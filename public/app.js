@@ -1182,7 +1182,8 @@ function noticeTimeLine(row) {
 
 function renderAbsences() {
   const container = $('#absenceRows');
-  const queueAbsences = state.absences.filter(row => row.noticeStatus !== 'Đã gửi');
+  const queueAbsences = state.absences.filter(row => row.noticeStatus !== 'Đã gửi'
+    && normalizeAbsenceStatus(row.absenceStatus) !== 'Nghỉ học' && row.studentStatus !== 'Nghỉ học');
 
   if (!queueAbsences.length) {
     container.innerHTML = '<div class="empty">Hàng xử lý trống. Học sinh đã gửi được lưu trong Lịch sử liên hệ.</div>';
@@ -1428,7 +1429,7 @@ async function loadQuitStudents() {
 
   tbody.innerHTML = rows.map(row => `
     <tr>
-      <td>${escapeHtml(row.quitDate || '')}</td>
+      <td>${escapeHtml(row.quitDate ? row.quitDate.split('-').reverse().join('/') : '')}</td>
       <td>
         <div class="person-main">${escapeHtml(row.fullName)}</div>
         <div class="muted">${escapeHtml(row.code)}</div>
@@ -1555,11 +1556,12 @@ async function updateRosterStatus(select) {
       body: JSON.stringify({
         absenceStatus: status,
         initialReason: status,
-        sendZalo: true
+        sendZalo: status !== 'Nghỉ học'
       })
     });
-  toast('Đã cập nhật trạng thái.' + queuedMessage(result));
+  toast(status === 'Nghỉ học' ? 'Đã chuyển học sinh vào Lịch sử nghỉ học; không gửi Zalo.' : 'Đã cập nhật trạng thái.' + queuedMessage(result));
     await loadBootstrap();
+    if (status === 'Nghỉ học') await loadQuitStudents();
     return;
   }
 
@@ -1576,11 +1578,12 @@ async function updateRosterStatus(select) {
       session: sessionInfo.sessionName,
       absenceStatus: status,
       initialReason: status,
-      sendZalo: true
+      sendZalo: status !== 'Nghỉ học'
     })
   });
-  toast('Đã cập nhật trạng thái.' + queuedMessage(result));
+  toast(status === 'Nghỉ học' ? 'Đã chuyển học sinh vào Lịch sử nghỉ học; không gửi Zalo.' : 'Đã cập nhật trạng thái.' + queuedMessage(result));
   await loadBootstrap();
+  if (status === 'Nghỉ học') await loadQuitStudents();
 }
 
 function bulkZaloMessage(result) {

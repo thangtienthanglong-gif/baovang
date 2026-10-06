@@ -499,6 +499,44 @@ function isActiveStudent(student) {
   return student && student.status !== 'Nghỉ học';
 }
 
+function isWithdrawnAbsence(absence, student) {
+  return normalizeAbsenceStatus(absence.absenceStatus) === 'Nghỉ học' || student?.status === 'Nghỉ học';
+}
+
+function quitStudentDetails(db, student) {
+  const events = [
+    ...(db.absences || []).filter(row => row.studentId === student.id && normalizeAbsenceStatus(row.absenceStatus) === 'Nghỉ học')
+      .map(row => ({ date: row.date, reason: row.note || row.reason || '' })),
+    ...(student.history || []).filter(row => row.status === 'Nghỉ học')
+  ].filter(row => row.date).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  return {
+    quitDate: student.quitDate || events[0]?.date || '',
+    quitReason: student.quitReason || events[0]?.reason || ''
+  };
+}
+
+function markStudentWithdrawn(db, studentId, event) {
+  const student = db.students.find(row => row.id === studentId);
+  if (!student) return;
+  Object.assign(student, { status: 'Nghỉ học', quitDate: event.date, quitReason: event.note || event.reason || '' });
+  const result = 'Học sinh đã nghỉ học; không gửi thông báo.';
+  for (const absence of db.absences || []) {
+    if (absence.studentId !== studentId) continue;
+    absence.autoNotice = false;
+    absence.noticeDueAt = '';
+    if (!['Đã gửi', 'Chạy thử'].includes(absence.noticeStatus)) {
+      absence.noticeStatus = 'Không gửi';
+      absence.noticeResult = result;
+    }
+  }
+  for (const log of db.notificationLogs || []) {
+    if (log.studentId === studentId && log.status === 'Chờ gửi thủ công') {
+      log.status = 'Không gửi';
+      log.result = result;
+    }
+  }
+}
+
 function enrichAbsence(absence, studentsMap) {
   const student = studentsMap[absence.studentId] || {};
   return {
@@ -507,6 +545,7 @@ function enrichAbsence(absence, studentsMap) {
     initialReason: normalizeInitialReason(absence.initialReason, normalizeAbsenceStatus(absence.absenceStatus)),
     studentCode: student.code || '',
     studentName: student.fullName || '',
+    studentStatus: student.status || '',
     className: absence.attendanceClass || student.className || '',
     parentName: student.parentName || '',
     phone1: student.phone1 || '',
@@ -552,10 +591,11 @@ function filterAbsences(db, query) {
 }
 
 function getSummary(absences) {
-  const count = status => absences.filter(row => row.callStatus === status).length;
-  const notice = status => absences.filter(row => row.noticeStatus === status).length;
+  const actionable = absences.filter(row => !isWithdrawnAbsence(row, { status: row.studentStatus }));
+  const count = status => actionable.filter(row => row.callStatus === status).length;
+  const notice = status => actionable.filter(row => row.noticeStatus === status).length;
   return {
-    total: absences.length,
+    total: actionable.length,
     pending: count('Chưa gọi'),
     called: count('Đã gọi'),
     noAnswer: count('Không nghe máy'),
@@ -1993,6 +2033,10 @@ async function sendZaloNotice(db, absenceId, reason = 'auto') {
     return log;
   }
 
+  if (isWithdrawnAbsence(absence, student)) {
+    return finish('Không gửi', 'Học sinh đã nghỉ học; không gửi thông báo.', { blocked: true });
+  }
+
   if (config.mode === 'personal-test') {
     const sender = [config.personalName, config.personalPhone].filter(Boolean).join(' - ') || 'Zalo cá nhân';
     return finish('Chạy thử', `Chạy thử ${sender}: đã ghi log nội dung tin nhắn, chưa gửi thật.`, {
@@ -2930,7 +2974,6 @@ app.options('/api/local-zalo/open-paste', (req, res) => {
 app.get('/api/quit-students', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
-    const absences = db.absences || [];
     const q = normalizeSearchText(req.query.q || '');
     
     let quitStudents = (db.students || []).filter(s => s.status === 'Nghỉ học');
@@ -2943,12 +2986,9 @@ app.get('/api/quit-students', async (req, res, next) => {
     }
 
     const enrichedRows = quitStudents.map(student => {
-      const quitAbsences = absences.filter(a => a.studentId === student.id && a.absenceStatus === 'Nghỉ học');
-      const lastQuit = quitAbsences.sort((a, b) => b.date.localeCompare(a.date))[0];
       return {
         ...student,
-        quitDate: lastQuit ? lastQuit.date : '',
-        quitReason: lastQuit ? lastQuit.reason : ''
+        ...quitStudentDetails(db, student)
       };
     });
 
@@ -2971,19 +3011,17 @@ app.get('/api/quit-students/export', async (req, res, next) => {
       });
     }
 
-    const rows = quitStudents.map(student => {
-      const history = student.history || [];
-      const quitEvents = history.filter(h => h.status === 'Nghỉ học');
-      const lastQuit = quitEvents[quitEvents.length - 1];
+    const rows = quitStudents.map(student => ({ ...student, ...quitStudentDetails(db, student) }))
+      .sort((a, b) => b.quitDate.localeCompare(a.quitDate)).map(student => {
       return {
-        'Ngày nghỉ': lastQuit ? lastQuit.date : '',
+        'Ngày nghỉ': student.quitDate ? student.quitDate.split('-').reverse().join('/') : '',
         'Học sinh': student.fullName,
         'Lớp': student.className,
         'Phụ huynh': student.parentName,
         'SĐT': student.phone1,
-        'Lý do': lastQuit ? lastQuit.reason : ''
+        'Lý do': student.quitReason
       };
-    }).sort((a, b) => b['Ngày nghỉ'].localeCompare(a['Ngày nghỉ']));
+    });
 
     const d = new Date();
     const suffix = `${d.getFullYear()}${(d.getMonth()+1).toString().padStart(2,'0')}${d.getDate().toString().padStart(2,'0')}`;
@@ -3101,7 +3139,11 @@ app.put('/api/students/:id', async (req, res, next) => {
     }
 
     const oldStudent = db.students[index];
+    if (req.body.status === undefined) student.status = oldStudent.status || 'Đang học';
     db.students[index] = { ...oldStudent, ...student };
+    if (student.status === 'Nghỉ học' && oldStudent.status !== 'Nghỉ học') {
+      markStudentWithdrawn(db, req.params.id, { date: req.body.quitDate || todayISO(), reason: req.body.quitReason || '' });
+    }
     
     if (student.className && oldStudent.className !== student.className) {
       if (db.scheduleExceptions) {
@@ -3596,12 +3638,13 @@ app.post('/api/absences', async (req, res, next) => {
       db.absences[duplicateIndex].absenceStatus = absenceStatus;
       db.absences[duplicateIndex].initialReason = normalizeInitialReason(req.body.initialReason || req.body.reason, absenceStatus);
       if (req.body.evidenceUrl) db.absences[duplicateIndex].evidenceUrl = req.body.evidenceUrl;
+      if (absenceStatus === 'Nghỉ học') markStudentWithdrawn(db, student.id, db.absences[duplicateIndex]);
       await saveBranchDb(req, db);
       return res.json(db.absences[duplicateIndex]);
     }
 
     const absenceStatus = normalizeAbsenceStatus(req.body.absenceStatus);
-    const shouldAutoSend = req.body.sendZalo !== false && absenceStatus !== 'Đi trễ' && absenceStatus !== 'Có phép' && absenceStatus !== 'Vắng có phép';
+    const shouldAutoSend = req.body.sendZalo !== false && !isWithdrawnAbsence({ absenceStatus }, student) && absenceStatus !== 'Đi trễ' && absenceStatus !== 'Có phép' && absenceStatus !== 'Vắng có phép';
     const noticeDelayMinutes = shouldAutoSend ? delayMinutesFromSettings(db.settings || defaultSettings()) : 0;
     const absence = {
       id: id('abs'),
@@ -3629,8 +3672,7 @@ app.post('/api/absences', async (req, res, next) => {
 
     db.absences.push(absence);
     if (absenceStatus === 'Nghỉ học') {
-      const studentIndex = db.students.findIndex(row => row.id === student.id);
-      if (studentIndex !== -1) db.students[studentIndex] = { ...db.students[studentIndex], status: 'Nghỉ học' };
+      markStudentWithdrawn(db, student.id, absence);
     }
     let noticeLog = null;
     if (shouldAutoSend && noticeDelayMinutes === 0) {
@@ -3663,7 +3705,7 @@ app.put('/api/absences/:id/status', async (req, res, next) => {
       error.status = 400;
       throw error;
     }
-    const shouldAutoSend = req.body.sendZalo !== false && absenceStatus !== 'Đi trễ';
+    const shouldAutoSend = req.body.sendZalo !== false && !isWithdrawnAbsence({ absenceStatus }, student) && absenceStatus !== 'Đi trễ';
     const noticeDelayMinutes = shouldAutoSend ? delayMinutesFromSettings(db.settings || defaultSettings()) : 0;
     db.absences[index] = {
       ...db.absences[index],
@@ -3676,8 +3718,7 @@ app.put('/api/absences/:id/status', async (req, res, next) => {
       updatedAt: nowISO()
     };
     if (absenceStatus === 'Nghỉ học') {
-      const studentIndex = db.students.findIndex(row => row.id === db.absences[index].studentId);
-      if (studentIndex !== -1) db.students[studentIndex] = { ...db.students[studentIndex], status: 'Nghỉ học' };
+      markStudentWithdrawn(db, db.absences[index].studentId, db.absences[index]);
     }
     let noticeLog = null;
     if (shouldAutoSend && noticeDelayMinutes === 0) {
@@ -3691,7 +3732,8 @@ app.put('/api/absences/:id/status', async (req, res, next) => {
 });
 
 function selectBulkZaloCandidates(db, filters) {
-  const rows = filterAbsences(db, filters || {});
+  const studentsMap = studentByIdMap(db.students || []);
+  const rows = filterAbsences(db, filters || {}).filter(row => !isWithdrawnAbsence(row, studentsMap[row.studentId]));
   const allCandidates = rows.filter(row => row.noticeStatus !== 'Đã gửi');
   const settings = db.settings || defaultSettings();
   const isPersonalMode = ['personal-test', 'personal-real'].includes(settings.zaloMode);
