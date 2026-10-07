@@ -853,6 +853,13 @@ function getClassGrade(className) {
   return String(className || '').trim().match(/^\d+/)?.[0] || '';
 }
 
+function getClassSubjectKey(className) {
+  const normalizedClass = String(className || '').trim().toUpperCase();
+  // N before a math shift (NS/NC/NT) marks advanced math, not a separate subject.
+  if (/^\d+N?[SCT]/.test(normalizedClass)) return 'TOAN';
+  return normalizedClass.match(/^\d+([A-Z])/)?.[1];
+}
+
 function normalizeComparableText(value) {
   return String(value ?? '')
     .normalize('NFD')
@@ -1062,8 +1069,16 @@ function renderRoster(searchMatches) {
     const title = className === 'ALL'
       ? `<div class="class-group-title"><span>${escapeHtml(groupName)}${sessionLabel}</span><span>${groups[groupName].length} học sinh</span></div>`
       : '';
-    const rows = groups[groupName].map(renderRosterStudent).join('');
-    return title + rows;
+    const regularStudents = groups[groupName].filter(student => !student.isMakeupAttendance);
+    const makeupStudents = groups[groupName].filter(student => student.isMakeupAttendance);
+    const regularRows = regularStudents.map(renderRosterStudent).join('');
+    const makeupRows = makeupStudents.length
+      ? `<section class="makeup-roster-section" aria-label="Học sinh học bù lớp ${escapeHtml(groupName)}">
+          <div class="makeup-roster-title"><span>Học sinh học bù</span><span>${makeupStudents.length} học sinh</span></div>
+          ${makeupStudents.map(renderRosterStudent).join('')}
+        </section>`
+      : '';
+    return title + regularRows + makeupRows;
   }).join('');
 }
 
@@ -3746,10 +3761,6 @@ async function openMakeupModal(studentId, studentName, originalClass) {
   }
   
   const originalGrade = String(originalClass || '').trim().match(/^\d+/)?.[0];
-  const getClassSubjectKey = className => {
-    const subjectCode = String(className || '').trim().match(/^\d+([A-Za-z])/i)?.[1]?.toUpperCase();
-    return ['S', 'C', 'T'].includes(subjectCode) ? 'TOAN' : subjectCode;
-  };
   const originalSubject = getClassSubjectKey(originalClass);
   const classNames = [...new Set(activeStudents()
     .map(s => String(s.className || '').trim())
@@ -4070,9 +4081,8 @@ window.closeTransferSuccessModal = function() {
 };
 
 function getTransferSubjectKey(className) {
-  const code = String(className || '').trim().match(/^\d+([A-Za-z])/i)?.[1]?.toUpperCase();
-  if (['S', 'C', 'T'].includes(code)) return 'TOAN';
-  return ['A', 'V', 'K'].includes(code) ? code : 'OTHER';
+  const subject = getClassSubjectKey(className);
+  return ['TOAN', 'A', 'V', 'K'].includes(subject) ? subject : 'OTHER';
 }
 
 function openTransferClassModal(studentId) {

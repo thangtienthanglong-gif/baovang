@@ -9,3 +9,5 @@ dist/
 .vercel
 public/uploads/
 test*
+!tests/
+!tests/*.test.js

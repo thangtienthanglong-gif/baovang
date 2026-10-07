@@ -750,6 +750,26 @@ input[type="file"]::file-selector-button:hover {
   gap: 0;
 }
 
+.makeup-roster-section {
+  margin-top: 16px;
+  border-top: 2px solid #99f6e4;
+}
+
+.makeup-roster-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 8px;
+  color: #0f766e;
+  font-weight: 800;
+}
+
+.makeup-roster-title span:last-child {
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .class-group-title {
   display: flex;
   justify-content: space-between;
