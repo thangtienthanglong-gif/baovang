@@ -2743,11 +2743,18 @@ app.get('/health', (req, res) => {
   res.json({ ok: true, app: 'bao-vang-hoc-sinh-zalo-oa', time: nowISO() });
 });
 
+function getBranchClasses(db) {
+  return [...new Set([
+    ...(db.classes || []),
+    ...(db.students || []).filter(isActiveStudent).map(student => student.className)
+  ].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi'));
+}
+
 app.get('/api/bootstrap', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
     const absences = filterAbsences(db, req.query);
-    const classes = [...new Set((db.students || []).filter(isActiveStudent).map(student => student.className).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi'));
+    const classes = getBranchClasses(db);
     res.json({
       today: todayISO(),
       settings: publicSettings(db.settings || defaultSettings()),
@@ -3243,12 +3250,36 @@ app.delete('/api/students/:id', async (req, res, next) => {
   }
 });
 
+app.post('/api/classes', async (req, res, next) => {
+  try {
+    const className = typeof req.body.className === 'string' ? cleanText(req.body.className).toUpperCase() : '';
+    if (!className || className.length > 50 || className === 'ALL') {
+      const err = new Error('Vui lòng nhập mã lớp hợp lệ, tối đa 50 ký tự (không dùng ALL).');
+      err.status = 400;
+      throw err;
+    }
+    const db = await getBranchDb(req);
+    const existingClasses = [...getBranchClasses(db), ...(db.students || []).map(student => student.className)];
+    if (existingClasses.some(name => cleanText(name).toUpperCase() === className)) {
+      const err = new Error(`Mã lớp ${className} đã tồn tại trong cơ sở này.`);
+      err.status = 409;
+      throw err;
+    }
+    db.classes = [...(db.classes || []), className];
+    await saveBranchDb(req, db);
+    res.status(201).json({ success: true, className, classes: getBranchClasses(db) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.delete('/api/classes/:className', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
     const targetClass = String(req.params.className || '').trim().toLowerCase();
     const initialCount = db.students.length;
     db.students = db.students.filter(student => String(student.className || '').trim().toLowerCase() !== targetClass);
+    db.classes = (db.classes || []).filter(name => String(name).trim().toLowerCase() !== targetClass);
     const deletedCount = initialCount - db.students.length;
     await saveBranchDb(req, db);
     res.json({ success: true, deletedCount, message: `Đã xóa lớp ${req.params.className} (${deletedCount} học sinh).` });
@@ -3269,6 +3300,7 @@ app.post('/api/classes/bulk-delete', async (req, res, next) => {
     const db = await getBranchDb(req);
     const initialCount = db.students.length;
     db.students = db.students.filter(student => !classSet.has(String(student.className || '').trim().toLowerCase()));
+    db.classes = (db.classes || []).filter(name => !classSet.has(String(name).trim().toLowerCase()));
     const deletedCount = initialCount - db.students.length;
     await saveBranchDb(req, db);
     res.json({ success: true, deletedClasses: classNames.length, deletedStudents: deletedCount, message: `Đã xóa ${classNames.length} lớp (${deletedCount} học sinh).` });

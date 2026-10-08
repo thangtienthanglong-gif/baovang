@@ -944,7 +944,8 @@ function renderClassDropdown() {
   const activeDay = selectedDay();
   const rows = attendanceRosterStudents(dateStr, activeDay);
   const groups = groupByClass(rows);
-  const classNames = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'vi'));
+  const classNames = [...new Set([...Object.keys(groups), ...(state.classes || [])])]
+    .sort((a, b) => a.localeCompare(b, 'vi'));
   const activeClass = selectedClass();
   const activeSession = selectedSession();
   const gradeDropdown = $('#gradeDropdown');
@@ -982,7 +983,7 @@ function renderClassDropdown() {
     if (sessionGroups[session].length > 0) {
       optionsHtml.push(`<optgroup label="Buổi ${session}">`);
       sessionGroups[session].forEach(className => {
-        const students = groups[className];
+        const students = groups[className] || [];
         const absenceCount = state.absences.filter(row => row.className === className).length;
         optionsHtml.push(`<option value="${escapeHtml(className)}">${escapeHtml(className)} - ${students.length} học sinh, ${absenceCount} vắng</option>`);
       });
@@ -4154,12 +4155,56 @@ function openTransferClassModal(studentId) {
 }
 
 // --- Class Management Functions ---
+window.createClass = async function(event) {
+  event.preventDefault();
+  const input = document.getElementById('newClassCode');
+  const button = document.getElementById('createClassBtn');
+  const errorEl = document.getElementById('createClassError');
+  if (button.disabled) return;
+  const className = input.value.replace(/\s+/g, ' ').trim().toUpperCase();
+  errorEl.textContent = '';
+  errorEl.style.display = 'none';
+  if (!className || className.length > 50 || className === 'ALL') {
+    errorEl.textContent = 'Vui lòng nhập mã lớp hợp lệ, tối đa 50 ký tự (không dùng ALL).';
+    errorEl.style.display = 'block';
+    input.focus();
+    return;
+  }
+  const branchId = getActiveBranch();
+  button.disabled = true;
+  input.disabled = true;
+  try {
+    const result = await api('/api/classes', {
+      method: 'POST', body: JSON.stringify({ className })
+    });
+    if (getActiveBranch() !== branchId) return;
+    state.classes = result.classes;
+    input.value = '';
+    document.getElementById('searchClassInput').value = '';
+    renderFilters();
+    renderClassDropdown();
+    renderManageClassList();
+    toast(`Đã tạo lớp ${result.className}. Bạn có thể thêm hoặc chuyển học sinh vào lớp.`, 'success');
+  } catch (error) {
+    if (getActiveBranch() !== branchId) return;
+    errorEl.textContent = error.message || 'Không thể tạo lớp. Vui lòng thử lại.';
+    errorEl.style.display = 'block';
+  } finally {
+    button.disabled = false;
+    input.disabled = false;
+    input.focus();
+  }
+};
+
 window.openManageClassesModal = function() {
   const modal = document.getElementById('manageClassesModal');
   if (!modal) return;
   modal.style.display = 'flex';
   document.getElementById('searchClassInput').value = '';
   document.getElementById('selectAllClassesCheckbox').checked = false;
+  document.getElementById('newClassCode').value = '';
+  document.getElementById('createClassError').textContent = '';
+  document.getElementById('createClassError').style.display = 'none';
   renderManageClassList();
 };
 
@@ -4197,7 +4242,7 @@ window.renderManageClassList = function() {
           <span>Lớp <span style="color:#2563eb;">${escapeHtml(className)}</span></span>
           <span style="font-weight:normal; font-size:12px; background:#f1f5f9; color:#64748b; padding:2px 8px; border-radius:12px;">${count} học sinh</span>
         </label>
-        <button type="button" onclick="deleteSingleClass('${escapeHtml(className)}')" style="border:none; background:#fee2e2; color:#ef4444; padding:6px 12px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">
+        <button type="button" data-class-name="${escapeHtml(className)}" onclick="deleteSingleClass(this.dataset.className)" style="border:none; background:#fee2e2; color:#ef4444; padding:6px 12px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">
           <i class="fa-solid fa-trash-can"></i> Xóa
         </button>
       </div>
@@ -4215,6 +4260,12 @@ window.toggleSelectAllClasses = function(checked) {
 
 function updateSelectedClassCount() {
   const selected = document.querySelectorAll('.manage-class-checkbox:checked');
+  const checkboxes = document.querySelectorAll('.manage-class-checkbox');
+  const selectAll = document.getElementById('selectAllClassesCheckbox');
+  if (selectAll) {
+    selectAll.checked = checkboxes.length > 0 && selected.length === checkboxes.length;
+    selectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+  }
   const textEl = document.getElementById('selectedClassCountText');
   if (textEl) textEl.textContent = `Đã chọn: ${selected.length} lớp`;
 }
@@ -4260,7 +4311,7 @@ window.deleteSingleClass = function(className) {
         const res = await api(`/api/classes/${encodeURIComponent(className)}`, { method: 'DELETE' });
         await loadBootstrap();
         renderManageClassList();
-        showDeleteClassSuccessModal(res.message || `Đã xóa thành công lớp <b>${escapeHtml(className)}</b>.`);
+        showDeleteClassSuccessModal(res.message ? escapeHtml(res.message) : `Đã xóa thành công lớp <b>${escapeHtml(className)}</b>.`);
       } catch (err) {
         showToast(err.message || 'Xóa lớp thất bại', 'error');
       }
@@ -4286,7 +4337,7 @@ window.deleteSelectedClasses = function() {
         });
         await loadBootstrap();
         closeManageClassesModal();
-        showDeleteClassSuccessModal(res.message || `Đã xóa thành công ${selected.length} lớp đã chọn.`);
+        showDeleteClassSuccessModal(res.message ? escapeHtml(res.message) : `Đã xóa thành công ${selected.length} lớp đã chọn.`);
       } catch (err) {
         showToast(err.message || 'Xóa lớp thất bại', 'error');
       }

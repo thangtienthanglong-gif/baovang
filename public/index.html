@@ -170,7 +170,7 @@
                 <span id="classCount" class="muted" style="font-size: 14px;">0 lớp</span>
               </div>
               <button type="button" onclick="openManageClassesModal()" class="btn small danger" style="padding: 6px 14px; font-size: 13px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; background: #ef4444; color: white; border: none; box-shadow: 0 2px 4px rgba(239,68,68,0.2);">
-                <i class="fa-solid fa-trash-can"></i> Quản lý & Xóa lớp
+                <i class="fa-solid fa-list-check"></i> Quản lý lớp
               </button>
             </div>
             <div style="display: flex; gap: 16px; flex-wrap: wrap;">
@@ -803,7 +803,7 @@
     </div>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="/app.js?v=20261007-2"></script>
+  <script src="/app.js?v=20261008-1"></script>
   <script src="/exams.js"></script>
   <nav class="bottom-nav">
     <button class="bottom-tab active" data-tab="absenceTab" type="button"><i class="fa-solid fa-clipboard-user"></i><span>Điểm danh</span></button>
@@ -1100,13 +1100,25 @@
         <div style="padding:20px 24px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; background:#f8fafc;">
             <div>
                 <h3 style="margin:0; font-size:18px; color:#1e293b; display:flex; align-items:center; gap:8px;">
-                    <i class="fa-solid fa-list-check" style="color:#ef4444;"></i> Quản lý & Xóa lớp học
+                    <i class="fa-solid fa-list-check" style="color:#2563eb;"></i> Quản lý lớp học
                 </h3>
-                <p style="margin:4px 0 0 0; font-size:13px; color:#64748b;">Chọn các lớp không cần thiết để xóa nhanh toàn bộ học sinh trong lớp.</p>
+                <p style="margin:4px 0 0 0; font-size:13px; color:#64748b;">Tạo mã lớp mới hoặc chọn lớp cần xóa cùng toàn bộ học sinh trong lớp.</p>
             </div>
             <button type="button" onclick="closeManageClassesModal()" style="border:none; background:none; font-size:22px; color:#94a3b8; cursor:pointer;">&times;</button>
         </div>
         
+        <form id="createClassForm" onsubmit="createClass(event)" style="padding:16px 24px; border-bottom:1px solid #e2e8f0; background:#eff6ff; flex-shrink:0;">
+            <label for="newClassCode" style="display:block; margin-bottom:8px; font-size:13px; font-weight:600; color:#1e293b;">Mã lớp mới</label>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <input type="text" id="newClassCode" placeholder="Ví dụ: 9VT6" required maxlength="50" autocomplete="off" aria-describedby="newClassHint createClassError" style="flex:1; min-width:120px; padding:9px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; text-transform:uppercase;">
+                <button type="submit" id="createClassBtn" style="padding:9px 16px; border:none; background:#2563eb; color:white; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                    <i class="fa-solid fa-plus"></i> Tạo lớp
+                </button>
+            </div>
+            <p id="newClassHint" style="margin:8px 0 0; font-size:12px; color:#64748b;">Lớp mới có 0 học sinh. Bạn có thể thêm hoặc chuyển học sinh vào lớp sau.</p>
+            <p id="createClassError" role="alert" style="display:none; margin:8px 0 0; font-size:13px; color:#dc2626;"></p>
+        </form>
+
         <div style="padding:16px 24px; border-bottom:1px solid #f1f5f9; background:#fff; display:flex; gap:12px; align-items:center;">
             <input type="text" id="searchClassInput" placeholder="Tìm kiếm tên lớp..." oninput="renderManageClassList()" style="flex:1; padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px;">
             <label style="font-size:13px; font-weight:600; color:#475569; display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none;">
