@@ -393,12 +393,14 @@ function getClassScheduleInfo(className, dateString, forcedDay = 'ALL') {
 
   let sessionName = 'Khác';
   let daysStr = '';
-  if (/^9?CT1\b/.test(str)) {
+  const ctGroupMatch = str.match(/^(?:\d{1,2})?CT([12])(?:\(([2-8-]+)\))?$/);
+  if (ctGroupMatch) {
+    // CT1/CT2 identify schedule groups; 1/2 are not weekdays.
+    // Use explicit days when present, then the same defaults as the makeup planner.
     sessionName = 'Tối';
-    daysStr = '357';
-  } else if (/^9?CT2\b/.test(str)) {
-    sessionName = 'Tối';
-    daysStr = '246';
+    daysStr = ctGroupMatch[2]
+      ? ctGroupMatch[2].replace(/-/g, '')
+      : ctGroupMatch[1] === '1' ? '357' : '246';
   } else {
     const ctMatch = str.match(/\d+CT.*?\(([\d-]+)\)/);
     if (ctMatch) {
