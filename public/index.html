@@ -254,8 +254,11 @@
         </div>
         <section class="queue-filters">
           <div class="field">
-            <label for="filterDate">Ngày</label>
-            <input id="filterDate" type="date">
+            <div class="date-filter-heading">
+              <label for="filterDate">Ngày</label>
+              <label class="date-auto-toggle" for="filterDateAuto"><input id="filterDateAuto" type="checkbox" checked> Tự động</label>
+            </div>
+            <input id="filterDate" type="date" readonly>
           </div>
           <div class="field">
             <label for="filterSession">Buổi</label>

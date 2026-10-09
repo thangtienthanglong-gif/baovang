@@ -18,6 +18,7 @@ let quickSearchIndex = [];
 let quickSearchTimer = null;
 let renderedQueueSession = '';
 let queueSessionAuto = true;
+let queueDateAuto = true;
 const QUICK_SEARCH_ROSTER_LIMIT = 80;
 
 function normalizeQuickSearch(value) {
@@ -252,13 +253,37 @@ async function downloadUrl(path, params = {}) {
 }
 
 function clientTodayISO() {
-  const date = new Date();
-  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-  return date.toISOString().slice(0, 10);
+  const parts = new Intl.DateTimeFormat('en', {
+    timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
 function selectedDate() {
-  return $('#filterDate')?.value || state.today || clientTodayISO();
+  return queueDateAuto ? clientTodayISO() : ($('#filterDate')?.value || clientTodayISO());
+}
+
+function syncAutomaticDate() {
+  const today = clientTodayISO();
+  state.today = today;
+  const input = $('#filterDate');
+  if (!input) return false;
+  const changed = queueDateAuto && input.value !== today;
+  if (queueDateAuto || !input.value) input.value = today;
+  input.readOnly = queueDateAuto;
+  if ($('#filterDateAuto')) $('#filterDateAuto').checked = queueDateAuto;
+  return changed;
+}
+
+async function refreshAutomaticDate() {
+  const changed = syncAutomaticDate();
+  if (changed) renderFilters();
+  const tab = activeTabId();
+  if (tab === 'queueTab') await loadAbsences();
+  else if (changed && (tab === 'absenceTab' || tab === 'overviewTab')) {
+    await loadAttendanceAbsences();
+  }
 }
 
 function currentSessionForTime() {
@@ -301,7 +326,7 @@ async function loadBootstrap() {
   const data = await api('/api/bootstrap?' + queryString(filters));
   Object.assign(state, data);
   try { state.scheduleExceptions = await api('/api/schedule-exceptions'); } catch(e) { state.scheduleExceptions = []; }
-  if ($('#filterDate') && !$('#filterDate').value) $('#filterDate').value = state.today;
+  syncAutomaticDate();
   renderFilters();
   renderSettings();
   await loadStudents();
@@ -328,7 +353,8 @@ async function refreshCurrentView(button) {
 }
 
 async function loadAbsences() {
-  if (selectedQueueSession() !== renderedQueueSession) renderFilters();
+  const dateChanged = syncAutomaticDate();
+  if (dateChanged || selectedQueueSession() !== renderedQueueSession) renderFilters();
   const data = await api('/api/absences?' + queryString(getFilters()));
   state.absences = data.absences;
   state.summary = data.summary;
@@ -339,6 +365,7 @@ async function loadAbsences() {
 }
 
 async function loadAttendanceAbsences() {
+  if (syncAutomaticDate()) renderFilters();
   const data = await api('/api/absences?' + queryString(getAttendanceFilters()));
   state.absences = data.absences;
   state.summary = data.summary;
@@ -2753,6 +2780,12 @@ function initEvents() {
     renderFilters();
     await loadAbsences();
   });
+  $('#filterDateAuto')?.addEventListener('change', async event => {
+    queueDateAuto = event.target.checked;
+    syncAutomaticDate();
+    renderFilters();
+    await loadAbsences();
+  });
   $('#filterKeyword').addEventListener('keydown', event => {
     if (event.key === 'Enter') loadAbsences();
   });
@@ -2941,6 +2974,7 @@ function initEvents() {
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
+  syncAutomaticDate();
   const dayDropdown = document.getElementById('dayDropdown');
   if (dayDropdown) {
     const dDay = new Date().getDay();
@@ -2958,10 +2992,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     await loadBranches();
     await loadBootstrap();
     setInterval(() => {
-      if (activeTabId() === 'queueTab') {
-        loadAbsences().catch(error => toast(error.message, 'error'));
-      }
+      refreshAutomaticDate().catch(error => toast(error.message, 'error'));
     }, 30000);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) refreshAutomaticDate().catch(error => toast(error.message, 'error'));
+    });
   } catch (error) {
     toast(error.message, 'error');
   }

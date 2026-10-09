@@ -590,6 +590,29 @@ main {
 }
 
 .field.grow { min-width: 0; }
+
+.date-filter-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.date-filter-heading .date-auto-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.date-auto-toggle input {
+  width: auto;
+  min-height: 0;
+  margin: 0;
+  accent-color: var(--primary);
+}
 .span-2 { grid-column: span 2; }
 .span-4 { grid-column: span 4; }
 

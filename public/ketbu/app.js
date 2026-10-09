@@ -272,7 +272,7 @@ function updateCloudConflictUi() {
   const branchId = getActiveBranch().id;
   const hasConflict = cloudConflicts.has(branchId);
   if (elements.retryCloudSyncBtn) elements.retryCloudSyncBtn.hidden = !hasConflict;
-  if (hasConflict) setNotice("Dữ liệu cơ sở trên máy này chưa đồng bộ. Bấm Thử đồng bộ khi kết nối đã ổn định.", "error");
+  if (hasConflict) setNotice("Dữ liệu cơ sở trên máy này chưa lưu được lên máy chủ. Bấm Thử lưu lại lên máy chủ khi kết nối đã ổn định.", "error");
 }
 
 function markCloudConflict(branchId) {
