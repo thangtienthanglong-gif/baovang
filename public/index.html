@@ -809,7 +809,7 @@
     </div>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="/app.js?v=20261008-1"></script>
+  <script src="/app.js?v=20261009-1"></script>
   <script src="/exams.js"></script>
   <nav class="bottom-nav">
     <button class="bottom-tab active" data-tab="absenceTab" type="button"><i class="fa-solid fa-clipboard-user"></i><span>Điểm danh</span></button>
@@ -1108,7 +1108,7 @@
                 <h3 style="margin:0; font-size:18px; color:#1e293b; display:flex; align-items:center; gap:8px;">
                     <i class="fa-solid fa-list-check" style="color:#2563eb;"></i> Quản lý lớp học
                 </h3>
-                <p style="margin:4px 0 0 0; font-size:13px; color:#64748b;">Tạo mã lớp mới hoặc chọn lớp cần xóa cùng toàn bộ học sinh trong lớp.</p>
+                <p style="margin:4px 0 0 0; font-size:13px; color:#64748b;">Tạo lớp mới, sửa mã lớp hoặc xóa lớp cùng toàn bộ học sinh trong lớp.</p>
             </div>
             <button type="button" onclick="closeManageClassesModal()" style="border:none; background:none; font-size:22px; color:#94a3b8; cursor:pointer;">&times;</button>
         </div>
@@ -1146,6 +1146,22 @@
             </div>
         </div>
 </div>
+</div>
+
+<!-- Edit Class Code Modal -->
+<div id="editClassModal" role="dialog" aria-modal="true" aria-labelledby="editClassTitle" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); z-index:9999999; justify-content:center; align-items:center;">
+    <form onsubmit="saveClassCode(event)" style="background:white; border-radius:16px; padding:24px; width:440px; max-width:90vw; box-sizing:border-box; box-shadow:0 20px 40px rgba(0,0,0,0.25);">
+        <h3 id="editClassTitle" style="margin:0 0 12px; font-size:18px; color:#1e293b;"><i class="fa-solid fa-pen-to-square" style="color:#2563eb;"></i> Sửa mã lớp</h3>
+        <p style="margin:0 0 16px; font-size:13px; color:#64748b;">Mã lớp hiện tại: <strong id="editClassCurrentCode" style="color:#2563eb;"></strong></p>
+        <label for="editClassCode" style="display:block; margin-bottom:8px; font-size:13px; font-weight:600; color:#1e293b;">Mã lớp mới</label>
+        <input id="editClassCode" type="text" required maxlength="50" autocomplete="off" aria-describedby="editClassHint editClassError" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; text-transform:uppercase;">
+        <p id="editClassHint" style="margin:8px 0 0; font-size:12px; color:#64748b;">Học sinh và dữ liệu liên quan của lớp sẽ được cập nhật sang mã mới.</p>
+        <p id="editClassError" role="alert" style="display:none; margin:8px 0 0; font-size:13px; color:#dc2626;"></p>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+            <button id="editClassCancelBtn" type="button" onclick="closeEditClassModal()" style="padding:10px 18px; border:1px solid #cbd5e1; background:white; color:#475569; border-radius:8px; font-weight:600; cursor:pointer;">Hủy</button>
+            <button id="saveClassCodeBtn" type="submit" style="padding:10px 18px; border:none; background:#2563eb; color:white; border-radius:8px; font-weight:600; cursor:pointer;"><i class="fa-solid fa-check"></i> Lưu mã lớp</button>
+        </div>
+    </form>
 </div>
 
 <!-- Custom Floating Class Delete Confirmation Modal -->

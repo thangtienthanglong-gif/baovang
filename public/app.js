@@ -4263,6 +4263,96 @@ window.createClass = async function(event) {
   }
 };
 
+window.openEditClassModal = function(className) {
+  const modal = document.getElementById('editClassModal');
+  if (document.getElementById('saveClassCodeBtn').disabled) return;
+  modal.dataset.className = className;
+  modal.dataset.branchId = getActiveBranch();
+  document.getElementById('editClassCurrentCode').textContent = className;
+  const input = document.getElementById('editClassCode');
+  input.value = className;
+  document.getElementById('editClassError').textContent = '';
+  document.getElementById('editClassError').style.display = 'none';
+  if (modal.parentNode !== document.body) document.body.appendChild(modal);
+  modal.style.display = 'flex';
+  input.focus();
+  input.select();
+};
+
+window.closeEditClassModal = function() {
+  if (document.getElementById('saveClassCodeBtn').disabled) return;
+  document.getElementById('editClassModal').style.display = 'none';
+};
+
+window.saveClassCode = async function(event) {
+  event.preventDefault();
+  const modal = document.getElementById('editClassModal');
+  const input = document.getElementById('editClassCode');
+  const button = document.getElementById('saveClassCodeBtn');
+  const cancel = document.getElementById('editClassCancelBtn');
+  const errorEl = document.getElementById('editClassError');
+  if (button.disabled) return;
+  const oldClassName = modal.dataset.className;
+  const branchId = modal.dataset.branchId;
+  const className = input.value.replace(/\s+/g, ' ').trim().toUpperCase();
+  errorEl.textContent = '';
+  errorEl.style.display = 'none';
+  if (!className || className.length > 50 || className === 'ALL') {
+    errorEl.textContent = 'Vui lòng nhập mã lớp hợp lệ, tối đa 50 ký tự (không dùng ALL).';
+    errorEl.style.display = 'block';
+    input.focus();
+    return;
+  }
+  if (getActiveBranch() !== branchId) {
+    errorEl.textContent = 'Cơ sở đang chọn đã thay đổi. Vui lòng mở lại danh sách lớp.';
+    errorEl.style.display = 'block';
+    return;
+  }
+  button.disabled = input.disabled = cancel.disabled = true;
+  try {
+    const result = await api(`/api/classes/${encodeURIComponent(oldClassName)}`, {
+      method: 'PUT', body: JSON.stringify({ className })
+    });
+    if (getActiveBranch() !== branchId) return;
+    state.classes = result.classes;
+    const matches = value => typeof value === 'string' && value.replace(/\s+/g, ' ').trim().toUpperCase() === oldClassName.toUpperCase();
+    for (const collection of ['students', 'absences', 'scheduleExceptions', 'callLogs', 'notificationLogs']) {
+      for (const record of state[collection] || []) {
+        for (const field of ['className', 'attendanceClass', 'originalClass', 'makeupClass']) {
+          if (matches(record[field])) record[field] = result.className;
+        }
+      }
+    }
+    document.querySelectorAll('select').forEach(select => {
+      const selected = matches(select.value);
+      Array.from(select.options).forEach(option => {
+        if (matches(option.value)) {
+          option.value = result.className;
+          option.textContent = option.textContent.replace(oldClassName, result.className);
+        }
+      });
+      if (selected) select.value = result.className;
+    });
+    document.getElementById('searchClassInput').value = '';
+    rebuildQuickSearchIndex();
+    renderFilters();
+    renderClassDropdown();
+    renderRoster();
+    renderStudentSelect();
+    renderAbsences();
+    renderManageClassList();
+    modal.style.display = 'none';
+    toast(`Đã đổi mã lớp ${oldClassName} thành ${result.className}.`, 'success');
+  } catch (error) {
+    if (getActiveBranch() !== branchId) return;
+    errorEl.textContent = error.message || 'Không thể sửa mã lớp. Vui lòng thử lại.';
+    errorEl.style.display = 'block';
+  } finally {
+    button.disabled = input.disabled = cancel.disabled = false;
+    if (modal.style.display !== 'none') input.focus();
+  }
+};
+
 window.openManageClassesModal = function() {
   const modal = document.getElementById('manageClassesModal');
   if (!modal) return;
@@ -4303,15 +4393,20 @@ window.renderManageClassList = function() {
   container.innerHTML = classNames.map(className => {
     const count = classCounts[className] || 0;
     return `
-      <div style="background:white; border:1px solid #e2e8f0; border-radius:10px; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
-        <label style="display:flex; align-items:center; gap:12px; font-weight:600; color:#1e293b; font-size:14px; margin:0; cursor:pointer; flex:1;">
+      <div style="background:white; border:1px solid #e2e8f0; border-radius:10px; padding:12px 16px; display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between; align-items:center; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+        <label style="display:flex; flex-wrap:wrap; align-items:center; gap:12px; font-weight:600; color:#1e293b; font-size:14px; margin:0; cursor:pointer; flex:1; min-width:180px; overflow-wrap:anywhere;">
           <input type="checkbox" class="manage-class-checkbox" value="${escapeHtml(className)}" onchange="updateSelectedClassCount()" style="width:18px; height:18px; cursor:pointer;">
           <span>Lớp <span style="color:#2563eb;">${escapeHtml(className)}</span></span>
           <span style="font-weight:normal; font-size:12px; background:#f1f5f9; color:#64748b; padding:2px 8px; border-radius:12px;">${count} học sinh</span>
         </label>
-        <button type="button" data-class-name="${escapeHtml(className)}" onclick="deleteSingleClass(this.dataset.className)" style="border:none; background:#fee2e2; color:#ef4444; padding:6px 12px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">
-          <i class="fa-solid fa-trash-can"></i> Xóa
-        </button>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          <button type="button" data-class-name="${escapeHtml(className)}" onclick="openEditClassModal(this.dataset.className)" style="border:none; background:#dbeafe; color:#2563eb; padding:6px 12px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">
+            <i class="fa-solid fa-pen-to-square"></i> Sửa mã lớp
+          </button>
+          <button type="button" data-class-name="${escapeHtml(className)}" onclick="deleteSingleClass(this.dataset.className)" style="border:none; background:#fee2e2; color:#ef4444; padding:6px 12px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">
+            <i class="fa-solid fa-trash-can"></i> Xóa
+          </button>
+        </div>
       </div>
     `;
   }).join('');

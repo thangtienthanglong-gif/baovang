@@ -3273,6 +3273,48 @@ app.post('/api/classes', async (req, res, next) => {
   }
 });
 
+app.put('/api/classes/:className', async (req, res, next) => {
+  try {
+    const className = typeof req.body.className === 'string' ? cleanText(req.body.className).toUpperCase() : '';
+    const oldClassName = cleanText(req.params.className).toUpperCase();
+    if (!className || className.length > 50 || className === 'ALL') {
+      const err = new Error('Vui lòng nhập mã lớp hợp lệ, tối đa 50 ký tự (không dùng ALL).');
+      err.status = 400;
+      throw err;
+    }
+    const rootDb = await readDb();
+    const branchId = resolveValidBranchId(req, rootDb);
+    const db = rootDb.branches[branchId];
+    const existingClasses = db ? [...getBranchClasses(db), ...(db.students || []).map(student => student.className)] : [];
+    if (!oldClassName || !existingClasses.some(name => cleanText(name).toUpperCase() === oldClassName)) {
+      const err = new Error('Không tìm thấy lớp học. Vui lòng tải lại danh sách lớp.');
+      err.status = 404;
+      throw err;
+    }
+    if (className !== oldClassName && existingClasses.some(name => cleanText(name).toUpperCase() === className)) {
+      const err = new Error(`Mã lớp ${className} đã tồn tại trong cơ sở này.`);
+      err.status = 409;
+      throw err;
+    }
+    const matches = name => typeof name === 'string' && cleanText(name).toUpperCase() === oldClassName;
+    const updatedStudents = (db.students || []).filter(student => matches(student.className)).length;
+    db.classes = [...new Set([...(db.classes || []).map(name => matches(name) ? className : name), className])];
+    // Keep references linked to this class without changing IDs or message contents.
+    const classFields = ['className', 'attendanceClass', 'originalClass', 'makeupClass', 'fromClass', 'toClass'];
+    for (const collection of ['students', 'absences', 'scheduleExceptions', 'exams', 'teaching_sessions', 'transferHistory', 'callLogs', 'notificationLogs']) {
+      for (const record of db[collection] || []) {
+        for (const field of classFields) {
+          if (matches(record[field])) record[field] = className;
+        }
+      }
+    }
+    await writeDb(rootDb);
+    res.json({ success: true, className, classes: getBranchClasses(db), updatedStudents });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.delete('/api/classes/:className', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
