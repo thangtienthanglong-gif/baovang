@@ -496,11 +496,11 @@ function studentByIdMap(students) {
 }
 
 function isActiveStudent(student) {
-  return student && student.status !== 'Nghỉ học';
+  return student && !student.removedFromClass && student.status !== 'Nghỉ học';
 }
 
 function isWithdrawnAbsence(absence, student) {
-  return normalizeAbsenceStatus(absence.absenceStatus) === 'Nghỉ học' || student?.status === 'Nghỉ học';
+  return normalizeAbsenceStatus(absence.absenceStatus) === 'Nghỉ học' || student?.status === 'Nghỉ học' || Boolean(student?.removedFromClass);
 }
 
 function quitStudentDetails(db, student) {
@@ -546,6 +546,7 @@ function enrichAbsence(absence, studentsMap) {
     studentCode: student.code || '',
     studentName: student.fullName || '',
     studentStatus: student.status || '',
+    studentRemovedFromClass: Boolean(student.removedFromClass),
     className: absence.attendanceClass || student.className || '',
     parentName: student.parentName || '',
     phone1: student.phone1 || '',
@@ -591,7 +592,7 @@ function filterAbsences(db, query) {
 }
 
 function getSummary(absences) {
-  const actionable = absences.filter(row => !isWithdrawnAbsence(row, { status: row.studentStatus }));
+  const actionable = absences.filter(row => !isWithdrawnAbsence(row, { status: row.studentStatus, removedFromClass: row.studentRemovedFromClass }));
   const count = status => actionable.filter(row => row.callStatus === status).length;
   const notice = status => actionable.filter(row => row.noticeStatus === status).length;
   return {
@@ -1566,6 +1567,7 @@ function selectSpecialZaloCandidates(db, filters, checkField) {
   const keyword = String(filters.q || '').toLowerCase().trim();
   
   const allStudents = (db.students || []).filter(s => {
+    if (s.removedFromClass) return false;
     if (className !== 'ALL' && s.className !== className) return false;
     if (checkField && (!s[checkField] || s[checkField].trim() === '')) return false;
     
@@ -2034,7 +2036,7 @@ async function sendZaloNotice(db, absenceId, reason = 'auto') {
   }
 
   if (isWithdrawnAbsence(absence, student)) {
-    return finish('Không gửi', 'Học sinh đã nghỉ học; không gửi thông báo.', { blocked: true });
+    return finish('Không gửi', student.removedFromClass ? 'Học sinh đã được xóa khỏi danh sách lớp; không gửi thông báo.' : 'Học sinh đã nghỉ học; không gửi thông báo.', { blocked: true });
   }
 
   if (config.mode === 'personal-test') {
@@ -2661,7 +2663,7 @@ app.get('/api/ketbu/students', async (req, res, next) => {
     const branchId = getBranchId(req);
     const db = await readDb();
     resolveValidBranchId(req, db);
-    let students = db.branches[branchId]?.students || [];
+    let students = (db.branches[branchId]?.students || []).filter(student => !student.removedFromClass);
     const evals = db.branches[branchId]?.evaluations || [];
     const warnings = db.branches[branchId]?.warnings || [];
     const part = req.query.part;
@@ -3097,6 +3099,7 @@ app.post('/api/students', async (req, res, next) => {
       throw err;
     }
     const sameStudent = db.students.some(row =>
+      !row.removedFromClass &&
       cleanText(row.fullName).toLocaleLowerCase('vi') === student.fullName.toLocaleLowerCase('vi') &&
       cleanText(row.className).toLocaleLowerCase('vi') === student.className.toLocaleLowerCase('vi') &&
       normalizePhone(row.phone1) === student.phone1
@@ -3165,6 +3168,79 @@ app.put('/api/students/:id', async (req, res, next) => {
   }
 });
 
+
+app.get('/api/removed-class-students', async (req, res, next) => {
+  try {
+    const db = await getBranchDb(req);
+    const q = normalizeSearchText(req.query.q || '');
+    const date = req.query.date || '';
+    const rows = (db.classRemovalHistory || []).filter(row => {
+      if (date && row.removedDate !== date) return false;
+      return !q || normalizeSearchText(`${row.fullName} ${row.className} ${row.parentName} ${row.phone1} ${row.phone2}`).includes(q);
+    });
+    res.json(rows.sort((a, b) => b.removedAt.localeCompare(a.removedAt)));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/students/:id/remove-from-class', async (req, res, next) => {
+  try {
+    const className = typeof req.body.className === 'string' ? cleanText(req.body.className) : '';
+    if (!className) {
+      const err = new Error('Vui lòng chọn lớp cần xóa tên học sinh.');
+      err.status = 400;
+      throw err;
+    }
+    const rootDb = await readDb();
+    const branchId = resolveValidBranchId(req, rootDb);
+    const db = rootDb.branches[branchId];
+    const student = (db?.students || []).find(row => row.id === req.params.id);
+    if (!student) {
+      const err = new Error('Không tìm thấy học sinh trong cơ sở đang chọn.');
+      err.status = 404;
+      throw err;
+    }
+    if (cleanText(student.className) !== className) {
+      const err = new Error('Lớp của học sinh đã thay đổi. Vui lòng tải lại danh sách trước khi xóa tên.');
+      err.status = 409;
+      throw err;
+    }
+    if (!student.removedFromClass) {
+      student.removedFromClass = true;
+      student.removedFromClassAt = nowISO();
+      const removedAt = student.removedFromClassAt;
+      const removedDate = new Date(Date.parse(removedAt) + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      if (!db.classRemovalHistory) db.classRemovalHistory = [];
+      db.classRemovalHistory.push({
+        studentId: student.id, fullName: student.fullName || student.name || '', className: student.className,
+        parentName: student.parentName || '', phone1: student.phone1 || '', phone2: student.phone2 || '',
+        removedAt, removedDate
+      });
+      // Preserve the class even when its last student is removed.
+      db.classes = [...new Set([...(db.classes || []), student.className])];
+      const result = 'Học sinh đã được xóa khỏi danh sách lớp; không gửi thông báo.';
+      for (const absence of db.absences || []) {
+        if (absence.studentId !== student.id) continue;
+        if (['Đã gửi', 'Chạy thử'].includes(absence.noticeStatus)) continue;
+        absence.autoNotice = false;
+        absence.noticeDueAt = '';
+        absence.noticeStatus = 'Không gửi';
+        absence.noticeResult = result;
+      }
+      for (const log of db.notificationLogs || []) {
+        if (log.studentId === student.id && ['Chờ gửi', 'Chờ gửi thủ công', 'Lỗi gửi'].includes(log.status)) {
+          log.status = 'Không gửi';
+          log.result = result;
+        }
+      }
+      await writeDb(rootDb);
+    }
+    res.json({ success: true, student, classes: getBranchClasses(db) });
+  } catch (error) {
+    next(error);
+  }
+});
 
 app.post('/api/students/:id/transfer', (req, res, next) => authenticateToken(req, res, next), async (req, res, next) => {
   try {
@@ -3539,7 +3615,9 @@ app.post('/api/exams', async (req, res, next) => {
       exam.className = className;
       exam.examName = examName;
       exam.date = date;
-      exam.scores = scores;
+      const removedStudentIds = new Set((db.students || []).filter(student => student.removedFromClass).map(student => student.id));
+      const preservedScores = (exam.scores || []).filter(score => removedStudentIds.has(score.studentId));
+      exam.scores = [...(scores || []).filter(score => !removedStudentIds.has(score.studentId)), ...preservedScores];
     } else {
       exam = {
         id: id || Date.now().toString() + Math.random().toString(36).substr(2, 5),
@@ -3678,6 +3756,12 @@ app.post('/api/absences', async (req, res, next) => {
     if (!student) {
       const err = new Error('Không tìm thấy học sinh.');
       err.status = 404;
+      throw err;
+    }
+
+    if (student.removedFromClass) {
+      const err = new Error('Học sinh đã được xóa khỏi danh sách lớp. Vui lòng tải lại danh sách.');
+      err.status = 409;
       throw err;
     }
 

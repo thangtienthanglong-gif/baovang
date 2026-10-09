@@ -143,6 +143,21 @@ test('history and the actual Excel workbook recover a legacy quit date from atte
   assert.equal(rows[0]['SĐT'], '0900000000');
 });
 
+test('removed class names stay out of notice retries and reject new attendance without deleting history', async () => {
+  const db = fixture();
+  db.students[0].removedFromClass = true;
+  db.absences = [{ id: 'old', studentId: 's1', absenceStatus: 'Vắng', noticeStatus: 'Lỗi gửi' }];
+  const app = setup(db);
+  assert.equal(app.context.selectBulkZaloCandidates(db, {}).candidates.length, 0);
+  const retry = await app.context.sendZaloNotice(db, 'old', 'manual_resend');
+  assert.equal(retry.status, 'Không gửi');
+  assert.equal(retry.responsePayload.blocked, true);
+  await assert.rejects(app.call('post', '/api/absences', { body: { ...withdrawal, absenceStatus: 'Vắng' } }), error => error.status === 409);
+  assert.equal(db.absences.length, 1);
+  assert.equal(app.networkCalls(), 0);
+  assert.equal(app.context.getSummary(app.context.filterAbsences(db, {})).total, 0);
+});
+
 test('editing student contact fields cannot silently reactivate a withdrawn student', async () => {
   const db = fixture();
   db.students[0].status = 'Nghỉ học';

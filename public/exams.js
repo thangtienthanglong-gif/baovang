@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       
-      const classStudents = state.students.filter(s => s.className === cls);
+      const classStudents = state.students.filter(s => !s.removedFromClass && s.className === cls);
       if (classStudents.length === 0) {
         toast('Lớp này chưa có học sinh.', 'warning');
         return;
@@ -147,7 +147,7 @@ async function openExamInput(className, examName) {
   
   document.getElementById('examInputTitle').textContent = `Nhập điểm: ${examName} - ${className}`;
   
-  const classStudents = state.students.filter(s => s.className === className);
+  const classStudents = state.students.filter(s => !s.removedFromClass && s.className === className);
   
   if (classStudents.length === 0) {
     toast('Lớp này không có học sinh nào.', 'warning');
@@ -320,7 +320,7 @@ async function sendExamZalo() {
   
   scores.forEach(s => {
     const student = state.students.find(st => st.id === s.studentId);
-    if (!student) return;
+    if (!student || student.removedFromClass) return;
     
     const phone = student.phone1 || student.phone2;
     if (!phone) return;

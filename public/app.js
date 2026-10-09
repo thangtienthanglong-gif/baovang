@@ -110,7 +110,7 @@ function initials(name) {
 }
 
 function isActiveStudent(student) {
-  return student && student.status !== 'Nghỉ học';
+  return student && !student.removedFromClass && student.status !== 'Nghỉ học';
 }
 
 function activeStudents() {
@@ -303,7 +303,7 @@ async function refreshAutomaticDate() {
     await loadAttendanceAbsences();
   }
   else if (historyChanged && tab === 'historyTab') {
-    await Promise.all([loadHistory(), loadNotices(), loadQuitStudents()]);
+    await Promise.all([loadHistory(), loadNotices(), loadQuitStudents(), loadRemovedClassStudents()]);
   }
 }
 
@@ -362,7 +362,7 @@ async function refreshCurrentView(button) {
     const tab = activeTabId();
     if (tab === 'queueTab') await loadAbsences();
     if (tab === 'historyTab') {
-      await Promise.all([loadHistory(), loadNotices(), loadQuitStudents()]);
+      await Promise.all([loadHistory(), loadNotices(), loadQuitStudents(), loadRemovedClassStudents()]);
     }
     if (tab === 'absenceTab' || tab === 'overviewTab') await loadAttendanceAbsences();
     toast('Đã tải lại dữ liệu.');
@@ -1025,7 +1025,7 @@ function renderClassDropdown() {
   if (!dropdown) return;
 
   const validStudents = rows.filter(s => validClasses.includes(s.className || 'Chưa có lớp'));
-  const validAbsences = state.absences.filter(a => validClasses.includes(a.className));
+  const validAbsences = state.absences.filter(a => !a.studentRemovedFromClass && validClasses.includes(a.className));
 
   const optionsHtml = [`<option value="ALL">Tất cả lớp (${validStudents.length} học sinh)</option>`];
   
@@ -1034,7 +1034,7 @@ function renderClassDropdown() {
       optionsHtml.push(`<optgroup label="Buổi ${session}">`);
       sessionGroups[session].forEach(className => {
         const students = groups[className] || [];
-        const absenceCount = state.absences.filter(row => row.className === className).length;
+        const absenceCount = validAbsences.filter(row => row.className === className).length;
         optionsHtml.push(`<option value="${escapeHtml(className)}">${escapeHtml(className)} - ${students.length} học sinh, ${absenceCount} vắng</option>`);
       });
       optionsHtml.push(`</optgroup>`);
@@ -1047,7 +1047,7 @@ function renderClassDropdown() {
   const selectedStudents = dropdown.value === 'ALL' ? validStudents : (groups[dropdown.value] || []);
   const selectedAbsences = dropdown.value === 'ALL'
     ? validAbsences.length
-    : state.absences.filter(row => row.className === dropdown.value).length;
+    : validAbsences.filter(row => row.className === dropdown.value).length;
   const phoneCount = selectedStudents.filter(student => student.phone1 || student.phone2).length;
 
   if (meta) {
@@ -1204,7 +1204,7 @@ function renderRosterStudent(student) {
     ['Về sớm', 'Về sớm']
   ];
   if (!student.isMakeupAttendance) {
-    statusOptions.push(['Nghỉ học', 'Nghỉ học'], ['Học phí', 'Trễ học phí']);
+    statusOptions.push(['Nghỉ học', 'Nghỉ học'], ['Học phí', 'Trễ học phí'], ['REMOVE_FROM_CLASS', 'Xóa khỏi danh sách lớp']);
   }
   if (!statusOptions.some(([value]) => value === currentStatus)) {
     statusOptions.push([currentStatus, currentStatus]);
@@ -1249,7 +1249,7 @@ function noticeTimeLine(row) {
 function renderAbsences() {
   const container = $('#absenceRows');
   const queueAbsences = state.absences.filter(row => row.noticeStatus !== 'Đã gửi'
-    && normalizeAbsenceStatus(row.absenceStatus) !== 'Nghỉ học' && row.studentStatus !== 'Nghỉ học');
+    && normalizeAbsenceStatus(row.absenceStatus) !== 'Nghỉ học' && row.studentStatus !== 'Nghỉ học' && !row.studentRemovedFromClass);
 
   if (!queueAbsences.length) {
     container.innerHTML = '<div class="empty">Hàng xử lý trống. Học sinh đã gửi được lưu trong Lịch sử liên hệ.</div>';
@@ -1510,6 +1510,29 @@ async function loadQuitStudents() {
   `).join('');
 }
 
+async function loadRemovedClassStudents() {
+  const tbody = $('#removedClassRows');
+  if (!tbody) return;
+  const branchId = getActiveBranch();
+  const rows = await api('/api/removed-class-students?' + queryString({
+    date: selectedHistoryDate(), q: $('#historyKeyword').value.trim()
+  }));
+  if (getActiveBranch() !== branchId) return;
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Không có học sinh nào được xóa khỏi lớp trong thời gian đã chọn.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(row => `
+    <tr>
+      <td>${escapeHtml(formatDateTime(row.removedAt))}</td>
+      <td><div class="person-main">${escapeHtml(row.fullName)}</div></td>
+      <td>${escapeHtml(row.className)}</td>
+      <td>${escapeHtml(row.parentName)}</td>
+      <td>${escapeHtml(row.phone1 || row.phone2 || '')}</td>
+    </tr>
+  `).join('');
+}
+
 async function loadNotices() {
   let rows = await api('/api/notification-logs?' + queryString({
     date: selectedHistoryDate(),
@@ -1584,7 +1607,7 @@ async function activateTab(tabId, activeShortcut = null) {
   $('#' + tabId).classList.add('active');
   if (tabId === 'overviewTab' || tabId === 'absenceTab') await loadAttendanceAbsences();
   if (tabId === 'historyTab') {
-    await Promise.all([loadHistory(), loadNotices(), loadQuitStudents()]);
+    await Promise.all([loadHistory(), loadNotices(), loadQuitStudents(), loadRemovedClassStudents()]);
   }
   if (tabId === 'queueTab') await loadAbsences();
 }
@@ -1606,6 +1629,39 @@ async function updateRosterStatus(select) {
   const attendanceClass = select.dataset.attendanceClass;
   const absenceId = select.dataset.absenceId;
   const status = normalizeAbsenceStatus(select.value);
+
+  if (select.value === 'REMOVE_FROM_CLASS') {
+    const student = state.students.find(row => row.id === studentId);
+    const absence = absenceForStudent(studentId, attendanceClass);
+    const previousStatus = absence ? normalizeAbsenceStatus(absence.absenceStatus) : 'Đang học';
+    select.value = previousStatus;
+    if (!student || student.className !== attendanceClass) {
+      throw new Error('Vui lòng xóa tên học sinh từ lớp chính của học sinh.');
+    }
+    if (!confirm(`Xóa ${student.fullName || student.name || 'học sinh này'} khỏi danh sách lớp ${attendanceClass}?\nHọc sinh sẽ được lưu vào Lịch sử → Đã xóa khỏi lớp, không tính lượt vắng. Lịch sử điểm danh và điểm thi đã có được giữ lại.`)) return;
+    const branchId = getActiveBranch();
+    const result = await api(`/api/students/${encodeURIComponent(studentId)}/remove-from-class`, {
+      method: 'POST', body: JSON.stringify({ className: attendanceClass })
+    });
+    if (getActiveBranch() !== branchId) return;
+    Object.assign(student, result.student);
+    state.classes = result.classes;
+    for (const row of state.absences || []) {
+      if (row.studentId === studentId) row.studentRemovedFromClass = true;
+    }
+    rebuildQuickSearchIndex();
+    renderClassDropdown();
+    renderRoster();
+    renderStudentSelect();
+    renderAbsences();
+    toast(`Đã xóa ${student.fullName || student.name || 'học sinh'} khỏi lớp ${attendanceClass} và lưu vào Lịch sử → Đã xóa khỏi lớp.`, 'success');
+    try {
+      await loadBootstrap();
+    } catch (error) {
+      toast('Đã xóa tên, nhưng chưa tải lại được dữ liệu. Vui lòng bấm Tải lại.', 'error');
+    }
+    return;
+  }
 
   if (status === 'Đang học') {
     if (absenceId) {
@@ -2848,6 +2904,8 @@ function initEvents() {
     } catch (error) {
       toast(error.message, 'error');
       await loadBootstrap();
+    } finally {
+      select.disabled = false;
     }
   });
 
@@ -2925,15 +2983,15 @@ function initEvents() {
   });
 
   $('#historyFilterBtn').addEventListener('click', async () => {
-    await Promise.all([loadHistory(), loadNotices(), loadQuitStudents()]);
+    await Promise.all([loadHistory(), loadNotices(), loadQuitStudents(), loadRemovedClassStudents()]);
   });
   $('#historyDateAuto')?.addEventListener('change', async event => {
     historyDateAuto = event.target.checked;
     syncAutomaticHistoryDate();
-    await Promise.all([loadHistory(), loadNotices(), loadQuitStudents()]);
+    await Promise.all([loadHistory(), loadNotices(), loadQuitStudents(), loadRemovedClassStudents()]);
   });
   $('#historyDate')?.addEventListener('change', async () => {
-    await Promise.all([loadHistory(), loadNotices(), loadQuitStudents()]);
+    await Promise.all([loadHistory(), loadNotices(), loadQuitStudents(), loadRemovedClassStudents()]);
   });
   
   $('#logFilterBtn')?.addEventListener('click', () => {
@@ -4377,7 +4435,7 @@ window.renderManageClassList = function() {
   
   const classCounts = {};
   (state.students || []).forEach(s => {
-    if (s.className) {
+    if (isActiveStudent(s) && s.className) {
       classCounts[s.className] = (classCounts[s.className] || 0) + 1;
     }
   });
