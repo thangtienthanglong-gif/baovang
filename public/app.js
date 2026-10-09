@@ -19,6 +19,7 @@ let quickSearchTimer = null;
 let renderedQueueSession = '';
 let queueSessionAuto = true;
 let queueDateAuto = true;
+let historyDateAuto = true;
 const QUICK_SEARCH_ROSTER_LIMIT = 80;
 
 function normalizeQuickSearch(value) {
@@ -276,13 +277,33 @@ function syncAutomaticDate() {
   return changed;
 }
 
+function syncAutomaticHistoryDate() {
+  const input = $('#historyDate');
+  if (!input) return false;
+  const today = clientTodayISO();
+  const changed = historyDateAuto && input.value !== today;
+  if (historyDateAuto) input.value = today;
+  input.readOnly = historyDateAuto;
+  if ($('#historyDateAuto')) $('#historyDateAuto').checked = historyDateAuto;
+  return changed;
+}
+
+function selectedHistoryDate() {
+  syncAutomaticHistoryDate();
+  return $('#historyDate')?.value || '';
+}
+
 async function refreshAutomaticDate() {
   const changed = syncAutomaticDate();
+  const historyChanged = syncAutomaticHistoryDate();
   if (changed) renderFilters();
   const tab = activeTabId();
   if (tab === 'queueTab') await loadAbsences();
   else if (changed && (tab === 'absenceTab' || tab === 'overviewTab')) {
     await loadAttendanceAbsences();
+  }
+  else if (historyChanged && tab === 'historyTab') {
+    await Promise.all([loadHistory(), loadNotices(), loadQuitStudents()]);
   }
 }
 
@@ -1412,7 +1433,7 @@ async function loadTeachingLog() {
 
 async function loadHistory() {
   const rows = await api('/api/call-logs?' + queryString({
-    date: $('#historyDate').value,
+    date: selectedHistoryDate(),
     q: $('#historyKeyword').value.trim()
   }));
 
@@ -1491,7 +1512,7 @@ async function loadQuitStudents() {
 
 async function loadNotices() {
   let rows = await api('/api/notification-logs?' + queryString({
-    date: $('#historyDate').value,
+    date: selectedHistoryDate(),
     q: $('#historyKeyword').value.trim()
   }));
   
@@ -2008,7 +2029,7 @@ function exportQuitList(params = {}) {
 
 async function clearQuitHistory() {
   const params = {
-    date: $('#historyDate')?.value || '',
+    date: selectedHistoryDate(),
     q: $('#historyKeyword')?.value || ''
   };
   await api('/api/quit-students/clear?' + queryString(params), { method: 'DELETE' });
@@ -2018,7 +2039,7 @@ async function clearQuitHistory() {
 
 async function clearCallHistory() {
   const params = {
-    date: $('#historyDate')?.value || '',
+    date: selectedHistoryDate(),
     q: $('#historyKeyword')?.value.trim() || ''
   };
   const scope = params.date || params.q ? 'lịch sử cuộc gọi đang lọc' : 'toàn bộ lịch sử cuộc gọi';
@@ -2030,7 +2051,7 @@ async function clearCallHistory() {
 
 async function clearNoticeHistory() {
   const params = {
-    date: $('#historyDate')?.value || '',
+    date: selectedHistoryDate(),
     q: $('#historyKeyword')?.value.trim() || ''
   };
   const scope = params.date || params.q ? 'lịch sử Zalo đang lọc' : 'toàn bộ lịch sử Zalo';
@@ -2906,6 +2927,14 @@ function initEvents() {
   $('#historyFilterBtn').addEventListener('click', async () => {
     await Promise.all([loadHistory(), loadNotices(), loadQuitStudents()]);
   });
+  $('#historyDateAuto')?.addEventListener('change', async event => {
+    historyDateAuto = event.target.checked;
+    syncAutomaticHistoryDate();
+    await Promise.all([loadHistory(), loadNotices(), loadQuitStudents()]);
+  });
+  $('#historyDate')?.addEventListener('change', async () => {
+    await Promise.all([loadHistory(), loadNotices(), loadQuitStudents()]);
+  });
   
   $('#logFilterBtn')?.addEventListener('click', () => {
     loadTeachingLog();
@@ -2928,33 +2957,33 @@ function initEvents() {
   });
   $('#exportLateHistoryBtn')?.addEventListener('click', () => {
     exportLateAbsences({
-      date: $('#historyDate')?.value || '',
+      date: selectedHistoryDate(),
       q: $('#historyKeyword')?.value.trim() || ''
     });
   });
 
   $('#exportExcusedHistoryBtn')?.addEventListener('click', () => {
     exportExcusedAbsences({
-      date: $('#historyDate')?.value || '',
+      date: selectedHistoryDate(),
       q: $('#historyKeyword')?.value.trim() || ''
     });
   });
   $('#exportFailedZaloHistoryBtn')?.addEventListener('click', () => {
     exportFailedZalo({
-      date: $('#historyDate')?.value || '',
+      date: selectedHistoryDate(),
       q: $('#historyKeyword')?.value.trim() || ''
     });
   });
   $('#exportCallListBtn')?.addEventListener('click', () => {
     exportCallList({
-      date: $('#historyDate')?.value || '',
+      date: selectedHistoryDate(),
       q: $('#historyKeyword')?.value.trim() || ''
     });
   });
 
   $('#exportQuitListBtn')?.addEventListener('click', () => {
     exportQuitList({
-      date: $('#historyDate')?.value || '',
+      date: selectedHistoryDate(),
       q: $('#historyKeyword')?.value.trim() || ''
     });
   });
@@ -2975,6 +3004,7 @@ function initEvents() {
 
 window.addEventListener('DOMContentLoaded', async () => {
   syncAutomaticDate();
+  syncAutomaticHistoryDate();
   const dayDropdown = document.getElementById('dayDropdown');
   if (dayDropdown) {
     const dDay = new Date().getDay();

@@ -35,7 +35,7 @@ function setup(instant = '2026-10-08T16:59:00Z') {
     assert.ok(offset >= 0 && source.indexOf(end, offset) > offset);
     vm.runInContext(source.slice(offset, source.indexOf(end, offset)), context);
   };
-  vm.runInContext("let queueDateAuto = true; let queueSessionAuto = true; let renderedQueueSession = '';", context);
+  vm.runInContext("let queueDateAuto = true; let historyDateAuto = true; let queueSessionAuto = true; let renderedQueueSession = '';", context);
   load('function clientTodayISO(', 'async function loadBootstrap(');
   load('async function loadAbsences(', 'async function loadAttendanceAbsences(');
   return {

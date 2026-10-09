@@ -479,8 +479,11 @@
     <section id="historyTab" class="tab-panel">
       <section class="card filters" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
         <div class="field" style="margin: 0;">
-          <label for="historyDate">Ngày vắng</label>
-          <input id="historyDate" type="date">
+          <div class="date-filter-heading">
+            <label for="historyDate">Ngày vắng</label>
+            <label class="date-auto-toggle" for="historyDateAuto"><input id="historyDateAuto" type="checkbox" checked> Tự động</label>
+          </div>
+          <input id="historyDate" type="date" readonly>
         </div>
         <div class="field grow" style="margin: 0;">
           <label for="historyKeyword">Tìm kiếm</label>
