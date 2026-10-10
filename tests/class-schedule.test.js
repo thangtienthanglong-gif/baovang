@@ -81,6 +81,17 @@ test('Thursday evening dropdown and roster show 8CT1 with its students', () => {
   assert.doesNotMatch(fields.studentRoster.innerHTML, /data-id="ct2"/);
 });
 
+test('made-up attendance keeps the student visible without increasing absence counts', () => {
+  const { context, fields } = setup();
+  context.state.absences = [{ studentId: 'ct1', className: '8CT1', absenceStatus: 'Đã bù' }];
+  context.absenceForStudent = id => id === 'ct1' ? context.state.absences[0] : null;
+  context.renderClassDropdown();
+  context.renderRoster();
+  assert.match(fields.classDropdown.innerHTML, /8CT1 - 1 học sinh, 0 vắng/);
+  assert.match(fields.rosterMeta.textContent, /0 đang báo vắng/);
+  assert.match(fields.studentRoster.innerHTML, /data-id="ct1"/);
+});
+
 test('choosing Thursday explicitly also includes 8CT1 when the date is Friday', () => {
   const { context, fields } = setup();
   context.selectedDate = () => '2026-10-09';

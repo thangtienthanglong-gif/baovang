@@ -56,6 +56,81 @@ function setup(db) {
 const withdrawal = { date: '2026-10-06', studentId: 's1', session: 'Tối', absenceStatus: 'Nghỉ học', sendZalo: true };
 
 for (const delay of [0, 15]) {
+  test(`made-up attendance keeps enrollment and never sends or schedules a notice (delay ${delay})`, async () => {
+    const db = fixture();
+    db.settings.delay = delay;
+    const app = setup(db);
+    const result = await app.call('post', '/api/absences', { body: { ...withdrawal, absenceStatus: 'Đã bù' } });
+    assert.equal(result.status, 201);
+    assert.equal(result.data.absence.absenceStatus, 'Đã bù');
+    assert.equal(result.data.absence.date, '2026-10-06');
+    assert.equal(db.students[0].status, 'Đang học');
+    assert.equal(db.students[0].className, '8AT3');
+    assert.equal(db.students[0].quitDate, undefined);
+    assert.equal(db.absences[0].noticeStatus, 'Không gửi');
+    assert.equal(db.absences[0].autoNotice, false);
+    assert.equal(db.absences[0].noticeDueAt, '');
+    assert.equal(db.notificationLogs.length, 0);
+    assert.equal(app.networkCalls(), 0);
+    assert.equal(app.context.getSummary(app.context.filterAbsences(db, {})).total, 0);
+  });
+}
+
+test('marking an existing absence made up cancels only that record and keeps sent message history', async () => {
+  const db = fixture();
+  db.absences = [
+    { id: 'today', studentId: 's1', date: '2026-10-06', absenceStatus: 'Vắng', noticeStatus: 'Chờ gửi', autoNotice: true, noticeDueAt: 'later' },
+    { id: 'other-day', studentId: 's1', date: '2026-10-05', absenceStatus: 'Vắng', noticeStatus: 'Chờ gửi', autoNotice: true }
+  ];
+  db.notificationLogs = [
+    { absenceId: 'today', studentId: 's1', status: 'Chờ gửi thủ công' },
+    { absenceId: 'today', studentId: 's1', status: 'Đã gửi', message: 'Tin đã gửi' },
+    { absenceId: 'other-day', studentId: 's1', status: 'Chờ gửi thủ công' }
+  ];
+  const untouched = structuredClone(db.absences[1]);
+  const app = setup(db);
+  await app.call('put', '/api/absences/:id/status', { id: 'today', body: { absenceStatus: 'Đã bù', sendZalo: true } });
+  assert.equal(db.absences[0].absenceStatus, 'Đã bù');
+  assert.equal(db.absences[0].autoNotice, false);
+  assert.equal(db.absences[0].noticeDueAt, '');
+  assert.equal(db.absences[0].noticeStatus, 'Không gửi');
+  assert.deepEqual(db.absences[1], untouched);
+  assert.deepEqual(db.notificationLogs.map(row => row.status), ['Không gửi', 'Đã gửi', 'Chờ gửi thủ công']);
+  assert.equal(db.notificationLogs[1].message, 'Tin đã gửi');
+  assert.equal(app.networkCalls(), 0);
+});
+
+test('posting made-up status over an existing attendance cancels its pending notice without adding a record', async () => {
+  const db = fixture();
+  db.absences = [{ ...withdrawal, id: 'existing', absenceStatus: 'Vắng', noticeStatus: 'Lỗi gửi', autoNotice: true, noticeDueAt: 'later' }];
+  const app = setup(db);
+  await app.call('post', '/api/absences', { body: { ...withdrawal, absenceStatus: 'Đã bù' } });
+  assert.equal(db.absences.length, 1);
+  assert.equal(db.absences[0].absenceStatus, 'Đã bù');
+  assert.equal(db.absences[0].noticeStatus, 'Không gửi');
+  assert.equal(db.absences[0].noticeDueAt, '');
+  assert.equal(app.networkCalls(), 0);
+});
+
+test('made-up status blocks bulk and direct retries while other absences remain actionable', async () => {
+  const db = fixture();
+  db.absences = [
+    { id: 'made-up', studentId: 's1', absenceStatus: 'Đã bù', noticeStatus: 'Lỗi gửi' },
+    { id: 'actual-absence', studentId: 's1', absenceStatus: 'Vắng', noticeStatus: 'Chờ gửi' }
+  ];
+  const app = setup(db);
+  assert.deepEqual(Array.from(app.context.selectBulkZaloCandidates(db, {}).candidates, row => row.id), ['actual-absence']);
+  for (const mode of ['personal-real', 'oa']) {
+    db.settings.zaloMode = mode;
+    const result = await app.context.sendZaloNotice(db, 'made-up', 'manual_resend');
+    assert.equal(result.status, 'Không gửi');
+    assert.equal(result.responsePayload.blocked, true);
+  }
+  assert.equal(app.networkCalls(), 0);
+  assert.equal(app.context.getSummary(app.context.filterAbsences(db, {})).total, 1);
+});
+
+for (const delay of [0, 15]) {
   test(`new withdrawal never sends or schedules Zalo, even if sendZalo=true (delay ${delay})`, async () => {
     const db = fixture();
     db.settings.delay = delay;

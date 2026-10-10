@@ -765,6 +765,7 @@ function renderCharts() {
   // 1. Prepare data for Pie Chart (Tỉ lệ vắng)
   const statusCounts = {};
   state.absences.forEach(a => {
+    if (a.absenceStatus === 'Đã bù') return;
     const status = state.absenceStatuses.find(s => s.id === a.absence_status_id);
     const label = status ? status.name : 'Khác';
     statusCounts[label] = (statusCounts[label] || 0) + 1;
@@ -795,6 +796,7 @@ function renderCharts() {
   // 2. Prepare data for Bar Chart (Thống kê theo lớp)
   const classCounts = {};
   state.absences.forEach(a => {
+    if (a.absenceStatus === 'Đã bù') return;
     const className = a.student_class || 'Khác';
     classCounts[className] = (classCounts[className] || 0) + 1;
   });
@@ -1025,7 +1027,7 @@ function renderClassDropdown() {
   if (!dropdown) return;
 
   const validStudents = rows.filter(s => validClasses.includes(s.className || 'Chưa có lớp'));
-  const validAbsences = state.absences.filter(a => !a.studentRemovedFromClass && validClasses.includes(a.className));
+  const validAbsences = state.absences.filter(a => a.absenceStatus !== 'Đã bù' && !a.studentRemovedFromClass && validClasses.includes(a.className));
 
   const optionsHtml = [`<option value="ALL">Tất cả lớp (${validStudents.length} học sinh)</option>`];
   
@@ -1090,7 +1092,10 @@ function renderRoster(searchMatches) {
   const sortedStudents = [...filtered].sort(compareStudentsByGivenName);
   const visibleStudents = searchQuery ? sortedStudents.slice(0, QUICK_SEARCH_ROSTER_LIMIT) : sortedStudents;
 
-  const absentCount = visibleStudents.filter(student => absenceForStudent(student.id, student.className)).length;
+  const absentCount = visibleStudents.filter(student => {
+    const absence = absenceForStudent(student.id, student.className);
+    return absence && absence.absenceStatus !== 'Đã bù';
+  }).length;
 
   $('#rosterTitle').textContent = className === 'ALL' ? 'Danh sách học sinh' : `Lớp ${className}`;
   $('#rosterMeta').textContent = searchQuery && filtered.length > QUICK_SEARCH_ROSTER_LIMIT
@@ -1204,6 +1209,7 @@ function renderRosterStudent(student) {
     ['Về sớm', 'Về sớm']
   ];
   if (!student.isMakeupAttendance) {
+    statusOptions.splice(3, 0, ['Đã bù', 'Đã bù']);
     statusOptions.push(['Nghỉ học', 'Nghỉ học'], ['Học phí', 'Trễ học phí'], ['REMOVE_FROM_CLASS', 'Xóa khỏi danh sách lớp']);
   }
   if (!statusOptions.some(([value]) => value === currentStatus)) {
@@ -1213,7 +1219,7 @@ function renderRosterStudent(student) {
   const isLocked = hasStuckNote;
 
   return `
-    <article class="student-card ${absence ? 'is-absent' : ''} ${student.isMakeupAttendance ? 'is-makeup' : ''} ${hasStuckNote ? 'is-stuck' : ''}">
+    <article class="student-card ${absence && currentStatus !== 'Đã bù' ? 'is-absent' : ''} ${student.isMakeupAttendance ? 'is-makeup' : ''} ${hasStuckNote ? 'is-stuck' : ''}">
       <div class="student-main">
         <div>
           <div class="person-main clickable-name" onclick="openStudentProfile('${escapeHtml(student.id)}')">
@@ -1228,8 +1234,8 @@ function renderRosterStudent(student) {
       </div>
       <div class="student-status-control">
         <label for="status-${escapeHtml(student.id)}-${escapeHtml(student.className)}">Trạng thái</label>
-        <select id="status-${escapeHtml(student.id)}-${escapeHtml(student.className)}" class="roster-status-select" data-student-id="${escapeHtml(student.id)}" data-attendance-class="${escapeHtml(student.className)}" data-absence-id="${escapeHtml(absence?.id || '')}" ${isLocked ? 'disabled' : ''} title="${isLocked ? 'Học sinh bị kẹt lịch, không thể thay đổi trạng thái ở đây.' : ''}">
-          ${statusOptions.map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === currentStatus ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}
+        <select id="status-${escapeHtml(student.id)}-${escapeHtml(student.className)}" class="roster-status-select" data-student-id="${escapeHtml(student.id)}" data-attendance-class="${escapeHtml(student.className)}" data-absence-id="${escapeHtml(absence?.id || '')}" title="${isLocked ? 'Học sinh bị kẹt lịch. Chọn Đã bù nếu đã học bù trước buổi này.' : ''}">
+          ${statusOptions.map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === currentStatus ? 'selected' : ''} ${isLocked && value !== currentStatus && value !== 'Đã bù' && !(currentStatus === 'Đã bù' && value === 'Đang học') ? 'disabled' : ''}>${escapeHtml(label)}</option>`).join('')}
         </select>
       </div>
     </article>
@@ -1249,7 +1255,8 @@ function noticeTimeLine(row) {
 function renderAbsences() {
   const container = $('#absenceRows');
   const queueAbsences = state.absences.filter(row => row.noticeStatus !== 'Đã gửi'
-    && normalizeAbsenceStatus(row.absenceStatus) !== 'Nghỉ học' && row.studentStatus !== 'Nghỉ học' && !row.studentRemovedFromClass);
+    && normalizeAbsenceStatus(row.absenceStatus) !== 'Nghỉ học' && normalizeAbsenceStatus(row.absenceStatus) !== 'Đã bù'
+    && row.studentStatus !== 'Nghỉ học' && !row.studentRemovedFromClass);
 
   if (!queueAbsences.length) {
     container.innerHTML = '<div class="empty">Hàng xử lý trống. Học sinh đã gửi được lưu trong Lịch sử liên hệ.</div>';
@@ -1678,10 +1685,11 @@ async function updateRosterStatus(select) {
       body: JSON.stringify({
         absenceStatus: status,
         initialReason: status,
-        sendZalo: status !== 'Nghỉ học'
+        sendZalo: status !== 'Nghỉ học' && status !== 'Đã bù'
       })
     });
-  toast(status === 'Nghỉ học' ? 'Đã chuyển học sinh vào Lịch sử nghỉ học; không gửi Zalo.' : 'Đã cập nhật trạng thái.' + queuedMessage(result));
+    toast(status === 'Đã bù' ? 'Đã ghi nhận học sinh học bù trước buổi này; không gửi báo vắng.'
+      : status === 'Nghỉ học' ? 'Đã chuyển học sinh vào Lịch sử nghỉ học; không gửi Zalo.' : 'Đã cập nhật trạng thái.' + queuedMessage(result));
     await loadBootstrap();
     if (status === 'Nghỉ học') await loadQuitStudents();
     return;
@@ -1700,10 +1708,11 @@ async function updateRosterStatus(select) {
       session: sessionInfo.sessionName,
       absenceStatus: status,
       initialReason: status,
-      sendZalo: status !== 'Nghỉ học'
+      sendZalo: status !== 'Nghỉ học' && status !== 'Đã bù'
     })
   });
-  toast(status === 'Nghỉ học' ? 'Đã chuyển học sinh vào Lịch sử nghỉ học; không gửi Zalo.' : 'Đã cập nhật trạng thái.' + queuedMessage(result));
+  toast(status === 'Đã bù' ? 'Đã ghi nhận học sinh học bù trước buổi này; không gửi báo vắng.'
+    : status === 'Nghỉ học' ? 'Đã chuyển học sinh vào Lịch sử nghỉ học; không gửi Zalo.' : 'Đã cập nhật trạng thái.' + queuedMessage(result));
   await loadBootstrap();
   if (status === 'Nghỉ học') await loadQuitStudents();
 }
