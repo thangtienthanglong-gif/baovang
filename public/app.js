@@ -1540,6 +1540,33 @@ async function loadRemovedClassStudents() {
   `).join('');
 }
 
+function groupFailedNoticeRows(rows) {
+  const groupedRows = [];
+  const failures = new Map();
+  const sortedRows = [...rows].sort((a, b) => String(b.time || '').localeCompare(String(a.time || '')));
+  for (const row of sortedRows) {
+    if (row.status !== 'Lỗi gửi') {
+      groupedRows.push(row);
+      continue;
+    }
+    const studentKey = row.studentId ? ['id', row.studentId] : row.studentCode ? ['code', row.studentCode] : null;
+    // An absence identifies one attendance session. Names alone are not unique.
+    const key = studentKey && row.absenceId ? JSON.stringify([
+      studentKey, row.absenceId, row.date || '', row.className || '', row.phone1 || '',
+      row.channel || '', row.absenceStatus || ''
+    ]) : null;
+    const existing = key ? failures.get(key) : null;
+    if (existing) {
+      existing.failedAttempts.push(row);
+    } else {
+      const group = { ...row, failedAttempts: [row] };
+      groupedRows.push(group);
+      if (key) failures.set(key, group);
+    }
+  }
+  return groupedRows;
+}
+
 async function loadNotices() {
   let rows = await api('/api/notification-logs?' + queryString({
     date: selectedHistoryDate(),
@@ -1553,6 +1580,7 @@ async function loadNotices() {
     row.absenceCallStatus !== 'Đã nhắc' &&
     row.absenceCallStatus !== 'Không nghe máy'
   );
+  rows = groupFailedNoticeRows(rows);
 
   const tbody = $('#noticeRows');
   if (!rows.length) {
@@ -1572,7 +1600,19 @@ async function loadNotices() {
       <td>
         <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
           <span style="font-weight: 500;">${escapeHtml(absenceStatusLabel(row.absenceStatus) || 'Khác')}</span>
-          <span class="badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span>
+          ${row.failedAttempts?.length > 1 ? `
+            <details>
+              <summary class="badge ${statusClass(row.status)}" style="cursor:pointer;" title="Bấm để xem từng lần gửi lỗi">Lỗi gửi x${row.failedAttempts.length} <i class="fa-solid fa-chevron-down" aria-hidden="true" style="font-size:9px; margin-left:4px;"></i></summary>
+              <div style="margin-top:8px; padding:8px 12px; border:1px solid #e2e8f0; border-radius:8px; font-size:12px;">
+                ${row.failedAttempts.map(attempt => `
+                  <div style="padding:4px 0;">
+                    <strong>${escapeHtml(formatDateTime(attempt.time))}</strong>
+                    <div class="muted">${escapeHtml(attempt.result || 'Gửi không thành công.')}</div>
+                  </div>
+                `).join('')}
+              </div>
+            </details>
+          ` : `<span class="badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span>`}
           ${row.status === 'Chờ gửi thủ công' && row.message ? `
             <button class="btn ghost btn-sm copy-log-msg-btn" type="button" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;" data-msg="${escapeHtml(row.message)}">
               Copy tin nhắn
@@ -1582,10 +1622,10 @@ async function loadNotices() {
             <button class="btn ghost btn-sm confirm-zalo-sent-btn" type="button" data-id="${escapeHtml(row.absenceId)}" data-logid="${escapeHtml(row.id)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Đánh dấu đã gửi</button>
           ` : ''}
           ${row.status === 'Lỗi gửi' && row.absenceId ? `
-            ${/Đã bấm Gửi|gửi một phần|chưa xác nhận được nội dung/i.test(row.result || '')
+            ${(row.failedAttempts || [row]).some(attempt => /Đã bấm Gửi|gửi một phần|chưa xác nhận được nội dung/i.test(attempt.result || ''))
               ? '<span class="muted">Kiểm tra tin trong Zalo trước khi thao tác tiếp</span>'
-              : `<button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${row.absenceId}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Gửi lại</button>`}
-            ${row.channel === 'Zalo cá nhân' ? `<button class="btn ghost btn-sm confirm-zalo-sent-btn" type="button" data-id="${row.absenceId}" data-logid="${row.id}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Xác nhận đã gửi</button>` : ''}
+              : `<button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${escapeHtml(row.absenceId)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Gửi lại</button>`}
+            ${row.channel === 'Zalo cá nhân' ? `<button class="btn ghost btn-sm confirm-zalo-sent-btn" type="button" data-id="${escapeHtml(row.absenceId)}" data-logid="${escapeHtml(row.id)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Xác nhận đã gửi</button>` : ''}
           ` : ''}
         </div>
       </td>
