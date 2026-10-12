@@ -1450,7 +1450,7 @@ async function loadHistory() {
 
   const tbody = $('#historyRows');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty">Chưa có lịch sử cuộc gọi.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">Chưa có lịch sử học phí.</td></tr>';
     return;
   }
 
@@ -2151,10 +2151,10 @@ async function clearCallHistory() {
     date: selectedHistoryDate(),
     q: $('#historyKeyword')?.value.trim() || ''
   };
-  const scope = params.date || params.q ? 'lịch sử cuộc gọi đang lọc' : 'toàn bộ lịch sử cuộc gọi';
+  const scope = params.date || params.q ? 'lịch sử học phí đang lọc' : 'toàn bộ lịch sử học phí';
   if (!confirm(`Xóa ${scope}?`)) return;
   const result = await api('/api/call-logs?' + queryString(params), { method: 'DELETE' });
-  toast(`Đã xóa ${result.deleted || 0} dòng lịch sử cuộc gọi.`);
+  toast(`Đã xóa ${result.deleted || 0} dòng lịch sử học phí.`);
   await loadHistory();
 }
 
@@ -2372,7 +2372,7 @@ function buildImportReply() {
 }
 
 function buildHistoryReply() {
-  return 'Lịch sử Zalo nằm ở tab Lịch sử Zalo, lịch sử cuộc gọi nằm ở tab Lịch sử gọi. Có thể lọc theo ngày hoặc từ khóa rồi xuất danh sách học sinh đi trễ nếu cần.';
+  return 'Lịch sử Zalo nằm ở tab Lịch sử Zalo, lịch sử học phí nằm ở tab Lịch sử học phí. Có thể lọc theo ngày hoặc từ khóa rồi xuất danh sách học sinh đi trễ nếu cần.';
 }
 
 function searchableStudentText(student) {
