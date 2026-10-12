@@ -640,24 +640,43 @@ function filterCallLogs(db, query) {
   return rows.sort((a, b) => String(b.time).localeCompare(String(a.time)));
 }
 
+function notificationLogDate(log) {
+  const time = new Date(log.time);
+  if (!log.time || !Number.isFinite(time.getTime())) return log.date || '';
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(time);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 function filterNotificationLogs(db, query) {
   const q = String(query.q || '').toLowerCase().trim();
   const date = query.date || '';
-  let rows = db.notificationLogs || [];
+  const absenceStatus = query.absenceStatus && query.absenceStatus !== 'ALL'
+    ? normalizeAbsenceStatus(query.absenceStatus) : '';
+  const excludeAbsenceStatus = query.excludeAbsenceStatus
+    ? normalizeAbsenceStatus(query.excludeAbsenceStatus) : '';
+  const absences = new Map((db.absences || []).map(absence => [absence.id, absence]));
+  let rows = (db.notificationLogs || []).map(log => {
+    const absence = absences.get(log.absenceId);
+    return {
+      ...log,
+      // New logs retain the message type at send time; legacy logs use the
+      // linked attendance record so existing tuition history is visible.
+      absenceStatus: log.absenceStatus || absence?.absenceStatus || 'Khác',
+      absenceCallStatus: absence ? absence.status : ''
+    };
+  });
 
-  if (date) rows = rows.filter(log => log.date === date);
+  if (date) rows = rows.filter(log => (query.dateBasis === 'time' ? notificationLogDate(log) : log.date) === date);
+  if (absenceStatus) rows = rows.filter(log => normalizeAbsenceStatus(log.absenceStatus) === absenceStatus);
+  if (excludeAbsenceStatus) rows = rows.filter(log => normalizeAbsenceStatus(log.absenceStatus) !== excludeAbsenceStatus);
   if (q) {
     rows = rows.filter(log => `${log.studentCode} ${log.studentName} ${log.className} ${log.parentName} ${log.phone1} ${log.zaloUserId} ${log.status} ${log.result}`.toLowerCase().includes(q));
   }
 
-  return rows.sort((a, b) => String(b.time).localeCompare(String(a.time))).map(log => {
-    const absence = db.absences ? db.absences.find(abs => abs.id === log.absenceId) : null;
-    return { 
-      ...log, 
-      absenceStatus: absence ? absence.absenceStatus : 'Khác',
-      absenceCallStatus: absence ? absence.status : ''
-    };
-  });
+  return rows.sort((a, b) => String(b.time).localeCompare(String(a.time)));
 }
 
 function sendWorkbook(res, filename, sheets) {
@@ -2023,6 +2042,7 @@ async function sendZaloNotice(db, absenceId, reason = 'auto') {
     time,
     absenceId: absence.id,
     date: absence.date,
+    absenceStatus: normalizeAbsenceStatus(absence.absenceStatus),
     studentId: student.id || '',
     studentCode: student.code || '',
     studentName: student.fullName || '',
@@ -3935,8 +3955,15 @@ function selectBulkZaloCandidates(db, filters) {
   };
 }
 
-async function runBulkZaloAction(db, filters, reason = 'bulk_send') {
+async function runBulkZaloAction(db, filters, reason = 'bulk_send', ids = null) {
   const selection = selectBulkZaloCandidates(db, filters);
+  if (ids !== null) {
+    const idSet = new Set(ids);
+    selection.rows = selection.rows.filter(row => idSet.has(row.id));
+    selection.candidates = selection.candidates.filter(row => idSet.has(row.id));
+    selection.allCandidates = selection.allCandidates.filter(row => idSet.has(row.id));
+    selection.alreadySent = selection.rows.length - selection.allCandidates.length;
+  }
   const logs = [];
   
   const settings = db.settings || defaultSettings();
@@ -3980,7 +4007,14 @@ app.post('/api/absences/zalo/bulk', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
     const filters = req.body?.filters || req.query || {};
-    const result = await runBulkZaloAction(db, filters, 'bulk_send');
+    const rawIds = req.body?.ids;
+    if (rawIds !== undefined && !Array.isArray(rawIds)) {
+      const error = new Error('Danh sách học sinh được chọn không hợp lệ.');
+      error.status = 400;
+      throw error;
+    }
+    const ids = Array.isArray(rawIds) ? rawIds.filter(id => typeof id === 'string' && id) : null;
+    const result = await runBulkZaloAction(db, filters, 'bulk_send', ids);
     await saveBranchDb(req, db);
     res.json(result);
   } catch (error) {
@@ -4058,6 +4092,7 @@ app.post('/api/absences/:id/zalo/manual-sent', async (req, res, next) => {
       db.notificationLogs.push(log);
     }
     
+    log.absenceStatus ||= normalizeAbsenceStatus(absence.absenceStatus);
     await saveBranchDb(req, db);
     res.json({ absence: enrichAbsence(db.absences[index], studentByIdMap(db.students)), log });
   } catch (error) {
@@ -4124,6 +4159,7 @@ app.post('/api/absences/:id/zalo/manual-error', async (req, res, next) => {
       db.notificationLogs.push(log);
     }
     
+    log.absenceStatus ||= normalizeAbsenceStatus(absence.absenceStatus);
     await saveBranchDb(req, db);
     res.json({ absence: enrichAbsence(db.absences[index], studentByIdMap(db.students)), log });
   } catch (error) {

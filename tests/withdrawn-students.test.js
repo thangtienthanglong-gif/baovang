@@ -248,7 +248,7 @@ test('the processing queue hides withdrawal records and older records of withdra
   const context = { state: { absences: [
     { studentName: 'Không được xuất hiện', absenceStatus: 'Nghỉ học', noticeStatus: 'Không gửi' },
     { studentName: 'Không được xuất hiện', absenceStatus: 'Vắng', noticeStatus: 'Lỗi gửi', studentStatus: 'Nghỉ học' }
-  ] }, $: () => container, normalizeAbsenceStatus: value => value };
+  ] }, $: () => container, normalizeAbsenceStatus: value => value, updateBulkSendCount() {} };
   const start = frontend.indexOf('function renderAbsences()');
   vm.runInNewContext(frontend.slice(start, frontend.indexOf('function getWeekRange(', start)), context);
   context.renderAbsences();

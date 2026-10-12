@@ -95,6 +95,49 @@ function emitInput(el, value) {
   }
 }
 
+function selectSearchText(search) {
+  search.focus();
+  if (search.isContentEditable || search.getAttribute('contenteditable') === 'true') {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(search);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  } else {
+    search.select();
+  }
+}
+
+const searchText = search => String(search.isContentEditable ? textOf(search) : search.value || '').trim();
+
+async function fillSearchBox(search, phone) {
+  // A DOM value plus synthetic input/change events can display the phone
+  // without running Zalo's native paste handling. Reset through native editing
+  // first, including when retrying the same number, then paste from clipboard.
+  selectSearchText(search);
+  document.execCommand('delete', false);
+  await wait(600);
+  search = findSearchBox();
+  if (!search || searchText(search)) {
+    throw new Error('Không xóa được lượt tìm kiếm cũ trên Zalo; chưa gửi tin.');
+  }
+
+  try {
+    await navigator.clipboard.writeText(phone);
+  } catch (_) {
+    throw new Error('Chrome không cho phép ghi clipboard để dán số điện thoại vào Zalo; chưa gửi tin.');
+  }
+  // Zalo can replace the search input while clearing or updating its view.
+  search = findSearchBox();
+  if (!search || searchText(search)) {
+    throw new Error('Ô tìm kiếm Zalo đã thay đổi trước khi dán số điện thoại; chưa gửi tin.');
+  }
+  selectSearchText(search);
+  if (!document.execCommand('paste', false)) {
+    throw new Error('Chrome không cho phép dán số điện thoại vào Zalo; chưa gửi tin.');
+  }
+}
+
 function clickLike(el) {
   el.focus?.();
   for (const type of ['mousedown', 'mouseup']) {
@@ -311,7 +354,8 @@ function searchResultCandidates() {
 
 function findSearchResult(phone, previousResults) {
   const normalizedPhone = phoneForSearch(phone);
-  const candidates = searchResultCandidates();
+  const candidates = searchResultCandidates().filter(el =>
+    !/không tìm thấy|không có kết quả|chưa đăng ký tài khoản|không cho phép tìm kiếm|no results|tìm tất cả/i.test(textOf(el)));
   const exact = candidates.filter(el => {
     const digits = textOf(el).replace(/\D/g, '');
     return normalizedPhone && digits.includes(normalizedPhone.slice(-8));
@@ -321,8 +365,7 @@ function findSearchResult(phone, previousResults) {
   // Search results may show only the account name. Accept a single newly
   // rendered result, never an unchanged chat from the left-hand history.
   const fresh = candidates.filter(el => previousResults.get(el) !== textOf(el))
-    .filter(el => el.matches?.('[role="option"]') || el.closest?.('[role="listbox"], [class*="search"], [class*="Search"]'))
-    .filter(el => !/không tìm thấy|không có kết quả|no results|tìm tất cả/i.test(textOf(el)));
+    .filter(el => el.matches?.('[role="option"]') || el.closest?.('[role="listbox"], [class*="search"], [class*="Search"]'));
   const leaves = fresh.filter(el => !fresh.some(other => other !== el && el.contains(other)));
   return leaves.length === 1 ? leaves[0] : null;
 }
@@ -336,12 +379,12 @@ function skippedError(message) {
 async function openConversation(item, search) {
   const previousResults = new Map(searchResultCandidates().map(el => [el, textOf(el)]));
   const searchedPhone = phoneForSearch(item.phone);
-  emitInput(search, searchedPhone);
-  const enteredPhone = String(search.isContentEditable ? textOf(search) : search.value || '').replace(/\D/g, '');
-  if (!enteredPhone.endsWith(searchedPhone.slice(-8))) {
+  await fillSearchBox(search, searchedPhone);
+  await wait(800);
+  search = findSearchBox();
+  if (!search || searchText(search) !== searchedPhone) {
     throw new Error('Zalo Web không nhận số điện thoại trong ô Tìm kiếm.');
   }
-  await wait(800);
   const result = await waitFor(() => findSearchResult(item.phone, previousResults), 7000);
   if (!result) throw skippedError(`Không tìm thấy kết quả tìm kiếm rõ ràng cho số ${item.phone}; chưa gửi tin.`);
   clickLike(result);

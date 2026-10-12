@@ -67,7 +67,7 @@ test('made-up attendance stays out of the queue even if a stale record is still 
   const container = {};
   const context = {
     state: { absences: [{ absenceStatus: 'Đã bù', noticeStatus: 'Chờ gửi', studentName: 'Đã học bù' }] },
-    $: () => container, normalizeAbsenceStatus: value => value
+    $: () => container, normalizeAbsenceStatus: value => value, updateBulkSendCount() {}
   };
   vm.runInNewContext(slice('function renderAbsences(', 'function getWeekRange('), context);
   context.renderAbsences();

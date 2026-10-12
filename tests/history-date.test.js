@@ -10,7 +10,7 @@ function setup() {
   let now = new Date('2026-10-08T16:59:00Z');
   const fields = Object.fromEntries([
     'filterDate', 'filterDateAuto', 'historyDate', 'historyDateAuto', 'historyKeyword',
-    'historyRows', 'noticeRows', 'quitRows', 'removedClassRows', 'exportLateHistoryBtn',
+    'historyRows', 'callHistoryRows', 'noticeRows', 'noticePagination', 'quitRows', 'removedClassRows', 'exportLateHistoryBtn',
     'exportExcusedHistoryBtn', 'exportFailedZaloHistoryBtn', 'exportCallListBtn', 'exportQuitListBtn'
   ].map(id => [id, {
     value: '', listeners: {},
@@ -22,7 +22,7 @@ function setup() {
     Date: class extends Date {
       constructor(...args) { super(...(args.length ? args : [now.getTime()])); }
     },
-    state: {}, $: selector => fields[selector.slice(1)],
+    state: {}, $: selector => fields[selector.slice(1)], escapeHtml: value => String(value ?? ''),
     activeTabId: () => 'historyTab', getActiveBranch: () => 'main', renderFilters() {},
     api: async url => { requests.push(url); return []; },
     queryString: params => new URLSearchParams(params).toString(),
@@ -62,11 +62,15 @@ test('history defaults to today and its live tab reloads at Vietnam midnight', a
   app.setTime('2026-10-08T17:01:00Z');
   await app.context.refreshAutomaticDate();
   assert.equal(app.fields.historyDate.value, '2026-10-09');
-  assert.equal(app.requests.length, 4);
+  assert.equal(app.requests.length, 5);
   for (const route of ['/api/call-logs', '/api/notification-logs', '/api/removed-class-students']) {
     const request = app.requests.map(url => new URL(url, 'https://example.test')).find(url => url.pathname === route);
     assert.equal(request.searchParams.get('date'), '2026-10-09');
   }
+  const tuitionRequest = app.requests.map(url => new URL(url, 'https://example.test'))
+    .find(url => url.searchParams.get('absenceStatus') === 'Học phí');
+  assert.equal(tuitionRequest.searchParams.get('date'), '2026-10-09');
+  assert.equal(tuitionRequest.searchParams.get('dateBasis'), 'time');
 });
 
 test('manual history dates and all-date searches survive automatic queue rollover', async () => {
@@ -105,5 +109,5 @@ test('automatic history and manual queue dates operate independently', async () 
   await app.context.refreshAutomaticDate();
   assert.equal(app.fields.filterDate.value, '2026-09-20');
   assert.equal(app.fields.historyDate.value, '2026-10-09');
-  assert.equal(app.requests.length, 4);
+  assert.equal(app.requests.length, 5);
 });

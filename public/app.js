@@ -85,13 +85,14 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;');
 }
 
-function formatDateTime(value) {
+function formatDateTime(value, timeZone) {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString('vi-VN', {
     year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit'
+    hour: '2-digit', minute: '2-digit',
+    ...(timeZone ? { timeZone } : {})
   });
 }
 
@@ -845,7 +846,7 @@ function statusClass(status) {
     'Chưa gửi': 'pending',
     'Chạy thử': 'callback',
     'Đã gửi': 'called',
-    'Lỗi gửi': 'wrong',
+    'Lỗi gửi': 'error',
     'Không gửi': 'no-answer'
   }[status] || 'pending';
 }
@@ -1266,24 +1267,85 @@ function scheduleMakeupUrl(row) {
   return `/ketbu/index.html?${params.toString()}`;
 }
 
+// Menu thả xuống ở topbar (quản lý chi nhánh, tài khoản)
+function closeHeaderMenus() {
+  document.querySelectorAll('.menu-dropdown').forEach(m => { m.hidden = true; });
+  document.querySelectorAll('[aria-expanded]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+}
+
+function setupHeaderMenus() {
+  [['#branchMenuBtn', '#branchMenu'], ['#accountMenuBtn', '#accountMenu']].forEach(([btnSel, menuSel]) => {
+    const btn = $(btnSel);
+    const menu = $(menuSel);
+    if (!btn || !menu) return;
+    btn.addEventListener('click', event => {
+      event.stopPropagation();
+      const willShow = menu.hidden;
+      closeHeaderMenus();
+      menu.hidden = !willShow;
+      btn.setAttribute('aria-expanded', String(willShow));
+    });
+    menu.addEventListener('click', event => {
+      if (event.target.closest('button')) closeHeaderMenus();
+    });
+  });
+  document.addEventListener('click', closeHeaderMenus);
+}
+
+// Cập nhật nhãn nút "Gửi Zalo hàng loạt (n)" theo số học sinh được chọn
+function updateBulkSendCount() {
+  const btn = $('#bulkSendZaloBtn');
+  if (!btn) return;
+  if (!btn.dataset.baseLabel) btn.dataset.baseLabel = btn.textContent.trim();
+  const boxes = document.querySelectorAll('#absenceRows .bulk-select');
+  const checked = document.querySelectorAll('#absenceRows .bulk-select:checked').length;
+  btn.textContent = boxes.length ? `${btn.dataset.baseLabel} (${checked})` : btn.dataset.baseLabel;
+}
+
 function renderAbsences() {
   const container = $('#absenceRows');
   const queueAbsences = state.absences.filter(row => row.noticeStatus !== 'Đã gửi'
     && normalizeAbsenceStatus(row.absenceStatus) !== 'Nghỉ học' && normalizeAbsenceStatus(row.absenceStatus) !== 'Đã bù'
     && row.studentStatus !== 'Nghỉ học' && !row.studentRemovedFromClass);
 
+  const queueBadge = $('#queueNavBadge');
+  if (queueBadge) {
+    queueBadge.textContent = String(queueAbsences.length);
+    queueBadge.hidden = queueAbsences.length === 0;
+  }
+  const queueCountLine = $('#queueCountLine');
+  if (queueCountLine) {
+    queueCountLine.textContent = queueAbsences.length ? `Tìm thấy ${queueAbsences.length} học sinh` : '';
+  }
+
   if (!queueAbsences.length) {
     container.innerHTML = '<div class="empty">Hàng xử lý trống. Học sinh đã gửi được lưu trong Lịch sử liên hệ.</div>';
+    updateBulkSendCount();
     return;
   }
 
   container.innerHTML = queueAbsences.map(row => {
-    const phone = row.phone1 || row.phone2 || 'Chưa có SĐT';
+    const rawPhone = row.phone1 || row.phone2 || '';
+    const phone = rawPhone || 'Chưa có SĐT';
+    const phoneHtml = rawPhone.trim() && /^[0-9+\s().-]+$/.test(rawPhone)
+      ? `<a class="student-phone-link" href="tel:${escapeHtml(rawPhone.replace(/[\s().-]+/g, ''))}">${escapeHtml(phone)}</a>`
+      : `<span>${escapeHtml(phone)}</span>`;
+    const noticeStatus = row.noticeStatus || 'Chưa gửi';
+    const canRetry = ['Lỗi gửi', 'Chưa gửi'].includes(noticeStatus);
+    const zaloBadge = noticeStatus === 'Lỗi gửi'
+      ? `<button class="badge error retry-zalo-btn" type="button" data-id="${row.id}" title="Bấm để gửi lại Zalo ngay">${escapeHtml(noticeStatus)}</button>`
+      : `<span class="badge ${statusClass(noticeStatus)}">${escapeHtml(noticeStatus)}</span>`;
     return `
     <article class="absence-item" data-id="${row.id}">
+      <div class="absence-check">
+        <input type="checkbox" class="bulk-select" data-id="${row.id}" checked aria-label="Chọn ${escapeHtml(row.studentName)} để gửi Zalo hàng loạt">
+      </div>
       <div class="absence-student">
-        <div class="person-main clickable-name" onclick="openStudentProfile('${escapeHtml(row.studentId)}')">${escapeHtml(row.studentName)}</div>
-        <div class="student-phone">${escapeHtml(phone)}</div>
+        <div class="student-heading">
+          <div class="person-main clickable-name" onclick="openStudentProfile('${escapeHtml(row.studentId)}')">${escapeHtml(row.studentName)}</div>
+          ${row.className ? `<span class="mini-chip">${escapeHtml(row.className)}</span>` : ''}
+        </div>
+        <div class="student-phone">${phoneHtml}</div>
       </div>
 
       <div class="absence-controls">
@@ -1291,29 +1353,32 @@ function renderAbsences() {
         <span class="absence-status-pill">${escapeHtml(absenceStatusLabel(row.absenceStatus) || 'Không rõ')}</span>
         ${row.initialReason && absenceStatusLabel(row.initialReason) !== absenceStatusLabel(row.absenceStatus) ? `<span class="muted">${escapeHtml(row.initialReason)}</span>` : ''}
         ${row.evidenceUrl ? `<a href="${row.evidenceUrl}" target="_blank" style="font-size: 11px; display: inline-block; margin-top: 4px; color: #3b82f6; text-decoration: none;"><i class="fa-solid fa-image"></i> Xem ảnh</a>` : ''}
-        <button class="btn primary btn-sm schedule-makeup-btn" type="button" 
-          data-url="${escapeHtml(scheduleMakeupUrl(row))}"
-          onclick="window.open(this.dataset.url, '_blank')"
-          style="margin-top: 8px; font-size: 12px; padding: 4px 8px;">
-          Xếp lịch bù
-        </button>
       </div>
 
       <div class="stack notice-cell">
         <label>Zalo</label>
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span class="badge ${statusClass(row.noticeStatus)}">${escapeHtml(row.noticeStatus || 'Chưa gửi')}</span>
-          ${['Lỗi gửi', 'Chưa gửi'].includes(row.noticeStatus || 'Chưa gửi') ? `<button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${row.id}" style="padding: 2px 8px; font-size: 12px;">Gửi thủ công</button>` : ''}
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          ${zaloBadge}
+          ${canRetry ? `<button class="btn ghost btn-sm retry-zalo-btn nowrap" type="button" data-id="${row.id}" style="padding: 2px 8px; font-size: 12px;">Gửi thủ công</button>` : ''}
         </div>
       </div>
 
       <div class="stack notice-time-cell">
         <label>Thời gian xử lý</label>
-        <span class="notice-time">${noticeTimeLine(row)}</span>
+        <span class="notice-time subtle">${noticeTimeLine(row)}</span>
+      </div>
+      <div class="absence-actions">
+        <button class="btn primary btn-sm schedule-makeup-btn" type="button"
+          data-url="${escapeHtml(scheduleMakeupUrl(row))}"
+          onclick="window.open(this.dataset.url, '_blank')">
+          Xếp lịch bù
+        </button>
       </div>
     </article>
   `;
   }).join('');
+
+  updateBulkSendCount();
 }
 
 function getWeekRange(dateStr) {
@@ -1454,18 +1519,73 @@ async function loadTeachingLog() {
 }
 
 async function loadHistory() {
+  await Promise.all([loadCallHistory(), loadTuitionHistory()]);
+}
+
+const historyPages = new Map();
+const HISTORY_PAGE_SIZE = 15;
+
+function setHistoryRows(tbodyId, pagerId, rows, renderRow, emptyMessage, columns) {
+  historyPages.set(pagerId, { tbodyId, rows, renderRow, emptyMessage, columns, page: 1 });
+  renderHistoryPage(pagerId);
+}
+
+function renderHistoryPage(pagerId) {
+  const history = historyPages.get(pagerId);
+  if (!history) return;
+  const tbody = $('#' + history.tbodyId);
+  const pager = $('#' + pagerId);
+  if (!tbody) return;
+  const { rows } = history;
+  const totalPages = Math.max(1, Math.ceil(rows.length / HISTORY_PAGE_SIZE));
+  history.page = Math.max(1, Math.min(history.page, totalPages));
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="${history.columns}" class="empty">${escapeHtml(history.emptyMessage)}</td></tr>`;
+    if (pager) pager.innerHTML = '';
+    return;
+  }
+  const start = (history.page - 1) * HISTORY_PAGE_SIZE;
+  const end = Math.min(start + HISTORY_PAGE_SIZE, rows.length);
+  tbody.innerHTML = rows.slice(start, end).map(history.renderRow).join('');
+  if (!pager) return;
+  const firstPage = Math.max(1, Math.min(history.page - 2, totalPages - 4));
+  const lastPage = Math.min(totalPages, firstPage + 4);
+  const buttons = [];
+  for (let page = firstPage; page <= lastPage; page++) {
+    buttons.push(`<button class="btn ghost btn-sm${page === history.page ? ' active' : ''}" type="button" data-page="${page}"${page === history.page ? ' aria-current="page"' : ''}>${page}</button>`);
+  }
+  pager.innerHTML = `
+    <span class="pagination-info">Hiển thị ${start + 1}–${end} / tổng ${rows.length}</span>
+    <div class="pagination-btns">
+      <button class="btn ghost btn-sm" type="button" data-page="${history.page - 1}"${history.page === 1 ? ' disabled' : ''}>‹ Trước</button>
+      ${buttons.join('')}
+      <button class="btn ghost btn-sm" type="button" data-page="${history.page + 1}"${history.page === totalPages ? ' disabled' : ''}>Sau ›</button>
+    </div>
+  `;
+}
+
+function handleHistoryPageClick(event) {
+  const button = event.target.closest('.pagination [data-page]');
+  if (!button || button.disabled) return;
+  const pagerId = button.closest('.pagination').id;
+  const history = historyPages.get(pagerId);
+  const page = Number(button.dataset.page);
+  if (!history || !Number.isInteger(page) || page < 1) return;
+  history.page = page;
+  renderHistoryPage(pagerId);
+}
+
+async function loadCallHistory() {
+  const branchId = getActiveBranch();
   const rows = await api('/api/call-logs?' + queryString({
     date: selectedHistoryDate(),
     q: $('#historyKeyword').value.trim()
   }));
 
-  const tbody = $('#historyRows');
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty">Chưa có lịch sử học phí.</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = rows.map(row => `
+  if (getActiveBranch() !== branchId) return;
+  const tbody = $('#callHistoryRows');
+  if (!tbody) return;
+  setHistoryRows('callHistoryRows', 'callHistoryPagination', rows, row => `
     <tr>
       <td>${escapeHtml(formatDateTime(row.time))}</td>
       <td>${escapeHtml(row.date)}</td>
@@ -1487,7 +1607,26 @@ async function loadHistory() {
       <td>${escapeHtml(row.caller)}</td>
       <td>${escapeHtml(row.note)}</td>
     </tr>
-  `).join('');
+  `, 'Chưa có lịch sử gọi điện.', 9);
+}
+
+function tuitionHistoryParams() {
+  return {
+    date: selectedHistoryDate(),
+    q: $('#historyKeyword')?.value.trim() || '',
+    absenceStatus: 'Học phí',
+    dateBasis: 'time'
+  };
+}
+
+async function loadTuitionHistory() {
+  const branchId = getActiveBranch();
+  const rows = await api('/api/notification-logs?' + queryString(tuitionHistoryParams()));
+  if (getActiveBranch() !== branchId) return;
+  const tbody = $('#historyRows');
+  if (!tbody) return;
+  setHistoryRows('historyRows', 'tuitionHistoryPagination', groupFailedNoticeRows(rows),
+    renderNoticeHistoryRow, 'Chưa có lịch sử học phí trong thời gian đã chọn.', 3);
 }
 
 async function updateCallResult(id, result) {
@@ -1510,12 +1649,7 @@ async function loadQuitStudents() {
   const tbody = $('#quitRows');
   if (!tbody) return;
 
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty">Không có học sinh nào nghỉ học.</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = rows.map(row => `
+  setHistoryRows('quitRows', 'quitHistoryPagination', rows, row => `
     <tr>
       <td>${escapeHtml(row.quitDate ? row.quitDate.split('-').reverse().join('/') : '')}</td>
       <td>
@@ -1529,7 +1663,7 @@ async function loadQuitStudents() {
       </td>
       <td>${escapeHtml(row.quitReason || '')}</td>
     </tr>
-  `).join('');
+  `, 'Không có học sinh nào nghỉ học.', 6);
 }
 
 async function loadRemovedClassStudents() {
@@ -1540,11 +1674,7 @@ async function loadRemovedClassStudents() {
     date: selectedHistoryDate(), q: $('#historyKeyword').value.trim()
   }));
   if (getActiveBranch() !== branchId) return;
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="empty">Không có học sinh nào được xóa khỏi lớp trong thời gian đã chọn.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = rows.map(row => `
+  setHistoryRows('removedClassRows', 'removedClassHistoryPagination', rows, row => `
     <tr>
       <td>${escapeHtml(formatDateTime(row.removedAt))}</td>
       <td><div class="person-main">${escapeHtml(row.fullName)}</div></td>
@@ -1552,7 +1682,7 @@ async function loadRemovedClassStudents() {
       <td>${escapeHtml(row.parentName)}</td>
       <td>${escapeHtml(row.phone1 || row.phone2 || '')}</td>
     </tr>
-  `).join('');
+  `, 'Không có học sinh nào được xóa khỏi lớp trong thời gian đã chọn.', 5);
 }
 
 function groupFailedNoticeRows(rows) {
@@ -1582,39 +1712,37 @@ function groupFailedNoticeRows(rows) {
   return groupedRows;
 }
 
-async function loadNotices() {
-  let rows = await api('/api/notification-logs?' + queryString({
-    date: selectedHistoryDate(),
-    q: $('#historyKeyword').value.trim()
-  }));
-  
-  rows = rows.filter(row => 
-    row.status !== 'Chưa kết bạn - Cần gọi' && 
-    row.absenceCallStatus !== 'Cần gọi điện' && 
-    row.absenceCallStatus !== 'Đã gọi' && 
-    row.absenceCallStatus !== 'Đã nhắc' &&
-    row.absenceCallStatus !== 'Không nghe máy'
-  );
-  rows = groupFailedNoticeRows(rows);
+function renderNoticeActions(row) {
+  return `
+    ${row.status === 'Chờ gửi thủ công' && row.message ? `
+      <button class="btn ghost btn-sm copy-log-msg-btn" type="button" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;" data-msg="${escapeHtml(row.message)}">Copy tin nhắn</button>
+    ` : ''}
+    ${row.status === 'Chờ gửi thủ công' && row.absenceId && row.channel === 'Zalo cá nhân' ? `
+      <button class="btn ghost btn-sm confirm-zalo-sent-btn" type="button" data-id="${escapeHtml(row.absenceId)}" data-logid="${escapeHtml(row.id)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Đánh dấu đã gửi</button>
+    ` : ''}
+    ${row.status === 'Lỗi gửi' && row.absenceId ? `
+      ${(row.failedAttempts || [row]).some(attempt => /Đã bấm Gửi|gửi một phần|chưa xác nhận được nội dung/i.test(attempt.result || ''))
+        ? '<span class="muted">Kiểm tra tin trong Zalo trước khi thao tác tiếp</span>'
+        : `<button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${escapeHtml(row.absenceId)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Gửi lại</button>`}
+      ${row.channel === 'Zalo cá nhân' ? `<button class="btn ghost btn-sm confirm-zalo-sent-btn" type="button" data-id="${escapeHtml(row.absenceId)}" data-logid="${escapeHtml(row.id)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Xác nhận đã gửi</button>` : ''}
+    ` : ''}
+  `;
+}
 
-  const tbody = $('#noticeRows');
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty">Chưa có lịch sử gửi Zalo.</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = rows.map(row => `
+function renderNoticeHistoryRow(row) {
+  return `
     <tr>
-      <td>${escapeHtml(formatDateTime(row.time))}</td>
-      <td>
-        <div class="person-main">${escapeHtml(row.studentName)}</div>
-        <div class="muted">${escapeHtml(row.studentCode)}</div>
+      <td>${escapeHtml(formatDateTime(row.time, 'Asia/Ho_Chi_Minh'))}</td>
+      <td class="notice-history-student">
+        <div class="student-heading">
+          <div class="person-main">${escapeHtml(row.studentName)}</div>
+          ${row.className ? `<span class="mini-chip">${escapeHtml(row.className)}</span>` : ''}
+        </div>
+        <div class="student-phone">${escapeHtml(row.phone1 || '')}</div>
       </td>
-      <td>${escapeHtml(row.className)}</td>
-      <td>${escapeHtml(row.phone1 || '')}</td>
       <td>
-        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-          <span style="font-weight: 500;">${escapeHtml(absenceStatusLabel(row.absenceStatus) || 'Khác')}</span>
+        <div class="notice-history-status">
+          <span class="notice-history-reason">${escapeHtml(absenceStatusLabel(row.absenceStatus) || 'Khác')}</span>
           ${row.failedAttempts?.length > 1 ? `
             <details>
               <summary class="badge ${statusClass(row.status)}" style="cursor:pointer;" title="Bấm để xem từng lần gửi lỗi">Lỗi gửi x${row.failedAttempts.length} <i class="fa-solid fa-chevron-down" aria-hidden="true" style="font-size:9px; margin-left:4px;"></i></summary>
@@ -1627,25 +1755,67 @@ async function loadNotices() {
                 `).join('')}
               </div>
             </details>
-          ` : `<span class="badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span>`}
-          ${row.status === 'Chờ gửi thủ công' && row.message ? `
-            <button class="btn ghost btn-sm copy-log-msg-btn" type="button" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;" data-msg="${escapeHtml(row.message)}">
-              Copy tin nhắn
-            </button>
-          ` : ''}
-          ${row.status === 'Chờ gửi thủ công' && row.absenceId && row.channel === 'Zalo cá nhân' ? `
-            <button class="btn ghost btn-sm confirm-zalo-sent-btn" type="button" data-id="${escapeHtml(row.absenceId)}" data-logid="${escapeHtml(row.id)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Đánh dấu đã gửi</button>
-          ` : ''}
-          ${row.status === 'Lỗi gửi' && row.absenceId ? `
-            ${(row.failedAttempts || [row]).some(attempt => /Đã bấm Gửi|gửi một phần|chưa xác nhận được nội dung/i.test(attempt.result || ''))
-              ? '<span class="muted">Kiểm tra tin trong Zalo trước khi thao tác tiếp</span>'
-              : `<button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${escapeHtml(row.absenceId)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Gửi lại</button>`}
-            ${row.channel === 'Zalo cá nhân' ? `<button class="btn ghost btn-sm confirm-zalo-sent-btn" type="button" data-id="${escapeHtml(row.absenceId)}" data-logid="${escapeHtml(row.id)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Xác nhận đã gửi</button>` : ''}
-          ` : ''}
+          ` : `<span class="badge ${statusClass(row.status)}" title="${escapeHtml([row.channel, row.result].filter(Boolean).join(' — '))}">${escapeHtml(row.status)}</span>`}
+          ${renderNoticeActions(row)}
         </div>
       </td>
     </tr>
-  `).join('');
+  `;
+}
+
+let noticePage = 1;
+const NOTICE_PAGE_SIZE = 15;
+let noticeRowsAll = [];
+
+function renderNoticePage() {
+  const rows = noticeRowsAll;
+  const totalPages = Math.max(1, Math.ceil(rows.length / NOTICE_PAGE_SIZE));
+  noticePage = Math.max(1, Math.min(noticePage, totalPages));
+  const tbody = $('#noticeRows');
+  const pager = $('#noticePagination');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="3" class="empty">Chưa có lịch sử gửi Zalo.</td></tr>';
+    pager.innerHTML = '';
+    return;
+  }
+  const start = (noticePage - 1) * NOTICE_PAGE_SIZE;
+  const end = Math.min(start + NOTICE_PAGE_SIZE, rows.length);
+  tbody.innerHTML = rows.slice(start, end).map(renderNoticeHistoryRow).join('');
+
+  const firstPage = Math.max(1, Math.min(noticePage - 2, totalPages - 4));
+  const lastPage = Math.min(totalPages, firstPage + 4);
+  const pageButtons = [];
+  for (let page = firstPage; page <= lastPage; page++) {
+    pageButtons.push(`<button class="btn ghost btn-sm${page === noticePage ? ' active' : ''}" type="button" data-page="${page}"${page === noticePage ? ' aria-current="page"' : ''}>${page}</button>`);
+  }
+  pager.innerHTML = `
+    <span class="pagination-info">Hiển thị ${start + 1}–${end} / tổng ${rows.length}</span>
+    <div class="pagination-btns">
+      <button class="btn ghost btn-sm" type="button" data-page="${noticePage - 1}"${noticePage === 1 ? ' disabled' : ''}>‹ Trước</button>
+      ${pageButtons.join('')}
+      <button class="btn ghost btn-sm" type="button" data-page="${noticePage + 1}"${noticePage === totalPages ? ' disabled' : ''}>Sau ›</button>
+    </div>
+  `;
+}
+
+async function loadNotices() {
+  let rows = await api('/api/notification-logs?' + queryString({
+    date: selectedHistoryDate(),
+    q: $('#historyKeyword').value.trim(),
+    excludeAbsenceStatus: 'Học phí'
+  }));
+
+  rows = rows.filter(row =>
+    row.status !== 'Chưa kết bạn - Cần gọi' &&
+    row.absenceCallStatus !== 'Cần gọi điện' &&
+    row.absenceCallStatus !== 'Đã gọi' &&
+    row.absenceCallStatus !== 'Đã nhắc' &&
+    row.absenceCallStatus !== 'Không nghe máy'
+  );
+  rows = groupFailedNoticeRows(rows);
+  noticeRowsAll = rows;
+  noticePage = 1;
+  renderNoticePage();
 }
 
 async function markUnfriended(id) {
@@ -2028,9 +2198,15 @@ function renderManualSendChatCards(logs = []) {
 async function sendBulkZalo(button) {
   button.disabled = true;
   try {
+    const boxes = [...document.querySelectorAll('#absenceRows .bulk-select')];
+    const checkedIds = boxes.filter(box => box.checked).map(box => box.dataset.id);
+    if (!checkedIds.length) {
+      toast('Hãy chọn ít nhất 1 học sinh để gửi.', 'warning');
+      return;
+    }
     const result = await api('/api/absences/zalo/bulk', {
       method: 'POST',
-      body: JSON.stringify({ filters: getFilters() })
+      body: JSON.stringify({ filters: getFilters(), ids: checkedIds })
     });
     const manualLogs = (result.logs || []).filter(log => log.status === 'Chờ gửi thủ công');
     if (state.settings?.zaloMode === 'personal-real' && manualLogs.length) {
@@ -2162,23 +2338,33 @@ async function clearCallHistory() {
     date: selectedHistoryDate(),
     q: $('#historyKeyword')?.value.trim() || ''
   };
-  const scope = params.date || params.q ? 'lịch sử học phí đang lọc' : 'toàn bộ lịch sử học phí';
+  const scope = params.date || params.q ? 'lịch sử gọi điện đang lọc' : 'toàn bộ lịch sử gọi điện';
   if (!confirm(`Xóa ${scope}?`)) return;
   const result = await api('/api/call-logs?' + queryString(params), { method: 'DELETE' });
-  toast(`Đã xóa ${result.deleted || 0} dòng lịch sử học phí.`);
+  toast(`Đã xóa ${result.deleted || 0} dòng lịch sử gọi điện.`);
   await loadHistory();
+}
+
+async function clearTuitionHistory() {
+  const params = tuitionHistoryParams();
+  const scope = params.date || params.q ? 'lịch sử học phí đang lọc' : 'toàn bộ lịch sử học phí';
+  if (!confirm(`Xóa ${scope}?`)) return;
+  const result = await api('/api/notification-logs?' + queryString(params), { method: 'DELETE' });
+  toast(`Đã xóa ${result.deleted || 0} dòng lịch sử học phí.`);
+  await Promise.all([loadTuitionHistory(), loadNotices()]);
 }
 
 async function clearNoticeHistory() {
   const params = {
     date: selectedHistoryDate(),
-    q: $('#historyKeyword')?.value.trim() || ''
+    q: $('#historyKeyword')?.value.trim() || '',
+    excludeAbsenceStatus: 'Học phí'
   };
   const scope = params.date || params.q ? 'lịch sử Zalo đang lọc' : 'toàn bộ lịch sử Zalo';
   if (!confirm(`Xóa ${scope}?`)) return;
   const result = await api('/api/notification-logs?' + queryString(params), { method: 'DELETE' });
   toast(`Đã xóa ${result.deleted || 0} dòng lịch sử Zalo.`);
-  await loadNotices();
+  await Promise.all([loadNotices(), loadTuitionHistory()]);
 }
 
 function normalizeChatText(value) {
@@ -2772,6 +2958,7 @@ function initChatbox() {
 }
 
 function initEvents() {
+  $('#historyTab')?.addEventListener('click', handleHistoryPageClick);
   $('#addStudentBtn')?.addEventListener('click', openAddStudentModal);
   $('#closeAddStudentBtn')?.addEventListener('click', closeAddStudentModal);
   $('#cancelAddStudentBtn')?.addEventListener('click', closeAddStudentModal);
@@ -2848,7 +3035,20 @@ function initEvents() {
     await loadAbsences();
   });
 
-  $('#noticeRows')?.addEventListener('click', async event => {
+  $('#absenceRows')?.addEventListener('change', event => {
+    if (event.target.classList.contains('bulk-select')) updateBulkSendCount();
+  });
+
+  $('#noticePagination')?.addEventListener('click', event => {
+    const button = event.target.closest('[data-page]');
+    if (!button || button.disabled) return;
+    const page = Number(button.dataset.page);
+    if (!Number.isInteger(page) || page < 1) return;
+    noticePage = page;
+    renderNoticePage();
+  });
+
+  const handleNoticeActions = async event => {
     const copyBtn = event.target.closest('.copy-log-msg-btn');
     if (copyBtn) {
       const msg = copyBtn.dataset.msg;
@@ -2873,7 +3073,7 @@ function initEvents() {
           body: JSON.stringify({ logId: confirmBtn.dataset.logid })
         });
         toast('Đã cập nhật trạng thái: tin đã gửi trên Zalo.');
-        await Promise.all([loadNotices(), loadAbsences()]);
+        await Promise.all([loadNotices(), loadTuitionHistory(), loadAbsences()]);
       } catch (err) {
         confirmBtn.disabled = false;
         toast('Không cập nhật được trạng thái: ' + err.message, 'error');
@@ -2904,10 +3104,12 @@ function initEvents() {
         console.error(err);
         toast('Lỗi khi gửi lại Zalo: ' + err.message, 'error');
       }
-      await Promise.all([loadNotices(), loadAbsences()]);
+      await Promise.all([loadNotices(), loadTuitionHistory(), loadAbsences()]);
       return;
     }
-  });
+  };
+  $('#noticeRows')?.addEventListener('click', handleNoticeActions);
+  $('#historyRows')?.addEventListener('click', handleNoticeActions);
   $('#filterClass').addEventListener('change', loadAbsences);
   $('#filterSession')?.addEventListener('change', async () => {
     queueSessionAuto = false;
@@ -3070,6 +3272,14 @@ function initEvents() {
     }
   });
 
+  $('#clearTuitionHistoryBtn')?.addEventListener('click', async () => {
+    try {
+      await clearTuitionHistory();
+    } catch (error) {
+      toast(error.message, 'error');
+    }
+  });
+
   $('#clearQuitHistoryBtn')?.addEventListener('click', async () => {
     try {
       await clearQuitHistory();
@@ -3140,6 +3350,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (queueSessionDropdown) queueSessionDropdown.value = currentSessionForTime();
 
   initEvents();
+  setupHeaderMenus();
   try {
     await loadBranches();
     await loadBootstrap();

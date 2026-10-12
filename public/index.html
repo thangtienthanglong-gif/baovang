@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <link rel="stylesheet" href="/style.css?v=20261007-1">
+  <link rel="stylesheet" href="/style.css?v=20261013-history-2">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     /* Inner Tabs for History - INLINED TO PREVENT CACHE */
@@ -97,11 +97,11 @@
 
       <nav class="tabs side-nav" aria-label="Chức năng">
         <button class="tab active" data-tab="absenceTab" type="button"><span class="nav-icon"><i class="fa-solid fa-clipboard-user"></i></span> Điểm danh</button>
-        <a href="/ketbu_eval.html" class="tab" style="text-decoration: none; color: inherit; border: 1px solid #3b82f6; background: #eff6ff; color: #1e3a8a; font-weight: bold;"><span class="nav-icon"><i class="fa-solid fa-chalkboard-user" style="color:#3b82f6;"></i></span> Lên lớp</a>
-        <a href="/ketbu/index.html" class="tab" style="text-decoration: none; color: inherit;"><span class="nav-icon"><i class="fa-solid fa-calendar-alt"></i></span> Lịch học bù</a>
-        <button class="tab" data-tab="queueTab" type="button"><span class="nav-icon"><i class="fa-solid fa-list-check"></i></span> Hàng xử lý</button>
-        <button class="tab" data-tab="logTab" type="button"><span class="nav-icon"><i class="fa-solid fa-book-open"></i></span> Tiến độ phân phối</button>
+        <button class="tab" data-tab="queueTab" type="button"><span class="nav-icon"><i class="fa-solid fa-list-check"></i></span> Hàng xử lý <span class="nav-badge" id="queueNavBadge" hidden></span></button>
         <button class="tab" data-tab="historyTab" type="button"><span class="nav-icon"><i class="fa-solid fa-clock-rotate-left"></i></span> Lịch sử liên hệ</button>
+        <a href="/ketbu/index.html" class="tab" style="text-decoration: none; color: inherit;"><span class="nav-icon"><i class="fa-solid fa-calendar-alt"></i></span> Lịch học bù</a>
+        <a href="/ketbu_eval.html" class="tab" style="text-decoration: none; color: inherit; border: 1px solid #3b82f6; background: #eff6ff; color: #1e3a8a; font-weight: bold;"><span class="nav-icon"><i class="fa-solid fa-chalkboard-user" style="color:#3b82f6;"></i></span> Lên lớp</a>
+        <button class="tab" data-tab="logTab" type="button"><span class="nav-icon"><i class="fa-solid fa-book-open"></i></span> Tiến độ phân phối</button>
         <button class="tab" data-tab="importTab" type="button"><span class="nav-icon"><i class="fa-solid fa-file-excel"></i></span> Nạp Excel</button>
         <button class="tab" data-tab="zaloTab" type="button"><span class="nav-icon"><i class="fa-solid fa-comment-dots"></i></span> Zalo</button>
         <button class="tab admin-only" data-tab="staffTab" type="button" style="display:none;"><span class="nav-icon"><i class="fa-solid fa-users"></i></span> Nhân sự</button>
@@ -123,18 +123,23 @@
           <h1 style="margin: 0;">Báo vắng</h1>
         </div>
         <div class="header-actions">
-          
-          
-          <select id="branchSelector" style="padding: 6px; border-radius: 6px; border: 1px solid var(--border-color); background: white; margin-right: 8px;">
+          <select id="branchSelector" aria-label="Chi nhánh">
             <option value="main">Cơ sở chính (Main)</option>
           </select>
-          <button class="btn" id="newBranchBtn" type="button" style="margin-right: 8px; padding: 6px 12px;" title="Thêm chi nhánh mới"><i class="fa-solid fa-plus"></i></button>
-          <button class="btn danger" id="delBranchBtn" type="button" style="margin-right: 8px; padding: 6px 12px; background: #fee2e2; color: #dc2626; border-color: #fca5a5;" title="Xóa chi nhánh này"><i class="fa-solid fa-trash"></i></button>
-          <button class="btn" id="renameBranchBtn" type="button" style="margin-right: 8px; padding: 6px 12px; background: #e0e7ff; color: #4338ca; border-color: #c7d2fe;" title="Đổi tên chi nhánh"><i class="fa-solid fa-pen"></i></button>
+          <div class="menu-wrap">
+            <button class="btn secondary" id="branchMenuBtn" type="button" style="padding: 6px 12px;" title="Quản lý chi nhánh" aria-haspopup="true" aria-expanded="false" aria-controls="branchMenu"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+            <div class="menu-dropdown" id="branchMenu" hidden>
+              <button class="btn" id="newBranchBtn" type="button" title="Thêm chi nhánh mới"><i class="fa-solid fa-plus"></i> Thêm chi nhánh</button>
+              <button class="btn" id="renameBranchBtn" type="button" title="Đổi tên chi nhánh"><i class="fa-solid fa-pen"></i> Đổi tên chi nhánh</button>
+              <button class="btn danger" id="delBranchBtn" type="button" title="Xóa chi nhánh này"><i class="fa-solid fa-trash"></i> Xóa chi nhánh</button>
+            </div>
+          </div>
           <button class="btn secondary" id="refreshBtn" type="button"><span class="btn-icon"><i class="fa-solid fa-rotate-right"></i></span> Tải lại</button>
-          <div class="account-controls">
-            <span id="currentUsername"></span>
-            <button class="btn secondary" id="logoutBtn" type="button" title="Thoát tài khoản để đăng nhập chi nhánh khác"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</button>
+          <div class="menu-wrap account-controls">
+            <button class="btn secondary" id="accountMenuBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="accountMenu" title="Tài khoản"><i class="fa-solid fa-circle-user"></i> <span id="currentUsername"></span> <i class="fa-solid fa-caret-down" style="font-size: 10px;"></i></button>
+            <div class="menu-dropdown" id="accountMenu" hidden>
+              <button class="btn secondary" id="logoutBtn" type="button" title="Thoát tài khoản để đăng nhập chi nhánh khác"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</button>
+            </div>
           </div>
         </div>
       </header>
@@ -249,14 +254,14 @@
             <p>Theo dõi trạng thái gửi Zalo theo danh sách báo vắng trong ngày.</p>
           </div>
           <div class="section-actions">
-            <button class="btn blue" id="bulkSendZaloBtn" type="button">Gửi Zalo hàng loạt</button>
+            <button class="btn" id="bulkSendZaloBtn" type="button">Gửi Zalo hàng loạt</button>
           </div>
         </div>
         <section class="queue-filters">
           <div class="field">
             <div class="date-filter-heading">
               <label for="filterDate">Ngày</label>
-              <label class="date-auto-toggle" for="filterDateAuto"><input id="filterDateAuto" type="checkbox" checked> Tự động</label>
+              <label class="date-auto-toggle" for="filterDateAuto" title="Tự động dùng ngày hôm nay"><input id="filterDateAuto" type="checkbox" checked> Hôm nay</label>
             </div>
             <input id="filterDate" type="date" readonly>
           </div>
@@ -288,6 +293,7 @@
           <button class="btn" id="applyFilterBtn" type="button">Lọc</button>
         </section>
         <section id="manualSendPanel" class="manual-send-panel" hidden></section>
+        <div class="queue-count" id="queueCountLine" aria-live="polite"></div>
         <div id="absenceRows" class="absence-list"></div>
       </section>
     </section>
@@ -481,7 +487,7 @@
         <div class="field" style="margin: 0;">
           <div class="date-filter-heading">
             <label for="historyDate">Ngày</label>
-            <label class="date-auto-toggle" for="historyDateAuto"><input id="historyDateAuto" type="checkbox" checked> Tự động</label>
+            <label class="date-auto-toggle" for="historyDateAuto" title="Tự động dùng ngày hôm nay"><input id="historyDateAuto" type="checkbox" checked> Hôm nay</label>
           </div>
           <input id="historyDate" type="date" readonly>
         </div>
@@ -506,17 +512,19 @@
 
       <div class="inner-tabs" style="margin-bottom: 16px; display: flex; gap: 8px; overflow-x: auto;">
         <button class="inner-tab active" data-subtab="zaloHistoryPanel" type="button">Lịch sử Zalo</button>
-        <button class="inner-tab" data-subtab="callHistoryPanel" type="button">Lịch sử học phí</button>
+        <button class="inner-tab" data-subtab="tuitionHistoryPanel" type="button">Lịch sử học phí</button>
+        <button class="inner-tab" data-subtab="callHistoryPanel" type="button">Lịch sử gọi điện</button>
         <button class="inner-tab" data-subtab="quitHistoryPanel" type="button">Học sinh nghỉ học</button>
         <button class="inner-tab" data-subtab="removedClassHistoryPanel" type="button">Đã xóa khỏi lớp</button>
       </div>
 
-      <div id="zaloHistoryPanel" class="sub-panel active">
+      <div id="zaloHistoryPanel" class="sub-panel active notice-history-panel">
         <section class="card table-card">
-          <div class="section-title">
+          <div class="section-title notice-history-header history-pagination-header">
             <div>
               <h2>Lịch sử gửi Zalo</h2>
             </div>
+            <div class="pagination" id="noticePagination"></div>
             <div class="section-actions">
               <button class="btn danger" id="clearNoticeHistoryBtn" type="button">Xóa lịch sử Zalo</button>
             </div>
@@ -527,8 +535,6 @@
                 <tr>
                   <th>Thời gian</th>
                   <th>Họ và tên</th>
-                  <th>Lớp</th>
-                  <th>Điện thoại</th>
                   <th>Trạng thái</th>
                 </tr>
               </thead>
@@ -538,14 +544,39 @@
         </section>
       </div>
 
-      <div id="callHistoryPanel" class="sub-panel" style="display: none;">
+      <div id="tuitionHistoryPanel" class="sub-panel notice-history-panel" style="display: none;">
         <section class="card table-card">
-          <div class="section-title">
+          <div class="section-title history-pagination-header">
             <div>
               <h2>Lịch sử học phí</h2>
             </div>
+            <div class="pagination" id="tuitionHistoryPagination"></div>
             <div class="section-actions">
-              <button class="btn danger" id="clearCallHistoryBtn" type="button">Xóa lịch sử</button>
+              <button class="btn danger" id="clearTuitionHistoryBtn" type="button">Xóa lịch sử học phí</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Thời gian</th>
+                  <th>Họ và tên</th>
+                  <th>Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody id="historyRows"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <div id="callHistoryPanel" class="sub-panel" style="display: none;">
+        <section class="card table-card">
+          <div class="section-title history-pagination-header">
+            <div><h2>Lịch sử gọi điện</h2></div>
+            <div class="pagination" id="callHistoryPagination"></div>
+            <div class="section-actions">
+              <button class="btn danger" id="clearCallHistoryBtn" type="button">Xóa lịch sử gọi điện</button>
             </div>
           </div>
           <div class="table-wrap">
@@ -563,7 +594,7 @@
                   <th>Ghi chú</th>
                 </tr>
               </thead>
-              <tbody id="historyRows"></tbody>
+              <tbody id="callHistoryRows"></tbody>
             </table>
           </div>
         </section>
@@ -571,10 +602,11 @@
 
       <div id="quitHistoryPanel" class="sub-panel" style="display: none;">
         <section class="card table-card">
-          <div class="section-title">
+          <div class="section-title history-pagination-header">
             <div>
               <h2>Lịch sử học sinh nghỉ học</h2>
             </div>
+            <div class="pagination" id="quitHistoryPagination"></div>
             <div class="section-actions">
               <button class="btn danger" id="clearQuitHistoryBtn" type="button">Xóa lịch sử</button>
             </div>
@@ -598,8 +630,9 @@
       </div>
       <div id="removedClassHistoryPanel" class="sub-panel" style="display: none;">
         <section class="card table-card">
-          <div class="section-title">
+          <div class="section-title history-pagination-header history-header-no-actions">
             <div><h2>Lịch sử xóa tên khỏi lớp</h2><p class="muted">Lưu theo ngày xóa tên. Các thao tác này không tính là lượt vắng học.</p></div>
+            <div class="pagination" id="removedClassHistoryPagination"></div>
           </div>
           <div class="table-wrap">
             <table>
@@ -823,7 +856,7 @@
     </div>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="/app.js?v=20261012-3"></script>
+  <script src="/app.js?v=20261013-2"></script>
   <script src="/exams.js?v=20261009-2"></script>
   <nav class="bottom-nav">
     <button class="bottom-tab active" data-tab="absenceTab" type="button"><i class="fa-solid fa-clipboard-user"></i><span>Điểm danh</span></button>
