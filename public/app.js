@@ -1097,13 +1097,17 @@ function renderRoster(searchMatches) {
     return absence && absence.absenceStatus !== 'Đã bù';
   }).length;
 
-  $('#rosterTitle').textContent = className === 'ALL' ? 'Danh sách học sinh' : `Lớp ${className}`;
+  $('#rosterTitle').textContent = searchQuery
+    ? 'Kết quả tra cứu học sinh'
+    : className === 'ALL' ? 'Danh sách học sinh' : `Lớp ${className}`;
   $('#rosterMeta').textContent = searchQuery && filtered.length > QUICK_SEARCH_ROSTER_LIMIT
     ? `${filtered.length} kết quả · Hiển thị ${QUICK_SEARCH_ROSTER_LIMIT} đầu tiên, nhập thêm để thu hẹp`
-    : `${filtered.length} học sinh · ${absentCount} đang báo vắng`;
+    : `${filtered.length} học sinh${searchQuery ? ' · Tất cả lớp' : ''} · ${absentCount} đang báo vắng`;
 
   if (!filtered.length) {
-    roster.innerHTML = '<div class="empty">Chưa có học sinh trong phạm vi đang chọn.</div>';
+    roster.innerHTML = searchQuery
+      ? '<div class="empty">Không tìm thấy học sinh khớp nội dung tra cứu.</div>'
+      : '<div class="empty">Chưa có học sinh trong phạm vi đang chọn.</div>';
     return;
   }
 
@@ -1122,7 +1126,7 @@ function renderRoster(searchMatches) {
   roster.innerHTML = sortedGroups.map(groupName => {
     const info = getClassScheduleInfo(groupName, dateStr, activeDay);
     const sessionLabel = info.sessionName !== 'Khác' ? ` (Buổi ${info.sessionName})` : '';
-    const title = className === 'ALL'
+    const title = searchQuery || className === 'ALL'
       ? `<div class="class-group-title"><span>${escapeHtml(groupName)}${sessionLabel}</span><span>${groups[groupName].length} học sinh</span></div>`
       : '';
     const regularStudents = groups[groupName].filter(student => !student.isMakeupAttendance);
