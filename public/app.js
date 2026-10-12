@@ -1256,6 +1256,16 @@ function noticeTimeLine(row) {
   return 'Chưa xử lý';
 }
 
+function scheduleMakeupUrl(row) {
+  const params = new URLSearchParams({
+    class: row.className || '',
+    student: row.studentName || '',
+    date: row.date || '',
+    session: row.session || ''
+  });
+  return `/ketbu/index.html?${params.toString()}`;
+}
+
 function renderAbsences() {
   const container = $('#absenceRows');
   const queueAbsences = state.absences.filter(row => row.noticeStatus !== 'Đã gửi'
@@ -1282,7 +1292,8 @@ function renderAbsences() {
         ${row.initialReason && absenceStatusLabel(row.initialReason) !== absenceStatusLabel(row.absenceStatus) ? `<span class="muted">${escapeHtml(row.initialReason)}</span>` : ''}
         ${row.evidenceUrl ? `<a href="${row.evidenceUrl}" target="_blank" style="font-size: 11px; display: inline-block; margin-top: 4px; color: #3b82f6; text-decoration: none;"><i class="fa-solid fa-image"></i> Xem ảnh</a>` : ''}
         <button class="btn primary btn-sm schedule-makeup-btn" type="button" 
-          onclick="window.open('/ketbu/index.html?class=' + encodeURIComponent('${escapeHtml(row.className)}') + '&student=' + encodeURIComponent('${escapeHtml(row.studentName)}'), '_blank')"
+          data-url="${escapeHtml(scheduleMakeupUrl(row))}"
+          onclick="window.open(this.dataset.url, '_blank')"
           style="margin-top: 8px; font-size: 12px; padding: 4px 8px;">
           Xếp lịch bù
         </button>

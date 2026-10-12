@@ -69,6 +69,7 @@ let appState = loadAppState();
 let data = getActiveBranch().data;
 let currentSuggestions = [];
 let currentRejected = [];
+let pendingMissedSession = null;
 
 const elements = {
   classInputText: document.getElementById("classInputText"),
@@ -2156,7 +2157,7 @@ async function syncBranches() {
     
     data = getActiveBranch().data;
     persistAppState();
-    renderBranchSelector();
+    renderAll();
   } catch (err) {
     console.error("Failed to sync branches", err);
   }
@@ -2955,6 +2956,26 @@ function renderStudentInfo() {
   `;
 }
 
+function initializePlannerFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const classCode = params.get("class");
+  if (!classCode) return;
+
+  elements.studentClassCode.value = normalizeClassCodeValue(classCode);
+  elements.studentNameInput.value = params.get("student") || "";
+
+  const date = params.get("date") || "";
+  const missedDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(`${date}T12:00:00Z`) : null;
+  if (missedDate && !Number.isNaN(missedDate.getTime()) && missedDate.toISOString().slice(0, 10) === date) {
+    const shift = params.get("session");
+    pendingMissedSession = {
+      classCode: elements.studentClassCode.value,
+      weekday: missedDate.getUTCDay() === 0 ? 8 : missedDate.getUTCDay() + 1,
+      shift: ["Sáng", "Chiều", "Tối"].includes(shift) ? shift : ""
+    };
+  }
+}
+
 function renderMissedSessions() {
   const student = getSelectedStudent();
   const sessions = getMainClassSessions(student);
@@ -2971,7 +2992,20 @@ function renderMissedSessions() {
     `<option value="${escapeHtml(session.id)}">${escapeHtml(sessionLabel(session))} - ${escapeHtml(session.lessonParts)}</option>`
   ).join("");
 
-  if (sessions.some((session) => session.id === previousValue)) {
+  if (pendingMissedSession && student.mainClassCode === pendingMissedSession.classCode) {
+    const missedSession = sessions.find((session) =>
+      Number(session.weekday) === pendingMissedSession.weekday &&
+      (!pendingMissedSession.shift || session.shift === pendingMissedSession.shift)
+    );
+    if (missedSession) {
+      elements.missedSessionSelect.value = missedSession.id;
+      pendingMissedSession = null;
+    } else {
+      // Keep the requested session pending while branch/cloud data is loading.
+      elements.missedSessionSelect.innerHTML = '<option value="">Chọn buổi bị kẹt</option>' + elements.missedSessionSelect.innerHTML;
+      elements.missedSessionSelect.value = "";
+    }
+  } else if (sessions.some((session) => session.id === previousValue)) {
     elements.missedSessionSelect.value = previousValue;
   }
 
@@ -3594,6 +3628,7 @@ elements.parsedClassesBody.addEventListener("change", (event) => {
 });
 
 elements.studentClassCode.addEventListener("input", (e) => {
+  pendingMissedSession = null;
   renderAutocomplete(e.target.value);
   setNotice("");
   renderStudentInfo();
@@ -3615,6 +3650,7 @@ elements.studentNameInput.addEventListener("input", () => {
   renderStudentInfo();
 });
 elements.missedSessionSelect.addEventListener("change", () => {
+  pendingMissedSession = null;
   setNotice("");
   renderMissedInfo();
   clearResults();
@@ -3747,26 +3783,11 @@ elements.assignmentsBody.addEventListener("change", (event) => {
 });
 
 setPreferredMakeupToCurrentTime();
+initializePlannerFromUrl();
 renderAll();
 
 syncBranches().then(() => {
   initializeCloudSync();
-});
-
-// Auto-fill from URL params
-document.addEventListener("DOMContentLoaded", () => {
-  const params = new URLSearchParams(window.location.search);
-  const classCode = params.get('class');
-  const student = params.get('student');
-  
-  if (classCode) {
-    elements.studentClassCode.value = classCode;
-    renderStudentInfo();
-  }
-  if (student) {
-    elements.studentNameInput.value = student;
-    renderStudentInfo();
-  }
 });
 
 window.deleteAllClasses = function() {
