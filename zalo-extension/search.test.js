@@ -27,7 +27,7 @@ function candidate(text, attributes = {}) {
 function searchHarness({ editable = false, remount = false, pasteAllowed = true,
   pastedPhone, resetAllowed = true, clipboardAllowed = true,
   phoneUnavailable = false, phoneResults, nameResults = [], pastedName, namePasteAllowed = true,
-  staleHeader = false } = {}) {
+  staleHeader = false, openedHeader } = {}) {
   const commands = [];
   const clipboardWrites = [];
   const queries = [];
@@ -37,7 +37,7 @@ function searchHarness({ editable = false, remount = false, pasteAllowed = true,
   let activeName = 'Cuộc trò chuyện cũ';
   for (const contact of nameResults) {
     const click = contact.click.bind(contact);
-    contact.click = () => { click(); if (!staleHeader) activeName = contact.innerText.split(/\r?\n/)[0]; };
+    contact.click = () => { click(); if (!staleHeader) activeName = openedHeader ?? contact.innerText.split(/\r?\n/)[0]; };
   }
   const header = candidate('');
   Object.defineProperty(header, 'innerText', { get: () => activeName });
@@ -165,14 +165,40 @@ test('never selects the unregistered or search-disabled notice as a contact', ()
 });
 
 test('an unavailable phone triggers native full-name search for the same student', async () => {
-  const contact = candidate('Trương Bảo Ngọc');
+  const contact = candidate('Trương Bảo (C) Ngọc');
   const app = searchHarness({ phoneUnavailable: true, nameResults: [contact] });
   await app.api.openConversation({ phone: '0977686959', studentName: 'Trương Bảo (C) Ngọc', className: '9T2D+' }, app.original);
-  assert.deepEqual(app.clipboardWrites, ['0977686959', 'Trương Bảo Ngọc']);
-  assert.deepEqual(app.queries, ['', '0977686959', '', 'Trương Bảo Ngọc']);
+  assert.deepEqual(app.clipboardWrites, ['0977686959', 'Trương Bảo (C) Ngọc']);
+  assert.deepEqual(app.queries, ['', '0977686959', '', 'Trương Bảo (C) Ngọc']);
   assert.deepEqual(app.commands, ['delete', 'paste', 'delete', 'paste']);
   assert.equal(contact.clicked, true);
   assert.equal(app.unavailable.clicked, undefined);
+});
+
+test('name search preserves parenthesized markers and normalizes whitespace only', async () => {
+  const contact = candidate('Nguyễn Đặng Thiên (A) Kim');
+  const app = searchHarness({ phoneUnavailable: true, nameResults: [contact] });
+  await app.api.openConversation({ phone: '0909630582', studentName: '  Nguyễn Đặng  Thiên (A) Kim  '.normalize('NFD') }, app.original);
+  assert.deepEqual(app.clipboardWrites, ['0909630582', 'Nguyễn Đặng Thiên (A) Kim']);
+  assert.equal(contact.clicked, true);
+});
+
+test('a name with a missing or different marker never qualifies as the same student', async () => {
+  for (const name of ['Trương Bảo Ngọc', 'Trương Bảo (A) Ngọc']) {
+    const contact = candidate(name);
+    const app = searchHarness({ phoneUnavailable: true, nameResults: [contact] });
+    await assert.rejects(app.api.openConversation({ phone: '0977686959', studentName: 'Trương Bảo (C) Ngọc' }, app.original), error => error.skipped);
+    assert.equal(contact.clicked, undefined);
+  }
+});
+
+test('conversation verification retains the marker from the searched student name', async () => {
+  for (const openedHeader of ['Trương Bảo Ngọc', 'Trương Bảo (A) Ngọc']) {
+    const contact = candidate('Trương Bảo (C) Ngọc');
+    const app = searchHarness({ phoneUnavailable: true, nameResults: [contact], openedHeader });
+    await assert.rejects(app.api.openConversation({ phone: '0977686959', studentName: 'Trương Bảo (C) Ngọc' }, app.original), error => error.skipped && /cuộc trò chuyện khớp tên/.test(error.message));
+    assert.equal(contact.clicked, true);
+  }
 });
 
 test('normal phone search remains the first and only search when it succeeds', async () => {

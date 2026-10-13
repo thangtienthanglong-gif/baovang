@@ -377,7 +377,7 @@ function skippedError(message) {
 }
 
 const studentSearchName = value => String(value || '').normalize('NFC')
-  .replace(/\s*\([a-z]\)\s*/gi, ' ').replace(/\s+/g, ' ').trim();
+  .replace(/\s+/g, ' ').trim();
 const comparableContactName = value => studentSearchName(value).normalize('NFD')
   .replace(/\p{M}/gu, '').replace(/[đĐ]/g, 'd').toLocaleLowerCase('vi')
   .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
