@@ -1625,28 +1625,16 @@ td.empty {
   padding: 2px 4px;
 }
 
-.call-history-details {
-  margin-top: 0;
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.call-history-details summary {
-  cursor: pointer;
-  display: list-item;
-  list-style-position: inside;
-  min-height: 28px;
-  line-height: 28px;
-}
-
-.call-history-details[open] {
-  flex-basis: 100%;
-}
-
-.call-history-details .form-control {
+.call-history-result {
   width: auto;
   max-width: 100%;
-  margin-top: 4px;
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+#callHistoryTypeTabs {
+  margin-bottom: 12px;
 }
 
 .pagination {

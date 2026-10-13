@@ -97,7 +97,7 @@ test('empty results remove the pager and a page past the end is clamped', async 
   assert.deepEqual(visibleLogIds(app), ['log-31', 'log-32']);
   app.setRows([]);
   await app.context.loadNotices();
-  assert.match(app.fields.noticeRows.innerHTML, /colspan="3".*Chưa có lịch sử gửi Zalo\./);
+  assert.match(app.fields.noticeRows.innerHTML, /colspan="3".*Chưa có lịch sử vắng\./);
   assert.equal(app.fields.noticePagination.innerHTML, '');
   app.setRows(makeRows(1));
   await app.context.loadNotices();

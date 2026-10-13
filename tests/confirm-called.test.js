@@ -220,9 +220,10 @@ test('legacy no-answer outcomes show the correct status without rewriting or rem
 
 function ui() {
   const events = {}, fields = {}, requests = [], refreshes = [];
-  for (const id of ['noticeRows', 'historyRows', 'callHistoryRows', 'noticePagination', 'callHistoryPagination', 'historyKeyword']) {
+  for (const id of ['noticeRows', 'historyRows', 'callHistoryRows', 'noticePagination', 'callHistoryPagination', 'callHistoryTypeTabs', 'historyKeyword']) {
     fields[id] = { value: '', innerHTML: '', addEventListener: (type, handler) => { events[`${id}:${type}`] = handler; } };
   }
+  fields.callHistoryTypeTabs.querySelectorAll = () => [];
   const app = {
     $: selector => fields[selector.slice(1)], escapeHtml: value => String(value ?? '').replace(/</g, '&lt;').replace(/"/g, '&quot;'),
     formatDateTime: value => value, absenceStatusLabel: value => value, toast() {},
@@ -274,7 +275,7 @@ test('a failed confirmation re-enables the button and leaves local history uncha
   assert.deepEqual(refreshes, []);
 });
 
-test('call history keeps compact identity, original type, caller details and editable result without AUTO codes', async () => {
+test('call history keeps compact identity and inline editable result without details or AUTO codes', async () => {
   const { app, fields } = ui();
   app.api = async () => [{ id: 'call-1', studentName: 'Kim', studentCode: 'AUTO-HIDDEN', className: '9T2D+', phoneCalled: '0909630582',
     absenceStatus: 'Học phí', callStatus: 'Đã gọi', caller: 'nhanvien-truc', callResult: 'Đã gọi', note: 'Đã liên hệ phụ huynh' }];
@@ -286,12 +287,12 @@ test('call history keeps compact identity, original type, caller details and edi
   assert.match(html, /student-phone.*0909630582/);
   assert.match(html, /class="badge called"[^>]*>Đã gọi/);
   assert.match(html, /Học phí/);
-  assert.match(html, /nhanvien-truc/);
+  assert.doesNotMatch(html, /nhanvien-truc|Đã liên hệ phụ huynh|Chi tiết cuộc gọi|Ngày vắng|<details/);
   assert.match(html, /data-call-logid="call-1"/);
   assert.doesNotMatch(html, /AUTO-HIDDEN/);
 });
 
-test('editing no answer on page three preserves the row and expanded details and synchronizes other panels', async () => {
+test('editing no answer on page three preserves the row and inline result and synchronizes other panels', async () => {
   const { app, fields, refreshes } = ui();
   const rows = Array.from({ length: 32 }, (_, i) => ({
     id: `call-${i + 1}`, studentName: `HS-${i + 1}`, callResult: 'Đã gọi', callStatus: 'Đã gọi'
@@ -311,7 +312,7 @@ test('editing no answer on page three preserves the row and expanded details and
   await app.updateCallResult('call-32', select.value, select);
   assert.match(fields.callHistoryPagination.innerHTML, /Hiển thị 31–32 \/ tổng 32/);
   assert.match(fields.callHistoryRows.innerHTML, /HS-32/);
-  assert.match(fields.callHistoryRows.innerHTML, /data-call-details="call-32" open/);
+  assert.match(fields.callHistoryRows.innerHTML, /data-call-logid="call-32"/);
   assert.match(fields.callHistoryRows.innerHTML, /class="badge no-answer"[^>]*>Không nghe máy/);
   assert.match(fields.callHistoryRows.innerHTML, /value="Không bắt máy" selected/);
   assert.equal(select.disabled, false);
@@ -345,4 +346,27 @@ test('linked call outcomes stay in contact history even when attendance has a ca
   assert.match(fields.noticeRows.innerHTML, /Kim/);
   assert.match(fields.noticeRows.innerHTML, /Không nghe máy/);
   assert.doesNotMatch(fields.noticeRows.innerHTML, /Other/);
+});
+
+test('switching call history type requests the correct scope and starts at page one', async () => {
+  const { app, fields, events, requests } = ui();
+  app.queryString = params => new URLSearchParams(params).toString();
+  app.api = async url => {
+    requests.push({ url });
+    const tuition = new URL(url, 'http://localhost').searchParams.get('absenceStatus') === 'Học phí';
+    return Array.from({ length: tuition ? 17 : 32 }, (_, i) => ({ id: `call-${i}`, studentName: `${tuition ? 'Tuition' : 'Absence'}-${i}`, callStatus: 'Đã gọi' }));
+  };
+  vm.runInContext(slice(frontend, 'async function loadCallHistory(', 'function tuitionHistoryParams('), app);
+  await app.loadCallHistory();
+  assert.equal(new URL(requests.at(-1).url, 'http://localhost').searchParams.get('excludeAbsenceStatus'), 'Học phí');
+  app.handleHistoryPageClick({ target: { closest: () => ({ dataset: { page: '3' }, closest: () => ({ id: 'callHistoryPagination' }) }) } });
+  const click = type => events['callHistoryTypeTabs:click']({ target: { closest: () => ({ dataset: { callType: type } }) } });
+  await click('tuition');
+  assert.equal(new URL(requests.at(-1).url, 'http://localhost').searchParams.get('absenceStatus'), 'Học phí');
+  assert.match(fields.callHistoryPagination.innerHTML, /Hiển thị 1–15 \/ tổng 17/);
+  assert.match(fields.callHistoryRows.innerHTML, /Tuition-0/);
+  assert.doesNotMatch(fields.callHistoryRows.innerHTML, /Absence-/);
+  await click('absence');
+  assert.match(fields.callHistoryPagination.innerHTML, /Hiển thị 1–15 \/ tổng 32/);
+  assert.match(fields.callHistoryRows.innerHTML, /Absence-0/);
 });

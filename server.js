@@ -631,15 +631,24 @@ function filterCallLogs(db, query) {
   const q = String(query.q || '').toLowerCase().trim();
   const date = query.date || '';
   const absences = new Map((db.absences || []).map(absence => [absence.id, absence]));
+  const notices = new Map((db.notificationLogs || []).map(log => [log.id, log]));
   let rows = (db.callLogs || []).map(log => ({
     ...log,
     callStatus: log.callStatus === 'Lỗi gọi'
       ? ({ 'Không bắt máy': 'Không nghe máy', 'Không liên lạc được': 'Không liên lạc được' }[log.callResult] || log.callStatus)
       : log.callStatus,
-    absenceStatus: log.absenceStatus || absences.get(log.absenceId)?.absenceStatus || ''
+    absenceStatus: log.absenceStatus || notificationLogAbsenceStatus(
+      notices.get(log.notificationLogId) || log, absences.get(log.absenceId)
+    )
   }));
 
   if (date) rows = rows.filter(log => log.date === date);
+  if (query.absenceStatus && query.absenceStatus !== 'ALL') {
+    rows = rows.filter(log => normalizeAbsenceStatus(log.absenceStatus) === normalizeAbsenceStatus(query.absenceStatus));
+  }
+  if (query.excludeAbsenceStatus) {
+    rows = rows.filter(log => normalizeAbsenceStatus(log.absenceStatus) !== normalizeAbsenceStatus(query.excludeAbsenceStatus));
+  }
   if (q) {
     rows = rows.filter(log => `${log.studentCode} ${log.studentName} ${log.className} ${log.parentName} ${log.phoneCalled} ${log.caller} ${log.callResult}`.toLowerCase().includes(q));
   }

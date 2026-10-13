@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <link rel="stylesheet" href="/style.css?v=20261013-history-4">
+  <link rel="stylesheet" href="/style.css?v=20261013-history-5">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     /* Inner Tabs for History - INLINED TO PREVENT CACHE */
@@ -511,7 +511,7 @@
       </section>
 
       <div class="inner-tabs" style="margin-bottom: 16px; display: flex; gap: 8px; overflow-x: auto;">
-        <button class="inner-tab active" data-subtab="zaloHistoryPanel" type="button">Lịch sử Zalo</button>
+        <button class="inner-tab active" data-subtab="zaloHistoryPanel" type="button">Lịch sử vắng</button>
         <button class="inner-tab" data-subtab="tuitionHistoryPanel" type="button">Lịch sử học phí</button>
         <button class="inner-tab" data-subtab="callHistoryPanel" type="button">Lịch sử gọi điện</button>
         <button class="inner-tab" data-subtab="quitHistoryPanel" type="button">Học sinh nghỉ học</button>
@@ -522,11 +522,11 @@
         <section class="card table-card">
           <div class="section-title notice-history-header history-pagination-header">
             <div>
-              <h2>Lịch sử gửi Zalo</h2>
+              <h2>Lịch sử vắng</h2>
             </div>
             <div class="pagination" id="noticePagination"></div>
             <div class="section-actions">
-              <button class="btn danger" id="clearNoticeHistoryBtn" type="button">Xóa lịch sử Zalo</button>
+              <button class="btn danger" id="clearNoticeHistoryBtn" type="button">Xóa lịch sử vắng</button>
             </div>
           </div>
           <div class="table-wrap">
@@ -571,6 +571,10 @@
       </div>
 
       <div id="callHistoryPanel" class="sub-panel notice-history-panel" style="display: none;">
+        <div class="inner-tabs" id="callHistoryTypeTabs">
+          <button class="inner-tab active" type="button" data-call-type="absence">Lịch sử vắng</button>
+          <button class="inner-tab" type="button" data-call-type="tuition">Lịch sử học phí</button>
+        </div>
         <section class="card table-card">
           <div class="section-title history-pagination-header">
             <div><h2>Lịch sử gọi điện</h2></div>
@@ -850,7 +854,7 @@
     </div>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="/app.js?v=20261013-7"></script>
+  <script src="/app.js?v=20261013-8"></script>
   <script src="/exams.js?v=20261009-2"></script>
   <nav class="bottom-nav">
     <button class="bottom-tab active" data-tab="absenceTab" type="button"><i class="fa-solid fa-clipboard-user"></i><span>Điểm danh</span></button>

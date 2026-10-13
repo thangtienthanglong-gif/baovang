@@ -1527,6 +1527,7 @@ async function loadHistory() {
 
 const historyPages = new Map();
 const HISTORY_PAGE_SIZE = 15;
+let callHistoryType = 'absence';
 
 function setHistoryRows(tbodyId, pagerId, rows, renderRow, emptyMessage, columns, page = 1) {
   historyPages.set(pagerId, { tbodyId, rows, renderRow, emptyMessage, columns, page });
@@ -1578,15 +1579,24 @@ function handleHistoryPageClick(event) {
   renderHistoryPage(pagerId);
 }
 
-async function loadCallHistory({ preservePage = false, expandedLogId = '' } = {}) {
-  const branchId = getActiveBranch();
-  const page = preservePage ? historyPages.get('callHistoryPagination')?.page || 1 : 1;
-  const rows = await api('/api/call-logs?' + queryString({
+function callHistoryParams() {
+  return {
     date: selectedHistoryDate(),
-    q: $('#historyKeyword').value.trim()
-  }));
+    q: $('#historyKeyword')?.value.trim() || '',
+    ...(callHistoryType === 'tuition' ? { absenceStatus: 'Học phí' } : { excludeAbsenceStatus: 'Học phí' })
+  };
+}
 
-  if (getActiveBranch() !== branchId) return;
+async function loadCallHistory({ preservePage = false } = {}) {
+  const branchId = getActiveBranch();
+  const type = callHistoryType;
+  const page = preservePage ? historyPages.get('callHistoryPagination')?.page || 1 : 1;
+  $('#callHistoryTypeTabs')?.querySelectorAll('[data-call-type]').forEach(button => {
+    button.classList.toggle('active', button.dataset.callType === type);
+  });
+  const rows = await api('/api/call-logs?' + queryString(callHistoryParams()));
+
+  if (getActiveBranch() !== branchId || callHistoryType !== type) return;
   const tbody = $('#callHistoryRows');
   if (!tbody) return;
   setHistoryRows('callHistoryRows', 'callHistoryPagination', rows, row => `
@@ -1602,24 +1612,17 @@ async function loadCallHistory({ preservePage = false, expandedLogId = '' } = {}
       <td>
         <div class="notice-history-status">
           ${row.absenceStatus && row.absenceStatus !== 'Khác' ? `<span class="notice-history-reason">${escapeHtml(absenceStatusLabel(row.absenceStatus))}</span>` : ''}
-          <span class="badge ${statusClass(row.callStatus)}" title="${escapeHtml([row.caller, row.note].filter(Boolean).join(' — '))}">${escapeHtml(row.callStatus)}</span>
-        <details class="call-history-details" data-call-details="${escapeHtml(row.id)}"${row.id === expandedLogId ? ' open' : ''}>
-          <summary>Chi tiết cuộc gọi</summary>
-          <div class="muted">Người gọi: ${escapeHtml(row.caller || '')} · Ngày vắng: ${escapeHtml(row.absenceDate || row.date || '')}</div>
-          <div class="muted">${escapeHtml(row.note || '')}</div>
-          <label>Kết quả
-        <select class="form-control" data-call-logid="${escapeHtml(row.id)}">
+          <span class="badge ${statusClass(row.callStatus)}">${escapeHtml(row.callStatus)}</span>
+        <select class="form-control call-history-result" aria-label="Kết quả gọi điện" data-call-logid="${escapeHtml(row.id)}">
           <option value="" ${!row.callResult ? 'selected' : ''}>-- Chọn --</option>
           <option value="Đã gọi" ${row.callResult === 'Đã gọi' ? 'selected' : ''}>Đã gọi</option>
           <option value="Không bắt máy" ${row.callResult === 'Không bắt máy' ? 'selected' : ''}>Không bắt máy</option>
           <option value="Không liên lạc được" ${row.callResult === 'Không liên lạc được' ? 'selected' : ''}>Không liên lạc được</option>
         </select>
-          </label>
-        </details>
         </div>
       </td>
     </tr>
-  `, 'Chưa có lịch sử gọi điện.', 3, page);
+  `, `Chưa có lịch sử gọi điện ${type === 'tuition' ? 'học phí' : 'vắng'}.`, 3, page);
 }
 
 function tuitionHistoryParams() {
@@ -1652,7 +1655,7 @@ async function updateCallResult(id, result, select = null) {
     });
     if (getActiveBranch() !== branchId) return;
     await Promise.all([
-      loadCallHistory({ preservePage: true, expandedLogId: id }),
+      loadCallHistory({ preservePage: true }),
       loadNotices(), loadTuitionHistory(), loadAbsences()
     ]);
   } catch (error) {
@@ -1801,7 +1804,7 @@ function renderNoticePage() {
   const tbody = $('#noticeRows');
   const pager = $('#noticePagination');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="3" class="empty">Chưa có lịch sử gửi Zalo.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" class="empty">Chưa có lịch sử vắng.</td></tr>';
     pager.innerHTML = '';
     return;
   }
@@ -2347,7 +2350,7 @@ function exportFailedZalo(params = {}) {
 }
 
 function exportCallList(params = {}) {
-  downloadUrl('/api/call-logs/export', params);
+  downloadUrl('/api/call-logs/export', { ...callHistoryParams(), ...params });
 }
 
 function exportQuitList(params = {}) {
@@ -2365,11 +2368,9 @@ async function clearQuitHistory() {
 }
 
 async function clearCallHistory() {
-  const params = {
-    date: selectedHistoryDate(),
-    q: $('#historyKeyword')?.value.trim() || ''
-  };
-  const scope = params.date || params.q ? 'lịch sử gọi điện đang lọc' : 'toàn bộ lịch sử gọi điện';
+  const params = callHistoryParams();
+  const typeLabel = callHistoryType === 'tuition' ? 'học phí' : 'vắng';
+  const scope = params.date || params.q ? `lịch sử gọi điện ${typeLabel} đang lọc` : `toàn bộ lịch sử gọi điện ${typeLabel}`;
   if (!confirm(`Xóa ${scope}?`)) return;
   const result = await api('/api/call-logs?' + queryString(params), { method: 'DELETE' });
   toast(`Đã xóa ${result.deleted || 0} dòng lịch sử gọi điện.`);
@@ -2391,10 +2392,10 @@ async function clearNoticeHistory() {
     q: $('#historyKeyword')?.value.trim() || '',
     excludeAbsenceStatus: 'Học phí'
   };
-  const scope = params.date || params.q ? 'lịch sử Zalo đang lọc' : 'toàn bộ lịch sử Zalo';
+  const scope = params.date || params.q ? 'lịch sử vắng đang lọc' : 'toàn bộ lịch sử vắng';
   if (!confirm(`Xóa ${scope}?`)) return;
   const result = await api('/api/notification-logs?' + queryString(params), { method: 'DELETE' });
-  toast(`Đã xóa ${result.deleted || 0} dòng lịch sử Zalo.`);
+  toast(`Đã xóa ${result.deleted || 0} dòng lịch sử vắng.`);
   await Promise.all([loadNotices(), loadTuitionHistory()]);
 }
 
@@ -2600,7 +2601,7 @@ function buildImportReply() {
 }
 
 function buildHistoryReply() {
-  return 'Lịch sử Zalo nằm ở tab Lịch sử Zalo, lịch sử học phí nằm ở tab Lịch sử học phí. Có thể lọc theo ngày hoặc từ khóa rồi xuất danh sách học sinh đi trễ nếu cần.';
+  return 'Lịch sử vắng và lịch sử học phí nằm trong Lịch sử liên hệ. Lịch sử gọi điện cũng chia thành vắng và học phí. Có thể lọc theo ngày hoặc từ khóa rồi xuất danh sách học sinh đi trễ nếu cần.';
 }
 
 function searchableStudentText(student) {
@@ -3163,6 +3164,16 @@ function initEvents() {
     const select = event.target.closest('[data-call-logid]');
     if (select) updateCallResult(select.dataset.callLogid, select.value, select);
   });
+  $('#callHistoryTypeTabs')?.addEventListener('click', async event => {
+    const button = event.target.closest('[data-call-type]');
+    if (!button || !['absence', 'tuition'].includes(button.dataset.callType) || button.dataset.callType === callHistoryType) return;
+    callHistoryType = button.dataset.callType;
+    try {
+      await loadCallHistory();
+    } catch (error) {
+      toast('Không tải được lịch sử gọi điện: ' + error.message, 'error');
+    }
+  });
   $('#filterClass').addEventListener('change', loadAbsences);
   $('#filterSession')?.addEventListener('change', async () => {
     queueSessionAuto = false;
@@ -3556,7 +3567,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Inner Tabs Logic for History Tab
   document.addEventListener('click', (e) => {
-    if (e.target.matches('.inner-tab')) {
+    if (e.target.matches('.inner-tab[data-subtab]')) {
       const parent = e.target.closest('.inner-tabs');
       if (!parent) return;
       
