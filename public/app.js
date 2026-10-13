@@ -837,6 +837,8 @@ function renderCharts() {
 function statusClass(status) {
   return {
     'Đã gọi': 'called',
+    'Không liên lạc được': 'no-answer',
+    'Cần gọi điện': 'waiting',
     'Chưa gửi': 'pending',
     'Đã gửi': 'called',
     'Không nghe máy': 'no-answer',
@@ -1526,8 +1528,8 @@ async function loadHistory() {
 const historyPages = new Map();
 const HISTORY_PAGE_SIZE = 15;
 
-function setHistoryRows(tbodyId, pagerId, rows, renderRow, emptyMessage, columns) {
-  historyPages.set(pagerId, { tbodyId, rows, renderRow, emptyMessage, columns, page: 1 });
+function setHistoryRows(tbodyId, pagerId, rows, renderRow, emptyMessage, columns, page = 1) {
+  historyPages.set(pagerId, { tbodyId, rows, renderRow, emptyMessage, columns, page });
   renderHistoryPage(pagerId);
 }
 
@@ -1576,8 +1578,9 @@ function handleHistoryPageClick(event) {
   renderHistoryPage(pagerId);
 }
 
-async function loadCallHistory() {
+async function loadCallHistory({ preservePage = false, expandedLogId = '' } = {}) {
   const branchId = getActiveBranch();
+  const page = preservePage ? historyPages.get('callHistoryPagination')?.page || 1 : 1;
   const rows = await api('/api/call-logs?' + queryString({
     date: selectedHistoryDate(),
     q: $('#historyKeyword').value.trim()
@@ -1600,8 +1603,7 @@ async function loadCallHistory() {
         <div class="notice-history-status">
           ${row.absenceStatus && row.absenceStatus !== 'Khác' ? `<span class="notice-history-reason">${escapeHtml(absenceStatusLabel(row.absenceStatus))}</span>` : ''}
           <span class="badge ${statusClass(row.callStatus)}" title="${escapeHtml([row.caller, row.note].filter(Boolean).join(' — '))}">${escapeHtml(row.callStatus)}</span>
-        </div>
-        <details class="call-history-details">
+        <details class="call-history-details" data-call-details="${escapeHtml(row.id)}"${row.id === expandedLogId ? ' open' : ''}>
           <summary>Chi tiết cuộc gọi</summary>
           <div class="muted">Người gọi: ${escapeHtml(row.caller || '')} · Ngày vắng: ${escapeHtml(row.absenceDate || row.date || '')}</div>
           <div class="muted">${escapeHtml(row.note || '')}</div>
@@ -1614,9 +1616,10 @@ async function loadCallHistory() {
         </select>
           </label>
         </details>
+        </div>
       </td>
     </tr>
-  `, 'Chưa có lịch sử gọi điện.', 3);
+  `, 'Chưa có lịch sử gọi điện.', 3, page);
 }
 
 function tuitionHistoryParams() {
@@ -1638,15 +1641,29 @@ async function loadTuitionHistory() {
     renderNoticeHistoryRow, 'Chưa có lịch sử học phí trong thời gian đã chọn.', 3);
 }
 
-async function updateCallResult(id, result) {
+async function updateCallResult(id, result, select = null) {
+  if (select?.disabled) return;
+  const branchId = getActiveBranch();
+  if (select) select.disabled = true;
   try {
-    await api(`/api/call-logs/${id}/result`, {
+    await api(`/api/call-logs/${encodeURIComponent(id)}/result`, {
       method: 'POST',
       body: JSON.stringify({ result })
     });
-    await loadHistory();
+    if (getActiveBranch() !== branchId) return;
+    await Promise.all([
+      loadCallHistory({ preservePage: true, expandedLogId: id }),
+      loadNotices(), loadTuitionHistory(), loadAbsences()
+    ]);
   } catch (error) {
     console.error('Failed to update call result:', error);
+    if (getActiveBranch() === branchId) {
+      const previous = historyPages.get('callHistoryPagination')?.rows.find(row => row.id === id);
+      if (select && previous) select.value = previous.callResult || '';
+      toast('Không lưu được kết quả gọi: ' + error.message, 'error');
+    }
+  } finally {
+    if (select) select.disabled = false;
   }
 }
 
@@ -1815,13 +1832,13 @@ async function loadNotices() {
     excludeAbsenceStatus: 'Học phí'
   }));
 
-  rows = rows.filter(row =>
+  rows = rows.filter(row => row.callLogId || (
     row.status !== 'Chưa kết bạn - Cần gọi' &&
     row.absenceCallStatus !== 'Cần gọi điện' &&
     row.absenceCallStatus !== 'Đã gọi' &&
     row.absenceCallStatus !== 'Đã nhắc' &&
     row.absenceCallStatus !== 'Không nghe máy'
-  );
+  ));
   rows = groupFailedNoticeRows(rows);
   noticeRowsAll = rows;
   noticePage = 1;
@@ -3144,7 +3161,7 @@ function initEvents() {
   $('#historyRows')?.addEventListener('click', handleNoticeActions);
   $('#callHistoryRows')?.addEventListener('change', event => {
     const select = event.target.closest('[data-call-logid]');
-    if (select) updateCallResult(select.dataset.callLogid, select.value);
+    if (select) updateCallResult(select.dataset.callLogid, select.value, select);
   });
   $('#filterClass').addEventListener('change', loadAbsences);
   $('#filterSession')?.addEventListener('change', async () => {

@@ -32,12 +32,21 @@ function backend(db = fixture()) {
   };
   vm.createContext(context);
   vm.runInContext(slice(server, 'function filterCallLogs(', 'function sendWorkbook('), context);
+  vm.runInContext(slice(server, "app.post('/api/call-logs/:id/result'", "app.get('/api/notification-logs'"), context);
   vm.runInContext(slice(server, "app.post('/api/notification-logs/:id/confirm-called'", "app.post('/api/notification-logs/:id/mark-unfriended'"), context);
   return { db, context, saves: () => saves, async confirm(logId = 'failed', branch = 'main') {
     let data, status = 200;
     const res = { status(code) { status = code; return this; }, json(value) { data = value; } };
     await routes.get('/api/notification-logs/:id/confirm-called')(
       { branch, params: { id: logId }, user: { username: 'nhanvien-truc' }, body: { caller: 'spoofed' } }, res,
+      error => { throw error; }
+    );
+    return { status, data };
+  }, async update(result, callId = 'call-new', branch = 'main') {
+    let data, status = 200;
+    const res = { status(code) { status = code; return this; }, json(value) { data = value; } };
+    await routes.get('/api/call-logs/:id/result')(
+      { branch, params: { id: callId }, user: { username: 'nhanvien-khac' }, body: { result } }, res,
       error => { throw error; }
     );
     return { status, data };
@@ -148,6 +157,67 @@ test('a resolved phone call is excluded from subsequent bulk Zalo sends', async 
   assert.equal(selection.alreadySent, 1);
 });
 
+test('changing to no answer keeps call history and synchronizes linked notice and attendance outcomes', async () => {
+  const app = backend();
+  await app.confirm();
+  const callTime = app.db.callLogs[0].time;
+  for (const [result, status] of [['Không bắt máy', 'Không nghe máy'], ['Không liên lạc được', 'Không liên lạc được'], ['Đã gọi', 'Đã gọi']]) {
+    assert.equal((await app.update(result)).status, 200);
+    assert.equal(app.db.callLogs.length, 1);
+    assert.equal(app.db.callLogs[0].time, callTime);
+    assert.equal(app.db.callLogs[0].caller, 'nhanvien-truc');
+    assert.equal(app.db.callLogs[0].resultUpdatedBy, 'nhanvien-khac');
+    assert.equal(app.db.callLogs[0].callStatus, status);
+    assert.equal(app.db.callLogs[0].callResult, result);
+    assert.equal(app.db.notificationLogs[0].status, status);
+    assert.equal(app.db.absences[0].callStatus, status);
+    assert.equal(app.db.absences[0].noticeStatus, status);
+    assert.equal(app.context.filterCallLogs(app.db, { date: '2026-10-13' }).length, 1);
+    assert.equal((await app.confirm()).status, 200);
+    assert.equal(app.db.callLogs.length, 1);
+    assert.equal(app.db.callLogs[0].callStatus, status);
+  }
+});
+
+test('editing a call does not change other calls or newer attendance and send attempts', async () => {
+  const app = backend();
+  await app.confirm();
+  app.db.callLogs.push({ id: 'newer-call', absenceId: 'a1', time: '2026-10-13T10:00:00Z', callStatus: 'Đã gọi' });
+  app.db.notificationLogs.push({ id: 'newer-notice', absenceId: 'a1', status: 'Đã gửi' });
+  const absence = structuredClone(app.db.absences[0]);
+  const newestCall = structuredClone(app.db.callLogs[1]);
+  const newestNotice = structuredClone(app.db.notificationLogs[1]);
+  await app.update('Không bắt máy');
+  assert.deepEqual(app.db.absences[0], absence);
+  assert.deepEqual(app.db.callLogs[1], newestCall);
+  assert.deepEqual(app.db.notificationLogs[1], newestNotice);
+  assert.equal(app.db.notificationLogs[0].status, 'Không nghe máy');
+});
+
+test('invalid results, unknown IDs and wrong branches leave all history intact', async () => {
+  const app = backend();
+  await app.confirm();
+  const before = structuredClone(app.db);
+  assert.equal((await app.update('INVALID')).status, 400);
+  assert.equal((await app.update('Không bắt máy', 'missing')).status, 404);
+  assert.equal((await app.update('Không bắt máy', 'call-new', 'other')).status, 404);
+  assert.deepEqual(structuredClone(app.db), before);
+  assert.equal(app.saves(), 1);
+});
+
+test('legacy no-answer outcomes show the correct status without rewriting or removing stored history', () => {
+  const app = backend();
+  app.db.callLogs = [
+    { id: 'old-1', callStatus: 'Lỗi gọi', callResult: 'Không bắt máy' },
+    { id: 'old-2', callStatus: 'Lỗi gọi', callResult: 'Không liên lạc được' }
+  ];
+  const before = structuredClone(app.db);
+  const rows = app.context.filterCallLogs(app.db, {});
+  assert.deepEqual(Array.from(rows, row => row.callStatus), ['Không nghe máy', 'Không liên lạc được']);
+  assert.deepEqual(app.db, before);
+  assert.equal(app.saves(), 0);
+});
+
 function ui() {
   const events = {}, fields = {}, requests = [], refreshes = [];
   for (const id of ['noticeRows', 'historyRows', 'callHistoryRows', 'noticePagination', 'callHistoryPagination', 'historyKeyword']) {
@@ -219,4 +289,60 @@ test('call history keeps compact identity, original type, caller details and edi
   assert.match(html, /nhanvien-truc/);
   assert.match(html, /data-call-logid="call-1"/);
   assert.doesNotMatch(html, /AUTO-HIDDEN/);
+});
+
+test('editing no answer on page three preserves the row and expanded details and synchronizes other panels', async () => {
+  const { app, fields, refreshes } = ui();
+  const rows = Array.from({ length: 32 }, (_, i) => ({
+    id: `call-${i + 1}`, studentName: `HS-${i + 1}`, callResult: 'Đã gọi', callStatus: 'Đã gọi'
+  }));
+  app.api = async (url, options) => {
+    if (!options) return rows;
+    const row = rows.find(row => url.includes(`/${row.id}/`));
+    row.callResult = JSON.parse(options.body).result;
+    row.callStatus = 'Không nghe máy';
+    return row;
+  };
+  vm.runInContext(slice(frontend, 'async function loadCallHistory(', 'function tuitionHistoryParams('), app);
+  vm.runInContext(slice(frontend, 'async function updateCallResult(', 'async function loadQuitStudents('), app);
+  await app.loadCallHistory();
+  app.handleHistoryPageClick({ target: { closest: () => ({ dataset: { page: '3' }, closest: () => ({ id: 'callHistoryPagination' }) }) } });
+  const select = { value: 'Không bắt máy', disabled: false };
+  await app.updateCallResult('call-32', select.value, select);
+  assert.match(fields.callHistoryPagination.innerHTML, /Hiển thị 31–32 \/ tổng 32/);
+  assert.match(fields.callHistoryRows.innerHTML, /HS-32/);
+  assert.match(fields.callHistoryRows.innerHTML, /data-call-details="call-32" open/);
+  assert.match(fields.callHistoryRows.innerHTML, /class="badge no-answer"[^>]*>Không nghe máy/);
+  assert.match(fields.callHistoryRows.innerHTML, /value="Không bắt máy" selected/);
+  assert.equal(select.disabled, false);
+  assert.deepEqual(refreshes, ['loadNotices', 'loadTuitionHistory', 'loadAbsences']);
+});
+
+test('a failed result update keeps the history page and restores the prior selection', async () => {
+  const { app, fields } = ui();
+  app.api = async () => [{ id: 'call-1', callResult: 'Đã gọi', callStatus: 'Đã gọi' }];
+  vm.runInContext(slice(frontend, 'async function loadCallHistory(', 'function tuitionHistoryParams('), app);
+  vm.runInContext(slice(frontend, 'async function updateCallResult(', 'async function loadQuitStudents('), app);
+  app.console = { error() {} };
+  await app.loadCallHistory();
+  const before = fields.callHistoryRows.innerHTML;
+  app.api = async () => { throw new Error('Network error'); };
+  const select = { value: 'Không bắt máy', disabled: false };
+  await app.updateCallResult('call-1', select.value, select);
+  assert.equal(select.value, 'Đã gọi');
+  assert.equal(select.disabled, false);
+  assert.equal(fields.callHistoryRows.innerHTML, before);
+});
+
+test('linked call outcomes stay in contact history even when attendance has a call-only status', async () => {
+  const { app, fields } = ui();
+  app.api = async () => [
+    { id: 'linked', status: 'Không nghe máy', callLogId: 'call-1', absenceCallStatus: 'Không nghe máy', studentName: 'Kim' },
+    { id: 'unfriended', status: 'Chưa kết bạn - Cần gọi', studentName: 'Other' }
+  ];
+  vm.runInContext(slice(frontend, 'async function loadNotices(', 'async function markUnfriended('), app);
+  await app.loadNotices();
+  assert.match(fields.noticeRows.innerHTML, /Kim/);
+  assert.match(fields.noticeRows.innerHTML, /Không nghe máy/);
+  assert.doesNotMatch(fields.noticeRows.innerHTML, /Other/);
 });

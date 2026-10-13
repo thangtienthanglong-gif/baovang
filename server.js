@@ -633,6 +633,9 @@ function filterCallLogs(db, query) {
   const absences = new Map((db.absences || []).map(absence => [absence.id, absence]));
   let rows = (db.callLogs || []).map(log => ({
     ...log,
+    callStatus: log.callStatus === 'Lỗi gọi'
+      ? ({ 'Không bắt máy': 'Không nghe máy', 'Không liên lạc được': 'Không liên lạc được' }[log.callResult] || log.callStatus)
+      : log.callStatus,
     absenceStatus: log.absenceStatus || absences.get(log.absenceId)?.absenceStatus || ''
   }));
 
@@ -2823,8 +2826,8 @@ app.get('/api/bootstrap', async (req, res, next) => {
       today: todayISO(),
       settings: publicSettings(db.settings || defaultSettings()),
       classes,
-      statuses: ['ALL', 'Chưa gọi', 'Đã gọi', 'Không nghe máy', 'Hẹn gọi lại', 'Sai số'],
-      noticeStatuses: ['ALL', 'Chờ gửi', 'Chờ gửi thủ công', 'Chưa gửi', 'Chạy thử', 'Đã gửi', 'Đã gọi', 'Lỗi gửi', 'Không gửi'],
+      statuses: ['ALL', 'Chưa gọi', 'Đã gọi', 'Không nghe máy', 'Không liên lạc được', 'Hẹn gọi lại', 'Sai số'],
+      noticeStatuses: ['ALL', 'Chờ gửi', 'Chờ gửi thủ công', 'Chưa gửi', 'Chạy thử', 'Đã gửi', 'Đã gọi', 'Không nghe máy', 'Không liên lạc được', 'Cần gọi điện', 'Lỗi gửi', 'Không gửi'],
       absenceStatuses: ABSENCE_STATUSES,
       results: [
         '',
@@ -4335,14 +4338,34 @@ app.delete('/api/call-logs', async (req, res, next) => {
 
 app.post('/api/call-logs/:id/result', async (req, res, next) => {
   try {
+    const result = cleanText(req.body?.result);
+    const statuses = { '': 'Cần gọi điện', 'Đã gọi': 'Đã gọi', 'Không bắt máy': 'Không nghe máy', 'Không liên lạc được': 'Không liên lạc được' };
+    if (!Object.hasOwn(statuses, result)) return res.status(400).json({ error: 'Kết quả gọi điện không hợp lệ.' });
     const db = await getBranchDb(req);
     const log = (db.callLogs || []).find(l => l.id === req.params.id);
     if (!log) return res.status(404).json({ error: 'Call log not found' });
-    log.callResult = req.body.result;
-    if (req.body.result === 'Đã gọi') {
-      log.callStatus = 'Đã gọi';
-    } else {
-      log.callStatus = 'Lỗi gọi';
+    log.callResult = result;
+    log.callStatus = statuses[result];
+    log.resultUpdatedAt = nowISO();
+    log.resultUpdatedBy = req.user.username;
+    const linkedNotices = (db.notificationLogs || []).filter(row => row.callLogId === log.id);
+    for (const notice of linkedNotices) {
+      notice.status = log.callStatus;
+      notice.callResult = result;
+      notice.result = `Kết quả gọi điện: ${result || 'Chưa chọn'}, nhân viên ${req.user.username} cập nhật.`;
+    }
+    const absence = (db.absences || []).find(row => row.id === log.absenceId);
+    const latestCall = (db.callLogs || []).filter(row => row.absenceId === log.absenceId)
+      .sort((a, b) => String(b.time || '').localeCompare(String(a.time || '')))[0];
+    if (absence && latestCall === log) {
+      absence.callStatus = log.callStatus;
+      absence.callResult = result;
+      absence.updatedAt = log.resultUpdatedAt;
+      const latestNotice = (db.notificationLogs || []).findLast(row => row.absenceId === log.absenceId);
+      if (latestNotice && linkedNotices.includes(latestNotice)) {
+        absence.noticeStatus = log.callStatus;
+        absence.noticeResult = latestNotice.result;
+      }
     }
     await saveBranchDb(req, db);
     res.json(log);
@@ -4366,7 +4389,7 @@ app.post('/api/notification-logs/:id/confirm-called', async (req, res, next) => 
     const log = (db.notificationLogs || []).find(row => row.id === req.params.id);
     if (!log) return res.status(404).json({ error: 'Không tìm thấy lượt gửi trong chi nhánh này.' });
     const existingCall = (db.callLogs || []).find(row => row.id === log.callLogId || row.notificationLogId === log.id);
-    if (log.status === 'Đã gọi' && existingCall) return res.json({ log, callLog: existingCall });
+    if (log.callLogId && existingCall) return res.json({ log, callLog: existingCall });
     if (log.status !== 'Lỗi gửi') return res.status(409).json({ error: 'Chỉ xác nhận đã gọi cho lượt gửi lỗi.' });
 
     const absence = (db.absences || []).find(row => row.id === log.absenceId);

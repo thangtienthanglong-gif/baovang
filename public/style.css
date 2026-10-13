@@ -1621,16 +1621,26 @@ td.empty {
 .notice-history-status .btn {
   min-height: 28px;
   line-height: 1.35;
+  font-size: 11px;
+  padding: 2px 4px;
 }
 
 .call-history-details {
-  margin-top: 6px;
+  margin-top: 0;
   font-size: 11px;
   color: var(--muted);
 }
 
 .call-history-details summary {
   cursor: pointer;
+  display: list-item;
+  list-style-position: inside;
+  min-height: 28px;
+  line-height: 28px;
+}
+
+.call-history-details[open] {
+  flex-basis: 100%;
 }
 
 .call-history-details .form-control {
