@@ -1555,6 +1555,11 @@ td.empty {
 .notice-history-panel th:nth-child(2) { width: 30%; }
 .notice-history-panel th:nth-child(3) { width: 55%; }
 
+.quit-history-panel th:nth-child(1) { width: 15%; }
+.quit-history-panel th:nth-child(2) { width: 35%; }
+.quit-history-panel th:nth-child(3) { width: 20%; }
+.quit-history-panel th:nth-child(4) { width: 30%; }
+
 .notice-history-panel th,
 .notice-history-panel td {
   padding: 10px 8px;

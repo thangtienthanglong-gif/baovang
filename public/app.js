@@ -1691,18 +1691,17 @@ async function loadQuitStudents() {
   setHistoryRows('quitRows', 'quitHistoryPagination', rows, row => `
     <tr>
       <td>${escapeHtml(row.quitDate ? row.quitDate.split('-').reverse().join('/') : '')}</td>
-      <td>
-        <div class="person-main">${escapeHtml(row.fullName)}</div>
-        <div class="muted">${escapeHtml(row.code)}</div>
+      <td class="notice-history-student">
+        <div class="student-heading">
+          <div class="person-main">${escapeHtml(row.fullName)}</div>
+          ${row.className ? `<span class="mini-chip">${escapeHtml(row.className)}</span>` : ''}
+        </div>
+        <div class="student-phone">${escapeHtml(row.phone1 || row.phone2 || '')}</div>
       </td>
-      <td>${escapeHtml(row.className)}</td>
       <td>${escapeHtml(row.parentName)}</td>
-      <td>
-        <div>${escapeHtml(row.phone1 || '')}</div>
-      </td>
       <td>${escapeHtml(row.quitReason || '')}</td>
     </tr>
-  `, 'Không có học sinh nào nghỉ học.', 6);
+  `, 'Không có học sinh nào nghỉ học.', 4);
 }
 
 async function loadRemovedClassStudents() {
