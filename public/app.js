@@ -1590,6 +1590,11 @@ function callHistoryParams() {
 async function loadCallHistory({ preservePage = false } = {}) {
   const branchId = getActiveBranch();
   const type = callHistoryType;
+  const typeLabel = type === 'tuition' ? 'học phí' : 'vắng';
+  const title = $('#callHistoryTitle');
+  if (title) title.textContent = `Gọi ${typeLabel}`;
+  const clearButton = $('#clearCallHistoryBtn');
+  if (clearButton) clearButton.textContent = `Xóa lịch sử gọi ${typeLabel}`;
   const page = preservePage ? historyPages.get('callHistoryPagination')?.page || 1 : 1;
   $('#callHistoryTypeTabs')?.querySelectorAll('[data-call-type]').forEach(button => {
     button.classList.toggle('active', button.dataset.callType === type);

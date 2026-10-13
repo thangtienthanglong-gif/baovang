@@ -572,15 +572,15 @@
 
       <div id="callHistoryPanel" class="sub-panel notice-history-panel" style="display: none;">
         <div class="inner-tabs" id="callHistoryTypeTabs">
-          <button class="inner-tab active" type="button" data-call-type="absence">Lịch sử vắng</button>
-          <button class="inner-tab" type="button" data-call-type="tuition">Lịch sử học phí</button>
+          <button class="inner-tab active" type="button" data-call-type="absence">Gọi vắng</button>
+          <button class="inner-tab" type="button" data-call-type="tuition">Gọi học phí</button>
         </div>
         <section class="card table-card">
           <div class="section-title history-pagination-header">
-            <div><h2>Lịch sử gọi điện</h2></div>
+            <div><h2 id="callHistoryTitle">Gọi vắng</h2></div>
             <div class="pagination" id="callHistoryPagination"></div>
             <div class="section-actions">
-              <button class="btn danger" id="clearCallHistoryBtn" type="button">Xóa lịch sử gọi điện</button>
+              <button class="btn danger" id="clearCallHistoryBtn" type="button">Xóa lịch sử gọi vắng</button>
             </div>
           </div>
           <div class="table-wrap">
@@ -854,7 +854,7 @@
     </div>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="/app.js?v=20261013-13"></script>
+  <script src="/app.js?v=20261013-14"></script>
   <script src="/exams.js?v=20261009-2"></script>
   <nav class="bottom-nav">
     <button class="bottom-tab active" data-tab="absenceTab" type="button"><i class="fa-solid fa-clipboard-user"></i><span>Điểm danh</span></button>
