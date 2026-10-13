@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <link rel="stylesheet" href="/style.css?v=20261013-history-10">
+  <link rel="stylesheet" href="/style.css?v=20261013-history-11">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     /* Inner Tabs for History - INLINED TO PREVENT CACHE */
@@ -168,18 +168,15 @@
     <section id="absenceTab" class="tab-panel active">
       <section class="attendance-layout">
         <aside class="class-panel">
-          <div class="class-panel-header" style="display: flex; flex-direction: column; gap: 16px;">
-            <div class="panel-heading" style="margin: 0; display: flex; justify-content: space-between; align-items: center;">
+          <div class="class-panel-header">
+            <div class="panel-heading">
               <div>
-                <h2 style="font-size: 18px; margin: 0 0 4px 0;">Danh sách lớp</h2>
+                <h2>Danh sách lớp</h2>
                 <span id="classCount" class="muted" style="font-size: 14px;">0 lớp</span>
               </div>
-              <button type="button" onclick="openManageClassesModal()" class="btn small danger" style="padding: 6px 14px; font-size: 13px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; background: #ef4444; color: white; border: none; box-shadow: 0 2px 4px rgba(239,68,68,0.2);">
-                <i class="fa-solid fa-list-check"></i> Quản lý lớp
-              </button>
             </div>
-            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
-              <div class="field class-dropdown-field" style="margin: 0; flex: 1; min-width: 150px;">
+            <div class="class-filter-row">
+              <div class="field class-dropdown-field">
                 <label for="dayDropdown">Chọn thứ</label>
                 <select id="dayDropdown">
                   <option value="ALL">Theo ngày hiện tại</option>
@@ -192,7 +189,7 @@
           <option value="8">Chủ nhật</option>
                 </select>
               </div>
-              <div class="field class-dropdown-field" style="margin: 0; flex: 1; min-width: 150px;">
+              <div class="field class-dropdown-field">
                 <label for="sessionDropdown">Chọn buổi</label>
                 <select id="sessionDropdown">
                   <option value="ALL">Tất cả các buổi</option>
@@ -201,15 +198,20 @@
               <option value="Tối">Buổi Tối</option>
                 </select>
               </div>
-              <div class="field class-dropdown-field" style="margin: 0; flex: 0.8; min-width: 130px;">
+              <div class="field class-dropdown-field">
                 <label for="gradeDropdown">Chọn khối</label>
                 <select id="gradeDropdown">
                   <option value="ALL">Tất cả khối</option>
                 </select>
               </div>
-              <div class="field class-dropdown-field" style="margin: 0; flex: 1.5; min-width: 200px;">
-                <label for="classDropdown">Chọn lớp</label>
-                <select id="classDropdown"></select>
+              <div class="class-select-actions">
+                <div class="field class-dropdown-field">
+                  <label for="classDropdown">Chọn lớp</label>
+                  <select id="classDropdown"></select>
+                </div>
+                <button type="button" onclick="openManageClassesModal()" class="btn danger class-manage-button">
+                  <i class="fa-solid fa-list-check"></i> Quản lý lớp
+                </button>
               </div>
             </div>
           </div>

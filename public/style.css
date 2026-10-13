@@ -485,16 +485,14 @@ main {
 .class-panel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 16px 20px;
+  gap: 12px;
+  padding: 14px 16px;
 }
 
 .class-panel-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: 16px;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .class-panel-header .panel-heading {
@@ -506,9 +504,40 @@ main {
 }
 
 .class-panel-header .class-dropdown-field {
-  width: 240px;
+  width: auto;
+  min-width: 0;
   max-width: 100%;
+  margin: 0;
   gap: 4px;
+}
+
+.class-filter-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 2fr);
+  align-items: end;
+  gap: 12px;
+}
+
+.class-select-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.class-select-actions .class-dropdown-field { flex: 1; }
+.class-select-actions .class-manage-button {
+  flex: 0 0 auto;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .class-filter-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .class-select-actions { grid-column: 1 / -1; }
 }
 
 .class-panel-header .class-dropdown-field label {
