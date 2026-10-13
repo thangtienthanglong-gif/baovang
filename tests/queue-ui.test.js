@@ -104,6 +104,19 @@ test('queue badge and result count update with the list', () => {
   assert.equal(app.els.queueCountLine.textContent, 'Tìm thấy 2 học sinh');
 });
 
+test('completed calls including unanswered and unreachable calls leave the queue and its selection count', () => {
+  const app = setup();
+  const resolved = ['Đã gọi', 'Không nghe máy', 'Không liên lạc được'].map((noticeStatus, i) => ({
+    ...ROWS[0], id: `resolved-${i}`, studentName: `Resolved-${i}`, noticeStatus
+  }));
+  app.setAbsences([...resolved, ROWS[0]]);
+  app.context.renderAbsences();
+  assert.doesNotMatch(app.els.absenceRows.innerHTML, /Resolved-/);
+  assert.match(app.els.absenceRows.innerHTML, /data-id="a1"/);
+  assert.equal(app.els.queueNavBadge.textContent, '1');
+  assert.equal(app.context.state.absences.length, 4);
+});
+
 test('an emptied queue clears the previous badge, result count and bulk selection count', () => {
   const app = setup();
   app.setAbsences(ROWS);

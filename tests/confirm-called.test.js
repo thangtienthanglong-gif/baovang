@@ -234,16 +234,36 @@ test('confirming an older failure preserves a newer send and current queue state
 });
 
 test('a resolved phone call is excluded from subsequent bulk Zalo sends', async () => {
-  const app = backend();
-  await app.confirm();
-  Object.assign(app.context, {
-    studentByIdMap: () => ({}), filterAbsences: db => db.absences,
-    isWithdrawnAbsence: () => false, defaultSettings: () => ({})
-  });
-  vm.runInContext(slice(server, 'function selectBulkZaloCandidates(', 'async function runBulkZaloAction('), app.context);
-  const selection = app.context.selectBulkZaloCandidates(app.db, {});
-  assert.equal(selection.candidates.length, 0);
-  assert.equal(selection.alreadySent, 1);
+  for (const result of ['Đã báo', 'Không bắt máy', 'Không liên lạc được']) {
+    const app = backend();
+    await app.confirm('failed', 'main', result);
+    Object.assign(app.context, {
+      studentByIdMap: () => ({}), filterAbsences: db => db.absences,
+      isWithdrawnAbsence: () => false, defaultSettings: () => ({})
+    });
+    vm.runInContext(slice(server, 'function selectBulkZaloCandidates(', 'async function runBulkZaloAction('), app.context);
+    const selection = app.context.selectBulkZaloCandidates(app.db, {});
+    assert.equal(selection.candidates.length, 0, result);
+    assert.equal(selection.alreadySent, 1);
+  }
+});
+
+test('resolved attempts only appear in call history for every outcome and type, while unrelated sends remain visible', async () => {
+  for (const absenceStatus of ['Vắng', 'Học phí']) {
+    for (const result of ['Đã báo', 'Không bắt máy', 'Không liên lạc được']) {
+      const db = fixture();
+      db.notificationLogs[0].absenceStatus = absenceStatus;
+      db.notificationLogs.unshift({ ...db.notificationLogs[0], id: 'older-grouped-attempt' });
+      db.notificationLogs.unshift({ ...db.notificationLogs[0], id: 'unrelated', absenceId: 'a2', studentId: 's2' });
+      const app = backend(db);
+      await app.confirm('failed', 'main', result);
+      const query = absenceStatus === 'Học phí' ? { absenceStatus: 'Học phí' } : { excludeAbsenceStatus: 'Học phí' };
+      assert.deepEqual(Array.from(app.context.filterNotificationLogs(db, query), row => row.id), ['unrelated']);
+      assert.equal((await app.listCalls(query)).length, 1);
+      assert.equal(db.notificationLogs.length, 3);
+      assert.equal(db.absences.length, 1);
+    }
+  }
 });
 
 test('changing to no answer keeps call history and synchronizes linked notice and attendance outcomes', async () => {
@@ -431,7 +451,7 @@ test('a failed result update keeps the history page and restores the prior selec
   assert.equal(fields.callHistoryRows.innerHTML, before);
 });
 
-test('linked call outcomes stay in contact history even when attendance has a call-only status', async () => {
+test('linked call outcomes are excluded from general contact history', async () => {
   const { app, fields } = ui();
   app.api = async () => [
     { id: 'linked', status: 'Không nghe máy', callLogId: 'call-1', absenceCallStatus: 'Không nghe máy', studentName: 'Kim' },
@@ -439,9 +459,20 @@ test('linked call outcomes stay in contact history even when attendance has a ca
   ];
   vm.runInContext(slice(frontend, 'async function loadNotices(', 'async function markUnfriended('), app);
   await app.loadNotices();
-  assert.match(fields.noticeRows.innerHTML, /Kim/);
-  assert.match(fields.noticeRows.innerHTML, /Không nghe máy/);
+  assert.doesNotMatch(fields.noticeRows.innerHTML, /Kim|Không nghe máy/);
   assert.doesNotMatch(fields.noticeRows.innerHTML, /Other/);
+});
+
+test('tuition history excludes moved calls even if a stale API response contains them', async () => {
+  const { app, fields } = ui();
+  app.api = async () => [
+    { id: 'moved', status: 'Không liên lạc được', callLogId: 'call-1', studentName: 'Moved-call' },
+    { id: 'pending', status: 'Lỗi gửi', studentName: 'Unresolved-send' }
+  ];
+  vm.runInContext(slice(frontend, 'async function loadTuitionHistory(', 'async function updateCallResult('), app);
+  await app.loadTuitionHistory();
+  assert.doesNotMatch(fields.historyRows.innerHTML, /Moved-call/);
+  assert.match(fields.historyRows.innerHTML, /Unresolved-send/);
 });
 
 test('switching call history type requests the correct scope and starts at page one', async () => {

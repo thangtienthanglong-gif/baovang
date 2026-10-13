@@ -1307,7 +1307,7 @@ function updateBulkSendCount() {
 
 function renderAbsences() {
   const container = $('#absenceRows');
-  const queueAbsences = state.absences.filter(row => !['Đã gửi', 'Đã gọi'].includes(row.noticeStatus)
+  const queueAbsences = state.absences.filter(row => !['Đã gửi', 'Đã gọi', 'Không nghe máy', 'Không liên lạc được'].includes(row.noticeStatus)
     && normalizeAbsenceStatus(row.absenceStatus) !== 'Nghỉ học' && normalizeAbsenceStatus(row.absenceStatus) !== 'Đã bù'
     && row.studentStatus !== 'Nghỉ học' && !row.studentRemovedFromClass);
 
@@ -1634,7 +1634,7 @@ async function loadTuitionHistory() {
   if (getActiveBranch() !== branchId) return;
   const tbody = $('#historyRows');
   if (!tbody) return;
-  setHistoryRows('historyRows', 'tuitionHistoryPagination', groupFailedNoticeRows(rows),
+  setHistoryRows('historyRows', 'tuitionHistoryPagination', groupFailedNoticeRows(rows.filter(row => !row.callLogId)),
     renderNoticeHistoryRow, 'Chưa có lịch sử học phí trong thời gian đã chọn.', 3);
 }
 
@@ -1840,7 +1840,7 @@ async function loadNotices() {
     excludeAbsenceStatus: 'Học phí'
   }));
 
-  rows = rows.filter(row => row.callLogId || (
+  rows = rows.filter(row => !row.callLogId && (
     row.status !== 'Chưa kết bạn - Cần gọi' &&
     row.absenceCallStatus !== 'Cần gọi điện' &&
     row.absenceCallStatus !== 'Đã gọi' &&

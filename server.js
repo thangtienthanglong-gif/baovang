@@ -715,6 +715,9 @@ function filterNotificationLogs(db, query) {
     };
   });
 
+  // Resolved phone contacts belong to call history; retain their source
+  // notices in storage for the call's original type and selected date.
+  rows = rows.filter(log => !log.callLogId);
   if (date) rows = rows.filter(log => (query.dateBasis === 'time' ? notificationLogDate(log) : log.date) === date);
   if (absenceStatus) rows = rows.filter(log => normalizeAbsenceStatus(log.absenceStatus) === absenceStatus);
   if (excludeAbsenceStatus) rows = rows.filter(log => normalizeAbsenceStatus(log.absenceStatus) !== excludeAbsenceStatus);
@@ -3986,7 +3989,7 @@ function selectBulkZaloCandidates(db, filters) {
   const studentsMap = studentByIdMap(db.students || []);
   const rows = filterAbsences(db, filters || {}).filter(row => normalizeAbsenceStatus(row.absenceStatus) !== 'Đã bù'
     && !isWithdrawnAbsence(row, studentsMap[row.studentId]));
-  const allCandidates = rows.filter(row => !['Đã gửi', 'Đã gọi'].includes(row.noticeStatus));
+  const allCandidates = rows.filter(row => !['Đã gửi', 'Đã gọi', 'Không nghe máy', 'Không liên lạc được'].includes(row.noticeStatus));
   const settings = db.settings || defaultSettings();
   const isPersonalMode = ['personal-test', 'personal-real'].includes(settings.zaloMode);
   const candidates = allCandidates;
