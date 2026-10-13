@@ -1625,21 +1625,12 @@ td.empty {
   padding: 2px 4px;
 }
 
-.call-history-result {
+.notice-history-status .confirm-called-result {
   width: auto;
   max-width: 100%;
   min-height: 28px;
-  padding: 4px 8px;
-  font-size: 12px;
-}
-
-.call-history-edit {
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.call-history-edit:disabled {
-  cursor: wait;
+  padding: 2px 6px;
+  font-size: 11px;
 }
 
 #callHistoryTypeTabs {

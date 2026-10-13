@@ -34,11 +34,11 @@ function backend(db = fixture()) {
   vm.runInContext(slice(server, 'function filterCallLogs(', 'function sendWorkbook('), context);
   vm.runInContext(slice(server, "app.post('/api/call-logs/:id/result'", "app.get('/api/notification-logs'"), context);
   vm.runInContext(slice(server, "app.post('/api/notification-logs/:id/confirm-called'", "app.post('/api/notification-logs/:id/mark-unfriended'"), context);
-  return { db, context, saves: () => saves, async confirm(logId = 'failed', branch = 'main') {
+  return { db, context, saves: () => saves, async confirm(logId = 'failed', branch = 'main', result = 'Đã báo') {
     let data, status = 200;
     const res = { status(code) { status = code; return this; }, json(value) { data = value; } };
     await routes.get('/api/notification-logs/:id/confirm-called')(
-      { branch, params: { id: logId }, user: { username: 'nhanvien-truc' }, body: { caller: 'spoofed' } }, res,
+      { branch, params: { id: logId }, user: { username: 'nhanvien-truc' }, body: { caller: 'spoofed', result } }, res,
       error => { throw error; }
     );
     return { status, data };
@@ -67,7 +67,7 @@ test('confirming a failed send saves the actual phone, original type and authent
   assert.equal(data.callLog.absenceStatus, 'Học phí');
   assert.equal(data.callLog.phoneCalled, '0909630582');
   assert.equal(data.callLog.callStatus, 'Đã gọi');
-  assert.equal(data.callLog.callResult, 'Đã gọi');
+  assert.equal(data.callLog.callResult, 'Đã báo');
   assert.equal(data.callLog.date, '2026-10-13');
   assert.equal(data.callLog.absenceDate, '2026-10-01');
   assert.equal(app.db.absences[0].noticeStatus, 'Đã gọi');
@@ -101,6 +101,30 @@ test('confirmation cannot target a different branch, missing log or a non-failed
     assert.deepEqual(app.db, state);
   }
   assert.equal(app.saves(), 0);
+});
+
+test('the selected call outcome is saved consistently to call, notice and attendance history', async () => {
+  for (const [result, status] of [['Đã báo', 'Đã gọi'], ['Không bắt máy', 'Không nghe máy'], ['Không liên lạc được', 'Không liên lạc được']]) {
+    const app = backend();
+    const { status: responseStatus, data } = await app.confirm('failed', 'main', result);
+    assert.equal(responseStatus, 200);
+    assert.equal(data.callLog.callResult, result);
+    assert.equal(data.callLog.callStatus, status);
+    assert.equal(data.log.status, status);
+    assert.equal(app.db.absences[0].callResult, result);
+    assert.equal(app.db.absences[0].noticeStatus, status);
+    assert.equal(app.db.notificationLogs[0].status, status);
+  }
+});
+
+test('missing or invalid call outcomes do not change history', async () => {
+  for (const result of ['', 'Đã gọi', 'Khác']) {
+    const app = backend();
+    const before = structuredClone(app.db);
+    assert.equal((await app.confirm('failed', 'main', result)).status, 400);
+    assert.deepEqual(app.db, before);
+    assert.equal(app.saves(), 0);
+  }
 });
 
 test('grouped failed attempts resolve together but other students, sessions and channels stay unchanged', async () => {
@@ -251,31 +275,40 @@ test('Zalo and tuition failed rows both offer call confirmation and resolved row
   assert.match(app.renderNoticeActions({ id: 'orphan', status: 'Lỗi gửi' }), /confirm-called-btn/);
 });
 
-test('both history tables confirm the exact log then refresh calls, tuition, Zalo and queue; disabled buttons are ignored', async () => {
+test('both history tables reveal call outcomes and save the selected result', async () => {
   const { events, requests, refreshes } = ui();
   for (const table of ['noticeRows', 'historyRows']) {
+    const previousRequests = requests.length;
     const button = { dataset: { logid: 'failed' }, disabled: false };
+    const select = { dataset: { logid: 'failed' }, disabled: false, hidden: true, value: '', focus() {} };
+    button.parentElement = { querySelector: selector => selector === '.confirm-called-result' ? select : null };
     const event = { target: { closest: selector => selector === '.confirm-called-btn' ? button : null } };
     await events[`${table}:click`](event);
+    assert.equal(requests.length, previousRequests);
+    assert.equal(select.hidden, false);
+    select.value = 'Không bắt máy';
+    await events[`${table}:change`]({ target: { closest: selector => selector === '.confirm-called-result' ? select : null } });
     assert.equal(requests.at(-1).url, '/api/notification-logs/failed/confirm-called');
     assert.equal(requests.at(-1).options.method, 'POST');
-    const count = requests.length;
-    await events[`${table}:click`](event);
-    assert.equal(requests.length, count);
+    assert.deepEqual(JSON.parse(requests.at(-1).options.body), { result: 'Không bắt máy' });
   }
   assert.deepEqual(refreshes, Array(2).fill(['loadNotices', 'loadTuitionHistory', 'loadCallHistory', 'loadAbsences']).flat());
 });
 
-test('a failed confirmation re-enables the button and leaves local history unchanged', async () => {
+test('a failed call-result save keeps the selector open for retry', async () => {
   const { app, events, refreshes } = ui();
   app.api = async () => { throw new Error('Không lưu được'); };
   const button = { dataset: { logid: 'failed' }, disabled: false };
-  await events['noticeRows:click']({ target: { closest: selector => selector === '.confirm-called-btn' ? button : null } });
+  const select = { dataset: { logid: 'failed' }, disabled: false, hidden: false, value: 'Đã báo' };
+  select.parentElement = { querySelector: selector => selector === '.confirm-called-btn' ? button : null };
+  await events['noticeRows:change']({ target: { closest: selector => selector === '.confirm-called-result' ? select : null } });
   assert.equal(button.disabled, false);
+  assert.equal(select.disabled, false);
+  assert.equal(select.hidden, false);
   assert.deepEqual(refreshes, []);
 });
 
-test('call history keeps compact identity and inline editable result without details or AUTO codes', async () => {
+test('call history keeps compact identity and passive result badge without AUTO codes', async () => {
   const { app, fields } = ui();
   app.api = async () => [{ id: 'call-1', studentName: 'Kim', studentCode: 'AUTO-HIDDEN', className: '9T2D+', phoneCalled: '0909630582',
     absenceStatus: 'Học phí', callStatus: 'Đã gọi', caller: 'nhanvien-truc', callResult: 'Đã gọi', note: 'Đã liên hệ phụ huynh' }];
@@ -285,18 +318,19 @@ test('call history keeps compact identity and inline editable result without det
   assert.equal((html.match(/<td(?:\s[^>]*)?>/g) || []).length, 3);
   assert.match(html, /mini-chip.*9T2D\+/);
   assert.match(html, /student-phone.*0909630582/);
-  assert.match(html, /class="badge call-history-edit called"[^>]*>Đã gọi/);
+  assert.match(html, /class="badge called">Đã gọi/);
   assert.match(html, /Học phí/);
   assert.doesNotMatch(html, /nhanvien-truc|Đã liên hệ phụ huynh|Chi tiết cuộc gọi|Ngày vắng|<details/);
-  assert.match(html, /data-call-logid="call-1"/);
+  assert.doesNotMatch(html, /call-history-edit|call-history-result|data-call-logid/);
   assert.doesNotMatch(html, /AUTO-HIDDEN/);
 });
 
-test('editing no answer on page three preserves the row and inline result and synchronizes other panels', async () => {
+test('call history shows a saved no-answer result as a passive badge', async () => {
   const { app, fields, refreshes } = ui();
   const rows = Array.from({ length: 32 }, (_, i) => ({
     id: `call-${i + 1}`, studentName: `HS-${i + 1}`, callResult: 'Đã gọi', callStatus: 'Đã gọi'
   }));
+  rows[31].callStatus = 'Không nghe máy';
   app.api = async (url, options) => {
     if (!options) return rows;
     const row = rows.find(row => url.includes(`/${row.id}/`));
@@ -308,17 +342,11 @@ test('editing no answer on page three preserves the row and inline result and sy
   vm.runInContext(slice(frontend, 'async function updateCallResult(', 'async function loadQuitStudents('), app);
   await app.loadCallHistory();
   app.handleHistoryPageClick({ target: { closest: () => ({ dataset: { page: '3' }, closest: () => ({ id: 'callHistoryPagination' }) }) } });
-  const select = { value: 'Không bắt máy', disabled: false };
-  await app.updateCallResult('call-32', select.value, select);
   assert.match(fields.callHistoryPagination.innerHTML, /Hiển thị 31–32 \/ tổng 32/);
   assert.match(fields.callHistoryRows.innerHTML, /HS-32/);
-  assert.match(fields.callHistoryRows.innerHTML, /data-call-logid="call-32"/);
-  assert.match(fields.callHistoryRows.innerHTML, /class="badge call-history-edit no-answer"[^>]*>Không nghe máy/);
-  assert.match(fields.callHistoryRows.innerHTML, /value="Không bắt máy" selected/);
-  assert.equal(select.disabled, false);
-  assert.equal(select.hidden, true);
-  assert.match(fields.callHistoryRows.innerHTML, /data-call-logid="call-32" hidden/);
-  assert.deepEqual(refreshes, ['loadNotices', 'loadTuitionHistory', 'loadAbsences']);
+  assert.match(fields.callHistoryRows.innerHTML, /class="badge no-answer">Không nghe máy/);
+  assert.doesNotMatch(fields.callHistoryRows.innerHTML, /call-history-edit|call-history-result|data-call-logid/);
+  assert.deepEqual(refreshes, []);
 });
 
 test('a failed result update keeps the history page and restores the prior selection', async () => {

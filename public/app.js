@@ -1612,13 +1612,7 @@ async function loadCallHistory({ preservePage = false } = {}) {
       <td>
         <div class="notice-history-status">
           ${row.absenceStatus && row.absenceStatus !== 'Khác' ? `<span class="notice-history-reason">${escapeHtml(absenceStatusLabel(row.absenceStatus))}</span>` : ''}
-          <button class="badge call-history-edit ${statusClass(row.callStatus)}" type="button" data-call-edit="${escapeHtml(row.id)}" aria-expanded="${!row.callResult}" aria-controls="call-result-${escapeHtml(row.id)}" title="Bấm để đổi kết quả gọi">${escapeHtml(row.callStatus)}</button>
-        <select class="form-control call-history-result" id="call-result-${escapeHtml(row.id)}" aria-label="Kết quả gọi điện" data-call-logid="${escapeHtml(row.id)}"${row.callResult ? ' hidden' : ''}>
-          <option value="" ${!row.callResult ? 'selected' : ''}>-- Chọn --</option>
-          <option value="Đã gọi" ${row.callResult === 'Đã gọi' ? 'selected' : ''}>Đã gọi</option>
-          <option value="Không bắt máy" ${row.callResult === 'Không bắt máy' ? 'selected' : ''}>Không bắt máy</option>
-          <option value="Không liên lạc được" ${row.callResult === 'Không liên lạc được' ? 'selected' : ''}>Không liên lạc được</option>
-        </select>
+          <span class="badge ${statusClass(row.callStatus)}">${escapeHtml(row.callStatus)}</span>
         </div>
       </td>
     </tr>
@@ -1765,7 +1759,7 @@ function renderNoticeActions(row) {
         ? '<span class="muted">Kiểm tra tin trong Zalo trước khi thao tác tiếp</span>'
         : row.absenceId ? `<button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${escapeHtml(row.absenceId)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Gửi lại</button>` : ''}
       ${row.absenceId && row.channel === 'Zalo cá nhân' ? `<button class="btn ghost btn-sm confirm-zalo-sent-btn" type="button" data-id="${escapeHtml(row.absenceId)}" data-logid="${escapeHtml(row.id)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Xác nhận đã gửi</button>` : ''}
-      ${row.id ? `<button class="btn ghost btn-sm confirm-called-btn" type="button" data-logid="${escapeHtml(row.id)}">Xác nhận đã gọi</button>` : ''}
+      ${row.id ? `<button class="btn ghost btn-sm confirm-called-btn" type="button" data-logid="${escapeHtml(row.id)}">Xác nhận đã gọi</button><select class="form-control confirm-called-result" data-logid="${escapeHtml(row.id)}" aria-label="Kết quả cuộc gọi" hidden><option value="">Chọn kết quả gọi</option><option value="Đã báo">Đã báo</option><option value="Không bắt máy">Không bắt máy</option><option value="Không liên lạc được">Không liên lạc được</option></select>` : ''}
     ` : ''}
   `;
 }
@@ -3096,16 +3090,10 @@ function initEvents() {
   const handleNoticeActions = async event => {
     const calledBtn = event.target.closest('.confirm-called-btn');
     if (calledBtn) {
-      if (calledBtn.disabled) return;
-      calledBtn.disabled = true;
-      try {
-        await api(`/api/notification-logs/${encodeURIComponent(calledBtn.dataset.logid)}/confirm-called`, { method: 'POST', body: '{}' });
-        toast('Đã xác nhận đã gọi và lưu vào lịch sử gọi điện.');
-        await Promise.all([loadNotices(), loadTuitionHistory(), loadCallHistory(), loadAbsences()]);
-      } catch (err) {
-        calledBtn.disabled = false;
-        toast('Không xác nhận được cuộc gọi: ' + err.message, 'error');
-      }
+      const select = calledBtn.parentElement?.querySelector('.confirm-called-result');
+      if (!select || select.disabled) return;
+      select.hidden = false;
+      select.focus();
       return;
     }
     const copyBtn = event.target.closest('.copy-log-msg-btn');
@@ -3171,19 +3159,30 @@ function initEvents() {
   };
   $('#noticeRows')?.addEventListener('click', handleNoticeActions);
   $('#historyRows')?.addEventListener('click', handleNoticeActions);
-  $('#callHistoryRows')?.addEventListener('click', event => {
-    const button = event.target.closest('[data-call-edit]');
-    if (!button || button.disabled) return;
-    const select = button.closest('tr')?.querySelector('.call-history-result');
-    if (!select || select.disabled) return;
-    select.hidden = !select.hidden;
-    button.setAttribute('aria-expanded', String(!select.hidden));
-    if (!select.hidden) select.focus();
-  });
-  $('#callHistoryRows')?.addEventListener('change', event => {
-    const select = event.target.closest('[data-call-logid]');
-    if (select) updateCallResult(select.dataset.callLogid, select.value, select);
-  });
+  const handleConfirmCallResult = async event => {
+    const select = event.target.closest('.confirm-called-result');
+    if (!select || !select.value || select.disabled) return;
+    const button = select.parentElement?.querySelector('.confirm-called-btn');
+    const branchId = getActiveBranch();
+    select.disabled = true;
+    if (button) button.disabled = true;
+    try {
+      await api(`/api/notification-logs/${encodeURIComponent(select.dataset.logid)}/confirm-called`, {
+        method: 'POST', body: JSON.stringify({ result: select.value })
+      });
+      if (getActiveBranch() !== branchId) return;
+      toast('Đã lưu kết quả gọi vào lịch sử.');
+      await Promise.all([loadNotices(), loadTuitionHistory(), loadCallHistory(), loadAbsences()]);
+    } catch (err) {
+      if (getActiveBranch() === branchId) {
+        select.disabled = false;
+        if (button) button.disabled = false;
+        toast('Không lưu được kết quả gọi: ' + err.message, 'error');
+      }
+    }
+  };
+  $('#noticeRows')?.addEventListener('change', handleConfirmCallResult);
+  $('#historyRows')?.addEventListener('change', handleConfirmCallResult);
   $('#callHistoryTypeTabs')?.addEventListener('click', async event => {
     const button = event.target.closest('[data-call-type]');
     if (!button || !['absence', 'tuition'].includes(button.dataset.callType) || button.dataset.callType === callHistoryType) return;

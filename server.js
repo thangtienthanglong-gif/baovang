@@ -4401,6 +4401,17 @@ app.post('/api/notification-logs/:id/confirm-called', async (req, res, next) => 
     if (log.callLogId && existingCall) return res.json({ log, callLog: existingCall });
     if (log.status !== 'Lỗi gửi') return res.status(409).json({ error: 'Chỉ xác nhận đã gọi cho lượt gửi lỗi.' });
 
+    const callResult = cleanText(req.body?.result);
+    const callOutcomes = {
+      'Đã báo': 'Đã gọi',
+      'Không bắt máy': 'Không nghe máy',
+      'Không liên lạc được': 'Không liên lạc được'
+    };
+    if (!Object.hasOwn(callOutcomes, callResult)) {
+      return res.status(400).json({ error: 'Vui lòng chọn kết quả cuộc gọi.' });
+    }
+    const callStatus = callOutcomes[callResult];
+
     const absence = (db.absences || []).find(row => row.id === log.absenceId);
     const time = nowISO();
     const caller = req.user.username;
@@ -4422,14 +4433,14 @@ app.post('/api/notification-logs/:id/confirm-called', async (req, res, next) => 
       studentId: log.studentId || absence?.studentId || '', studentCode: log.studentCode || '',
       studentName: log.studentName || '', className: log.className || '', parentName: log.parentName || '',
       phoneCalled: normalizePhone(log.responsePayload?.phone || log.phone1 || ''),
-      absenceStatus, callStatus: 'Đã gọi', callResult: 'Đã gọi', caller,
+      absenceStatus, callStatus, callResult, caller,
       note: `Nhân viên xác nhận đã gọi sau lỗi gửi ${log.channel || 'Zalo'}.`
     };
-    const result = `Đã gọi điện, nhân viên ${caller} xác nhận.`;
+    const result = `Kết quả gọi: ${callResult}; nhân viên ${caller} xác nhận sau lỗi gửi.`;
     for (const attempt of related) {
       attempt.previousStatus = attempt.status;
       attempt.previousResult = attempt.result || '';
-      attempt.status = 'Đã gọi';
+      attempt.status = callStatus;
       attempt.result = result;
       attempt.absenceStatus ||= absenceStatus;
       attempt.calledAt = time;
@@ -4439,8 +4450,8 @@ app.post('/api/notification-logs/:id/confirm-called', async (req, res, next) => 
     const latestAttempt = db.notificationLogs.findLast(row => row.absenceId === log.absenceId);
     if (absence && related.includes(latestAttempt)) {
       Object.assign(absence, {
-        callStatus: 'Đã gọi', callResult: 'Đã gọi', caller, lastCallAt: time,
-        noticeStatus: 'Đã gọi', noticeResult: result, noticeDueAt: '', autoNotice: false, updatedAt: time
+        callStatus, callResult, caller, lastCallAt: time,
+        noticeStatus: callStatus, noticeResult: result, noticeDueAt: '', autoNotice: false, updatedAt: time
       });
     }
     (db.callLogs ||= []).push(callLog);
