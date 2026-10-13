@@ -3261,16 +3261,37 @@ app.put('/api/students/:id', async (req, res, next) => {
 });
 
 
+function filterRemovedClassStudents(db, query) {
+  const q = normalizeSearchText(query.q || '');
+  const date = query.date || '';
+  return (db.classRemovalHistory || []).filter(row => {
+    if (date && row.removedDate !== date) return false;
+    return !q || normalizeSearchText(`${row.fullName} ${row.className} ${row.parentName} ${row.phone1} ${row.phone2}`).includes(q);
+  }).sort((a, b) => b.removedAt.localeCompare(a.removedAt));
+}
+
 app.get('/api/removed-class-students', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
-    const q = normalizeSearchText(req.query.q || '');
-    const date = req.query.date || '';
-    const rows = (db.classRemovalHistory || []).filter(row => {
-      if (date && row.removedDate !== date) return false;
-      return !q || normalizeSearchText(`${row.fullName} ${row.className} ${row.parentName} ${row.phone1} ${row.phone2}`).includes(q);
-    });
-    res.json(rows.sort((a, b) => b.removedAt.localeCompare(a.removedAt)));
+    res.json(filterRemovedClassStudents(db, req.query));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/removed-class-students/export', async (req, res, next) => {
+  try {
+    const db = await getBranchDb(req);
+    const rows = filterRemovedClassStudents(db, req.query).map((row, index) => ({
+      'STT': index + 1,
+      'Ngày xóa': row.removedDate || '',
+      'Thời gian': row.removedAt ? new Date(row.removedAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '',
+      'Học sinh': row.fullName || '',
+      'Lớp': row.className || '',
+      'SĐT': row.phone1 || row.phone2 || ''
+    }));
+    const suffix = req.query.date ? cleanText(req.query.date) : 'tat-ca';
+    sendWorkbook(res, `lich-su-xoa-khoi-lop-${suffix}.xlsx`, [{ name: 'Da Xoa Khoi Lop', rows }]);
   } catch (error) {
     next(error);
   }
@@ -4332,20 +4353,22 @@ app.get('/api/call-logs/export', async (req, res, next) => {
     const db = await getBranchDb(req);
     const rows = filterCallLogs(db, req.query).map((row, index) => ({
       'STT': index + 1,
-      'Ngày vắng': row.date,
-      'Thời gian ghi nhận': row.time ? new Date(row.time).toLocaleString('vi-VN') : '',
+      'Ngày lịch sử': row.date,
+      'Thời gian ghi nhận': row.time ? new Date(row.time).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '',
       'Học sinh': row.studentName || '',
       'Mã HS': row.studentCode || '',
       'Lớp': row.className || '',
       'Phụ huynh': row.parentName || '',
       'SĐT gọi': row.phoneCalled || '',
+      'Loại thông báo': row.absenceStatus || '',
       'Trạng thái cuộc gọi': row.callStatus || '',
       'Kết quả gọi điện': row.callResult || '',
       'Ghi chú': row.note || ''
     }));
     const suffix = req.query.date ? cleanText(req.query.date) : 'tat-ca';
-    sendWorkbook(res, `danh-sach-can-goi-${suffix}.xlsx`, [
-      { name: 'DS Cần Gọi', rows }
+    const tuition = normalizeAbsenceStatus(req.query.absenceStatus) === 'Học phí';
+    sendWorkbook(res, `lich-su-goi-${tuition ? 'hoc-phi' : 'vang'}-${suffix}.xlsx`, [
+      { name: tuition ? 'Goi Hoc Phi' : 'Goi Vang', rows }
     ]);
   } catch (error) {
     next(error);
@@ -4398,6 +4421,35 @@ app.post('/api/call-logs/:id/result', async (req, res, next) => {
     }
     await saveBranchDb(req, db);
     res.json(log);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/notification-logs/export', async (req, res, next) => {
+  try {
+    const db = await getBranchDb(req);
+    const tuition = normalizeAbsenceStatus(req.query.absenceStatus) === 'Học phí';
+    let logs = filterNotificationLogs(db, req.query);
+    if (!tuition) {
+      logs = logs.filter(row => row.status !== 'Chưa kết bạn - Cần gọi'
+        && !['Cần gọi điện', 'Đã gọi', 'Đã nhắc', 'Không nghe máy'].includes(row.absenceCallStatus));
+    }
+    const rows = logs.map((row, index) => ({
+      'STT': index + 1,
+      'Ngày lịch sử': req.query.dateBasis === 'time' ? notificationLogDate(row) : row.date || '',
+      'Thời gian': row.time ? new Date(row.time).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '',
+      'Học sinh': row.studentName || '',
+      'Lớp': row.className || '',
+      'SĐT': row.phone1 || '',
+      'Loại thông báo': row.absenceStatus || '',
+      'Trạng thái gửi': row.status || '',
+      'Kết quả': row.result || ''
+    }));
+    const suffix = req.query.date ? cleanText(req.query.date) : 'tat-ca';
+    sendWorkbook(res, `lich-su-${tuition ? 'hoc-phi' : 'vang'}-${suffix}.xlsx`, [
+      { name: tuition ? 'Lich Su Hoc Phi' : 'Lich Su Vang', rows }
+    ]);
   } catch (error) {
     next(error);
   }

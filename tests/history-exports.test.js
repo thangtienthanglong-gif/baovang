@@ -1,0 +1,146 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const test = require('node:test');
+const vm = require('node:vm');
+const XLSX = require('xlsx-js-style');
+
+const source = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+function slice(start, end) {
+  const offset = source.indexOf(start);
+  const finish = source.indexOf(end, offset);
+  assert.ok(offset >= 0 && finish > offset);
+  return source.slice(offset, finish);
+}
+
+function setup(db) {
+  const routes = new Map();
+  const context = {
+    XLSX,
+    app: { get: (url, handler) => routes.set(url, handler) },
+    getBranchDb: async req => req.headers['x-branch-id'] === 'other' ? {} : db,
+    cleanText: value => String(value ?? '').replace(/\s+/g, ' ').trim()
+  };
+  vm.createContext(context);
+  vm.runInContext(source.match(/^const ABSENCE_STATUSES = .*;$/m)[0], context);
+  for (const [start, end] of [
+    ['function normalizeAbsenceStatus(', 'function normalizeInitialReason('],
+    ['function normalizeSearchText(', 'function countByLabel('],
+    ['function quitStudentDetails(', 'function markStudentWithdrawn('],
+    ['function filterCallLogs(', 'function buildMessage('],
+    ['function filterRemovedClassStudents(', "app.post('/api/students/:id/remove-from-class'"],
+    ["app.get('/api/quit-students/export'", "app.delete('/api/quit-students/clear'"],
+    ["app.get('/api/call-logs/export'", "app.delete('/api/call-logs'"],
+    ["app.get('/api/notification-logs/export'", "app.get('/api/notification-logs'"]
+  ]) vm.runInContext(slice(start, end), context);
+  return async (route, query = {}, branch = 'main') => {
+    const headers = {};
+    let buffer;
+    await routes.get(route)(
+      { query, headers: { 'x-branch-id': branch } },
+      { setHeader: (key, value) => { headers[key] = value; }, send: value => { buffer = value; } },
+      error => { throw error; }
+    );
+    assert.ok(Buffer.isBuffer(buffer));
+    assert.equal(headers['Content-Type'], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    return {
+      filename: headers['Content-Disposition'],
+      sheet: workbook.SheetNames[0],
+      rows: XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]])
+    };
+  };
+}
+
+function notice(overrides = {}) {
+  return {
+    id: 'n1', date: '2026-10-12', time: '2026-10-12T13:00:00Z',
+    studentName: 'Nguyễn An', className: '8T3M+', phone1: '0901234567',
+    absenceStatus: 'Vắng không phép', status: 'Đã gửi', ...overrides
+  };
+}
+
+test('absence Excel exports all matching history beyond one page and excludes calls and tuition', async () => {
+  const exportFile = setup({
+    notificationLogs: [
+      ...Array.from({ length: 32 }, (_, index) => notice({ id: `n${index}` })),
+      notice({ absenceStatus: 'Học phí' }), notice({ callLogId: 'call1' }),
+      notice({ studentName: 'Bình' }), notice({ date: '2026-10-11' }),
+      notice({ status: 'Chưa kết bạn - Cần gọi' }),
+      notice({ absenceId: 'called-absence' })
+    ],
+    absences: [{ id: 'called-absence', status: 'Đã gọi' }]
+  });
+  const query = { date: '2026-10-12', q: 'nguyễn an', excludeAbsenceStatus: 'Học phí' };
+  const file = await exportFile('/api/notification-logs/export', query);
+  assert.equal(file.rows.length, 32);
+  assert.equal(file.sheet, 'Lich Su Vang');
+  assert.match(file.filename, /lich-su-vang-2026-10-12\.xlsx/);
+  assert.equal(file.rows[31].STT, 32);
+  assert.equal(file.rows[0]['SĐT'], '0901234567');
+  assert.equal(file.rows[0]['Thời gian'], new Date('2026-10-12T13:00:00Z').toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }));
+  const empty = await exportFile('/api/notification-logs/export', query, 'other');
+  assert.equal(empty.rows.length, 0);
+});
+
+test('tuition Excel uses the Vietnam send day and recovers types from old messages', async () => {
+  const exportFile = setup({ notificationLogs: [
+    notice({ date: '2026-10-01', time: '2026-10-11T18:00:00Z', absenceStatus: '', message: 'Học sinh: Học phí - thông báo' }),
+    notice({ absenceStatus: 'Học phí', time: '2026-10-12T18:00:00Z' }),
+    notice(), notice({ absenceStatus: 'Học phí', callLogId: 'called' })
+  ] });
+  const file = await exportFile('/api/notification-logs/export', { date: '2026-10-12', absenceStatus: 'Học phí', dateBasis: 'time' });
+  assert.equal(file.rows.length, 1);
+  assert.equal(file.sheet, 'Lich Su Hoc Phi');
+  assert.equal(file.rows[0]['Ngày lịch sử'], '2026-10-12');
+  assert.equal(file.rows[0]['Loại thông báo'], 'Học phí');
+});
+
+test('call exports separate absence and tuition using original history day and retain every outcome', async () => {
+  const exportFile = setup({
+    notificationLogs: [notice({ id: 'absence' }), notice({ id: 'tuition', absenceStatus: 'Học phí', date: '2026-10-01' })],
+    callLogs: [
+      ...['Đã gọi', 'Không bắt máy', 'Không liên lạc được'].map((result, index) => ({
+        id: `c${index}`, notificationLogId: 'absence', date: '2026-10-13',
+        time: '2026-10-13T03:00:00Z', studentName: 'Nguyễn An', phoneCalled: '0901234567',
+        callStatus: index ? 'Lỗi gọi' : 'Đã gọi', callResult: result
+      })),
+      { id: 'tuition-call', notificationLogId: 'tuition', date: '2026-10-13', time: '2026-10-13T04:00:00Z', studentName: 'Nguyễn An', callStatus: 'Đã gọi' }
+    ]
+  });
+  const absence = await exportFile('/api/call-logs/export', { date: '2026-10-12', q: 'nguyễn', excludeAbsenceStatus: 'Học phí' });
+  assert.equal(absence.sheet, 'Goi Vang');
+  assert.equal(absence.rows.length, 3);
+  assert.deepEqual(absence.rows.map(row => row['Trạng thái cuộc gọi']), ['Đã gọi', 'Không nghe máy', 'Không liên lạc được']);
+  assert.equal(absence.rows[0]['Ngày lịch sử'], '2026-10-12');
+  const tuition = await exportFile('/api/call-logs/export', { date: '2026-10-12', absenceStatus: 'Học phí' });
+  assert.equal(tuition.sheet, 'Goi Hoc Phi');
+  assert.equal(tuition.rows.length, 1);
+  assert.match(tuition.filename, /lich-su-goi-hoc-phi-2026-10-12\.xlsx/);
+});
+
+test('removal Excel matches date and accent-insensitive search and retains original class snapshots', async () => {
+  const exportFile = setup({ classRemovalHistory: [
+    { fullName: 'Nguyễn An', className: '8OLD', removedDate: '2026-10-12', removedAt: '2026-10-12T13:00:00Z', phone1: '0901234567' },
+    { fullName: 'Nguyễn An', className: '8OLD', removedDate: '2026-10-11', removedAt: '2026-10-11T13:00:00Z' },
+    { fullName: 'Bình', className: '8OLD', removedDate: '2026-10-12', removedAt: '2026-10-12T14:00:00Z' }
+  ] });
+  const file = await exportFile('/api/removed-class-students/export', { date: '2026-10-12', q: 'nguyen an' });
+  assert.equal(file.rows.length, 1);
+  assert.equal(file.sheet, 'Da Xoa Khoi Lop');
+  assert.equal(file.rows[0]['Lớp'], '8OLD');
+  assert.equal(file.rows[0]['SĐT'], '0901234567');
+});
+
+test('withdrawal Excel keeps all dates shown in its panel and exports the saved reason', async () => {
+  const exportFile = setup({ students: [
+    { id: 's1', status: 'Nghỉ học', fullName: 'Nguyễn An', quitDate: '2026-09-30', quitReason: 'Chuyển trường', phone1: '0901234567' },
+    { id: 's2', status: 'Đang học', fullName: 'Nguyễn An' },
+    { id: 's3', status: 'Nghỉ học', fullName: 'Bình', quitDate: '2026-10-12' }
+  ] });
+  const file = await exportFile('/api/quit-students/export', { q: 'nguyen an' });
+  assert.equal(file.rows.length, 1);
+  assert.equal(file.rows[0]['Ngày nghỉ'], '30/09/2026');
+  assert.equal(file.rows[0]['Lý do'], 'Chuyển trường');
+  assert.equal(file.rows[0]['SĐT'], '0901234567');
+});

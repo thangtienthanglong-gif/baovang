@@ -2426,6 +2426,28 @@ function exportQuitList(params = {}) {
   downloadUrl('/api/quit-students/export', params);
 }
 
+function exportHistory(type) {
+  const params = {
+    date: selectedHistoryDate(),
+    q: $('#historyKeyword')?.value.trim() || ''
+  };
+  switch (type) {
+    case 'absence':
+      return downloadUrl('/api/notification-logs/export', { ...params, excludeAbsenceStatus: 'Học phí' });
+    case 'tuition':
+      return downloadUrl('/api/notification-logs/export', { ...params, absenceStatus: 'Học phí', dateBasis: 'time' });
+    case 'call-absence':
+      return downloadUrl('/api/call-logs/export', { ...params, excludeAbsenceStatus: 'Học phí' });
+    case 'call-tuition':
+      return downloadUrl('/api/call-logs/export', { ...params, absenceStatus: 'Học phí' });
+    case 'quit':
+      // The withdrawal panel shows all withdrawal dates and filters by keyword.
+      return downloadUrl('/api/quit-students/export', { q: params.q });
+    case 'removed':
+      return downloadUrl('/api/removed-class-students/export', params);
+  }
+}
+
 async function clearQuitHistory() {
   const params = {
     date: selectedHistoryDate(),
@@ -3434,37 +3456,11 @@ function initEvents() {
       toast(error.message, 'error');
     }
   });
-  $('#exportLateHistoryBtn')?.addEventListener('click', () => {
-    exportLateAbsences({
-      date: selectedHistoryDate(),
-      q: $('#historyKeyword')?.value.trim() || ''
-    });
-  });
-
-  $('#exportExcusedHistoryBtn')?.addEventListener('click', () => {
-    exportExcusedAbsences({
-      date: selectedHistoryDate(),
-      q: $('#historyKeyword')?.value.trim() || ''
-    });
-  });
-  $('#exportFailedZaloHistoryBtn')?.addEventListener('click', () => {
-    exportFailedZalo({
-      date: selectedHistoryDate(),
-      q: $('#historyKeyword')?.value.trim() || ''
-    });
-  });
-  $('#exportCallListBtn')?.addEventListener('click', () => {
-    exportCallList({
-      date: selectedHistoryDate(),
-      q: $('#historyKeyword')?.value.trim() || ''
-    });
-  });
-
-  $('#exportQuitListBtn')?.addEventListener('click', () => {
-    exportQuitList({
-      date: selectedHistoryDate(),
-      q: $('#historyKeyword')?.value.trim() || ''
-    });
+  $('#historyExportMenu')?.addEventListener('click', event => {
+    const button = event.target.closest('[data-history-export]');
+    if (!button) return;
+    $('#historyExportMenu').style.display = 'none';
+    return exportHistory(button.dataset.historyExport);
   });
   $('#historyKeyword').addEventListener('keydown', async event => {
     if (event.key === 'Enter') {

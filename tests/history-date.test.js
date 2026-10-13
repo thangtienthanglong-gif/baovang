@@ -10,10 +10,9 @@ function setup() {
   let now = new Date('2026-10-08T16:59:00Z');
   const fields = Object.fromEntries([
     'filterDate', 'filterDateAuto', 'historyDate', 'historyDateAuto', 'historyKeyword',
-    'historyRows', 'callHistoryRows', 'noticeRows', 'noticePagination', 'quitRows', 'removedClassRows', 'exportLateHistoryBtn',
-    'exportExcusedHistoryBtn', 'exportFailedZaloHistoryBtn', 'exportCallListBtn', 'exportQuitListBtn'
+    'historyRows', 'callHistoryRows', 'noticeRows', 'noticePagination', 'quitRows', 'removedClassRows', 'historyExportMenu'
   ].map(id => [id, {
-    value: '', listeners: {},
+    value: '', listeners: {}, style: { display: 'block' },
     addEventListener(type, listener) { this.listeners[type] = listener; }
   }]));
   const requests = [];
@@ -26,11 +25,9 @@ function setup() {
     activeTabId: () => 'historyTab', getActiveBranch: () => 'main', renderFilters() {},
     api: async url => { requests.push(url); return []; },
     queryString: params => new URLSearchParams(params).toString(),
-    loadAttendanceAbsences() {}, loadAbsences() {}
+    loadAttendanceAbsences() {}, loadAbsences() {},
+    downloadUrl: (path, params) => exports.push({ path, params })
   };
-  for (const name of ['exportLateAbsences', 'exportExcusedAbsences', 'exportFailedZalo', 'exportCallList', 'exportQuitList']) {
-    context[name] = params => exports.push({ name, params });
-  }
   vm.createContext(context);
   function load(start, end) {
     const offset = source.indexOf(start);
@@ -41,11 +38,15 @@ function setup() {
   load('function clientTodayISO(', 'async function loadBootstrap(');
   load('async function loadHistory(', 'async function updateCallResult(');
   load('async function loadQuitStudents(', 'async function markUnfriended(');
-  load("  $('#exportLateHistoryBtn')", "  $('#historyKeyword').addEventListener");
+  load('function exportHistory(', 'async function clearQuitHistory(');
+  load("  $('#historyExportMenu')", "  $('#historyKeyword').addEventListener");
   context.syncAutomaticDate();
   context.syncAutomaticHistoryDate();
   return {
     context, fields, requests, exports,
+    exportType: type => fields.historyExportMenu.listeners.click({ target: {
+      closest: () => ({ dataset: { historyExport: type } })
+    } }),
     setTime: instant => { now = new Date(instant); },
     manualHistory: date => {
       vm.runInContext('historyDateAuto = false;', context);
@@ -91,13 +92,24 @@ test('manual history dates and all-date searches survive automatic queue rollove
 test('history exports use the current automatic date even before the polling timer runs', () => {
   const app = setup();
   app.setTime('2026-12-31T17:01:00Z');
-  for (const id of ['exportLateHistoryBtn', 'exportExcusedHistoryBtn', 'exportFailedZaloHistoryBtn', 'exportCallListBtn', 'exportQuitListBtn']) {
-    app.fields[id].listeners.click();
+  app.fields.historyKeyword.value = '  Ngọc  ';
+  for (const type of ['absence', 'tuition', 'call-absence', 'call-tuition', 'quit', 'removed']) app.exportType(type);
+  assert.equal(app.exports.length, 6);
+  for (const result of app.exports) {
+    assert.equal(result.params.q, 'Ngọc');
+    // Withdrawal history intentionally shows every date, as its panel does.
+    assert.equal(result.params.date, result.path === '/api/quit-students/export' ? undefined : '2027-01-01');
   }
-  assert.equal(app.exports.length, 5);
-  for (const result of app.exports) assert.equal(result.params.date, '2027-01-01');
+  assert.equal(app.exports[0].params.excludeAbsenceStatus, 'Học phí');
+  assert.equal(app.exports[1].params.absenceStatus, 'Học phí');
+  assert.equal(app.exports[1].params.dateBasis, 'time');
+  assert.equal(app.exports[2].path, '/api/call-logs/export');
+  assert.equal(app.exports[2].params.excludeAbsenceStatus, 'Học phí');
+  assert.equal(app.exports[3].params.absenceStatus, 'Học phí');
+  assert.equal(app.exports[5].path, '/api/removed-class-students/export');
+  assert.equal(app.fields.historyExportMenu.style.display, 'none');
   app.manualHistory('2026-09-28');
-  app.fields.exportCallListBtn.listeners.click();
+  app.exportType('call-absence');
   assert.equal(app.exports.at(-1).params.date, '2026-09-28');
 });
 

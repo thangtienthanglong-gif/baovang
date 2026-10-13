@@ -45,7 +45,7 @@ function setupServer() {
     ['const dbSnapshots = new WeakMap();', 'function defaultSettings()'],
     ['function isActiveStudent(', 'function quitStudentDetails('],
     ['function getBranchClasses(', "app.get('/api/bootstrap'"],
-    ["app.get('/api/removed-class-students'", "app.post('/api/students/:id/transfer'"],
+    ['function filterRemovedClassStudents(', "app.post('/api/students/:id/transfer'"],
     ["app.post('/api/exams'", "app.delete('/api/exams/:id'"]
   ]) vm.runInContext(slice(server, start, end), context);
   async function remove({ branch = 'main', id = 's1', className = '7C26M' } = {}) {
