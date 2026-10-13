@@ -117,6 +117,16 @@ test('new sends and manual success or failure capture the tuition message type',
   }
 });
 
+test('confirming an old send retains its original type even after attendance was changed', async () => {
+  for (const route of ['/api/absences/:id/zalo/manual-sent', '/api/absences/:id/zalo/manual-error']) {
+    const app = setupServer();
+    app.db.absences[0].absenceStatus = 'Vắng';
+    app.db.notificationLogs.push({ id: 'pending-old', absenceId: 'a1', channel: 'Zalo cá nhân', status: 'Chờ gửi thủ công', message: 'Trường thông báo học phí/tiền nợ của em Kim, lớp 9T2D+ hiện tại là: 500.000 VNĐ.' });
+    const { log } = await app.call('post', route, { body: { logId: 'pending-old' } });
+    assert.equal(log.absenceStatus, 'Học phí');
+  }
+});
+
 test('clearing tuition history deletes only matching tuition sends in the selected branch and day', async () => {
   const app = setupServer();
   const otherBefore = structuredClone(app.branches.other);

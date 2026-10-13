@@ -110,7 +110,7 @@ function selectSearchText(search) {
 
 const searchText = search => String(search.isContentEditable ? textOf(search) : search.value || '').trim();
 
-async function fillSearchBox(search, phone) {
+async function fillSearchBox(search, query) {
   // A DOM value plus synthetic input/change events can display the phone
   // without running Zalo's native paste handling. Reset through native editing
   // first, including when retrying the same number, then paste from clipboard.
@@ -123,18 +123,18 @@ async function fillSearchBox(search, phone) {
   }
 
   try {
-    await navigator.clipboard.writeText(phone);
+    await navigator.clipboard.writeText(query);
   } catch (_) {
-    throw new Error('Chrome không cho phép ghi clipboard để dán số điện thoại vào Zalo; chưa gửi tin.');
+    throw new Error('Chrome không cho phép ghi clipboard để tìm trên Zalo; chưa gửi tin.');
   }
   // Zalo can replace the search input while clearing or updating its view.
   search = findSearchBox();
   if (!search || searchText(search)) {
-    throw new Error('Ô tìm kiếm Zalo đã thay đổi trước khi dán số điện thoại; chưa gửi tin.');
+    throw new Error('Ô tìm kiếm Zalo đã thay đổi trước khi dán nội dung tìm kiếm; chưa gửi tin.');
   }
   selectSearchText(search);
   if (!document.execCommand('paste', false)) {
-    throw new Error('Chrome không cho phép dán số điện thoại vào Zalo; chưa gửi tin.');
+    throw new Error('Chrome không cho phép dán nội dung tìm kiếm vào Zalo; chưa gửi tin.');
   }
 }
 
@@ -376,6 +376,99 @@ function skippedError(message) {
   return error;
 }
 
+const studentSearchName = value => String(value || '').normalize('NFC')
+  .replace(/\s*\([a-z]\)\s*/gi, ' ').replace(/\s+/g, ' ').trim();
+const comparableContactName = value => studentSearchName(value).normalize('NFD')
+  .replace(/\p{M}/gu, '').replace(/[đĐ]/g, 'd').toLocaleLowerCase('vi')
+  .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+function phoneSearchUnavailable() {
+  return allVisible(['div', 'span', 'p', '[role="status"]']).some(el => {
+    const text = textOf(el);
+    return text.length < 300 && !el.closest?.('#baovang-zalo-status')
+      && /chưa đăng ký tài khoản|không cho phép tìm kiếm/i.test(text);
+  });
+}
+
+function contactResultPhones(el) {
+  return [el.getAttribute?.('data-phone'), ...textOf(el).split(/\r?\n/)]
+    .filter(Boolean).map(line => String(line).replace(/^(?:SĐT|Điện thoại|Phone)\s*:\s*/i, '').trim())
+    .filter(line => /^\+?\d[\d .()-]{8,}\d$/.test(line)).map(phoneForSearch);
+}
+
+function nameSearchCandidates(item, previousResults) {
+  const name = comparableContactName(item.studentName);
+  if (!name) return [];
+  const className = comparableContactName(item.className);
+  const phone = phoneForSearch(item.phone);
+  const candidates = searchResultCandidates().filter(el => {
+    const text = textOf(el);
+    if (/không tìm thấy|không có kết quả|chưa đăng ký tài khoản|không cho phép tìm kiếm|no results|tìm tất cả/i.test(text)
+        || previousResults.get(el) === text) return false;
+    if (!el.matches?.('[role="option"]') && !el.closest?.('[role="listbox"], [class*="search"], [class*="Search"]')) return false;
+    if (String(el.getAttribute?.('data-type') || '').toLowerCase() === 'group'
+        || el.matches?.('[class*="group-item"], [class*="group-chat"]')
+        || el.querySelector?.('[class*="group-avatar"], [class*="group-icon"]')
+        || /\d+\s+(?:thành viên|members)/i.test(text)) return false;
+    const nameElement = el.querySelector?.('[class*="name"], [class*="Name"], [data-name]');
+    const title = comparableContactName(textOf(nameElement || el).split(/\r?\n/)[0]);
+    if (title !== name && (!className || title !== `${name} ${className}`)) return false;
+    const listedClass = text.split(/\r?\n/).slice(1).map(line => line.match(/^Lớp\s*:?\s*(.+)$/i)).find(Boolean);
+    if (className && listedClass && comparableContactName(listedClass[1]) !== className) return false;
+    const phoneLines = contactResultPhones(el);
+    return !phoneLines.length || phoneLines.includes(phone);
+  });
+  let matches = candidates.filter(el => !candidates.some(other => other !== el && el.contains(other)));
+  const phoneMatches = matches.filter(el => contactResultPhones(el).includes(phone));
+  if (phoneMatches.length) matches = phoneMatches;
+  if (matches.length > 1 && className) {
+    const classMatches = matches.filter(el => comparableContactName(textOf(el).split(/\r?\n/)[0]) === `${name} ${className}`
+      || textOf(el).split(/\r?\n/).slice(1).some(line => comparableContactName(line.replace(/^Lớp\s*:?\s*/i, '')) === className));
+    if (classMatches.length) return classMatches;
+  }
+  return matches;
+}
+
+async function findStudentByName(item) {
+  const query = studentSearchName(item.studentName);
+  if (!query) throw skippedError(`Zalo không cho tìm số ${item.phone}, nhưng lượt gửi thiếu tên học sinh; chưa gửi tin.`);
+  const search = findSearchBox();
+  if (!search) throw skippedError('Không tìm thấy ô tìm kiếm để tìm theo tên học sinh; chưa gửi tin.');
+  const previousResults = new Map(searchResultCandidates().map(el => [el, textOf(el)]));
+  showZaloStatus(`BaoVang: số điện thoại không tìm được, đang tìm theo tên ${query}...`);
+  await fillSearchBox(search, query);
+  await wait(800);
+  const current = findSearchBox();
+  if (!current || searchText(current) !== query) throw new Error('Zalo Web không nhận đủ tên học sinh trong ô Tìm kiếm; chưa gửi tin.');
+  const outcome = await waitFor(() => {
+    const matches = nameSearchCandidates(item, previousResults);
+    return matches.length === 1 ? { result: matches[0] } : matches.length > 1 ? { ambiguous: true } : null;
+  }, 7000);
+  if (outcome?.ambiguous) throw skippedError(`Có nhiều kết quả trùng tên ${query}; cần chọn người nhận thủ công, chưa gửi tin.`);
+  if (!outcome?.result) throw skippedError(`Không tìm thấy liên hệ khớp tên ${query} cho số ${item.phone}; chưa gửi tin.`);
+  return outcome.result;
+}
+
+function conversationMatchesStudent(item, composer) {
+  const name = comparableContactName(item.studentName);
+  const className = comparableContactName(item.className);
+  const rect = composer.getBoundingClientRect();
+  const root = composer.closest?.('#chatView, #conversation, [class*="chat-panel"], [class*="conversation-view"]');
+  return allVisible([
+    '[class*="header"] [class*="name"]', '[class*="header"] [class*="title"]',
+    '[class*="Header"] [class*="Name"]', '[class*="chat-info"] [class*="name"]',
+    '.title-container', '[data-testid="conversation-title"]'
+  ]).some(el => {
+    if (root && !root.contains(el)) return false;
+    const header = el.getBoundingClientRect();
+    if (header.left < rect.left - 48 || header.top > Math.min(260, window.innerHeight * 0.3)) return false;
+    const text = textOf(el);
+    if (/\d+\s+(?:thành viên|members)/i.test(text)) return false;
+    const title = comparableContactName(text.split(/\r?\n/)[0]);
+    return title === name || Boolean(className && title === `${name} ${className}`);
+  });
+}
+
 async function openConversation(item, search) {
   const previousResults = new Map(searchResultCandidates().map(el => [el, textOf(el)]));
   const searchedPhone = phoneForSearch(item.phone);
@@ -385,7 +478,9 @@ async function openConversation(item, search) {
   if (!search || searchText(search) !== searchedPhone) {
     throw new Error('Zalo Web không nhận số điện thoại trong ô Tìm kiếm.');
   }
-  const result = await waitFor(() => findSearchResult(item.phone, previousResults), 7000);
+  const outcome = await waitFor(() => phoneSearchUnavailable()
+    ? { unavailable: true } : findSearchResult(item.phone, previousResults), 7000);
+  const result = outcome?.unavailable ? await findStudentByName(item) : outcome;
   if (!result) throw skippedError(`Không tìm thấy kết quả tìm kiếm rõ ràng cho số ${item.phone}; chưa gửi tin.`);
   clickLike(result);
   // The previous chat's composer may still be mounted while Zalo switches chats.
@@ -400,6 +495,13 @@ async function openConversation(item, search) {
     }
   }
   if (!composer) throw skippedError(`Không mở được cuộc trò chuyện của số ${item.phone}.`);
+  if (outcome?.unavailable) {
+    composer = await waitFor(() => {
+      const current = findComposer();
+      return current && conversationMatchesStudent(item, current) ? current : null;
+    }, 4500);
+    if (!composer) throw skippedError(`Chưa xác nhận được cuộc trò chuyện khớp tên ${studentSearchName(item.studentName)}; chưa gửi tin.`);
+  }
   return composer;
 }
 

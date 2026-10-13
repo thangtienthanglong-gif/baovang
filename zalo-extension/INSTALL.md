@@ -16,6 +16,8 @@ Bản 1.2.0 cần quyền **clipboardRead** để dán tin nhiều dòng. Chấp
 
 Bản **1.2.4** sửa cách tìm số điện thoại: xóa lượt tìm cũ bằng thao tác sửa văn bản của trình duyệt, chờ Zalo cập nhật rồi dán số qua clipboard như khi dán thủ công. Extension kiểm tra toàn bộ số trong ô tìm kiếm và không chọn thông báo “chưa đăng ký tài khoản hoặc không cho phép tìm kiếm” làm kết quả. Quyền clipboard đã có trong bản trước; khi chạy, clipboard sẽ chứa số đang tìm rồi nội dung tin nhắn nếu tin có nhiều dòng.
 
+Bản **1.2.5** tìm dự phòng theo tên học sinh của đúng lượt gửi khi Zalo báo số điện thoại chưa đăng ký hoặc không cho phép tìm kiếm. Các ký hiệu một chữ trong ngoặc như `(A)`, `(C)` được bỏ khỏi tên tìm kiếm. Extension chỉ chọn một liên hệ khớp đầy đủ tên, ưu tiên số điện thoại hoặc mã lớp nếu kết quả có thông tin này. Nếu trùng tên, số hoặc lớp hiển thị khác với lượt gửi, hoặc kết quả có dấu hiệu nhóm chat, lượt đó được bỏ qua để chọn thủ công. Sau khi mở kết quả theo tên, extension kiểm tra tên trên đầu cuộc trò chuyện trước khi dán tin. Tìm theo tên chỉ có tác dụng khi liên hệ trong Zalo được lưu bằng tên học sinh.
+
 Nếu Chrome ghi lỗi **Extension context invalidated** sau khi bấm Reload, tải lại cả tab BaoVang và Zalo. Đây là kết nối của mã cũ đã bị ngắt khi tiện ích cập nhật. Nút thùng rác trong màn hình lỗi của Chrome xóa bản ghi lỗi cũ; tin đã gửi không cần gửi lại.
 
 Nếu một tin đã xuất hiện trong cuộc trò chuyện nhưng extension báo lỗi xuống dòng, **không bấm Gửi lại** cho tin đó. Kiểm tra nội dung trong Zalo rồi đánh dấu đã gửi trong BaoVang để tránh phụ huynh nhận tin trùng.

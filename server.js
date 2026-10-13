@@ -650,6 +650,23 @@ function notificationLogDate(log) {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
+function notificationLogAbsenceStatus(log, absence) {
+  const recordedStatus = cleanText(log.absenceStatus);
+  if (recordedStatus) return recordedStatus;
+
+  // Old logs did not store their type. A generated message preserves the
+  // original type even if the linked attendance record was edited or deleted.
+  const message = String(log.message || log.responsePayload?.message || '').normalize('NFC');
+  const explicitStatus = message.match(/^\s*Học sinh:\s*(Vắng không phép|Vắng có phép|Vắng chưa rõ lý do|Không phép|Có phép|Vắng|Đã bù|Đi trễ|Về sớm|Cả ngày|Nghỉ học|Trễ học phí|Học phí)(?=\s*(?:[-–—]|$))/imu);
+  if (explicitStatus) {
+    const label = explicitStatus[1].toLocaleLowerCase('vi');
+    return normalizeAbsenceStatus(label[0].toLocaleUpperCase('vi') + label.slice(1));
+  }
+  if (/thông báo\s+học phí\s*\/\s*tiền nợ\s+của em\b/iu.test(message)) return 'Học phí';
+  if (/gửi thông báo định kỳ\s*\/\s*khóa mới cho em\b/iu.test(message)) return 'Định kỳ';
+  return cleanText(absence?.absenceStatus) || 'Khác';
+}
+
 function filterNotificationLogs(db, query) {
   const q = String(query.q || '').toLowerCase().trim();
   const date = query.date || '';
@@ -662,9 +679,7 @@ function filterNotificationLogs(db, query) {
     const absence = absences.get(log.absenceId);
     return {
       ...log,
-      // New logs retain the message type at send time; legacy logs use the
-      // linked attendance record so existing tuition history is visible.
-      absenceStatus: log.absenceStatus || absence?.absenceStatus || 'Khác',
+      absenceStatus: notificationLogAbsenceStatus(log, absence),
       absenceCallStatus: absence ? absence.status : ''
     };
   });
@@ -4092,7 +4107,7 @@ app.post('/api/absences/:id/zalo/manual-sent', async (req, res, next) => {
       db.notificationLogs.push(log);
     }
     
-    log.absenceStatus ||= normalizeAbsenceStatus(absence.absenceStatus);
+    log.absenceStatus ||= notificationLogAbsenceStatus(log, absence);
     await saveBranchDb(req, db);
     res.json({ absence: enrichAbsence(db.absences[index], studentByIdMap(db.students)), log });
   } catch (error) {
@@ -4104,7 +4119,31 @@ app.post('/api/absences/:id/zalo/manual-error', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
     const index = db.absences.findIndex(absence => absence.id === req.params.id);
+    const requestedLogId = String(req.body?.logId || '');
+    const time = nowISO();
+    const errorDetail = String(req.body?.error || '').trim().slice(0, 300);
+    const errorResult = errorDetail ? `Zalo Web: ${errorDetail}` : 'Zalo Web chưa xác nhận tin đã gửi.';
+    const existingLogIndex = requestedLogId
+      ? db.notificationLogs.findIndex(log => log.id === requestedLogId && log.absenceId === req.params.id && log.channel === 'Zalo cá nhân' && ['Chờ gửi thủ công', 'Lỗi gửi'].includes(log.status))
+      : db.notificationLogs.findLastIndex(log => log.absenceId === req.params.id && log.status === 'Chờ gửi thủ công');
+    if (requestedLogId && existingLogIndex === -1) {
+      const err = new Error('Không tìm thấy lượt gửi đang chờ hoặc lỗi khớp với báo cáo extension.');
+      err.status = 409;
+      throw err;
+    }
     if (index === -1) {
+      // An old log can outlive its attendance record. An exact log ID still
+      // lets the extension record its failure without changing another send.
+      if (requestedLogId && existingLogIndex !== -1) {
+        const log = db.notificationLogs[existingLogIndex];
+        log.status = 'Lỗi gửi';
+        log.result = errorResult;
+        log.time = time;
+        const messageType = notificationLogAbsenceStatus(log);
+        if (messageType !== 'Khác') log.absenceStatus ||= messageType;
+        await saveBranchDb(req, db);
+        return res.json({ absence: null, log });
+      }
       const err = new Error('Không tìm thấy bản ghi vắng học.');
       err.status = 404;
       throw err;
@@ -4112,24 +4151,23 @@ app.post('/api/absences/:id/zalo/manual-error', async (req, res, next) => {
 
     const absence = db.absences[index];
     const student = db.students.find(row => row.id === absence.studentId) || {};
-    const time = nowISO();
     const settings = db.settings || defaultSettings();
     const message = buildMessage(settings, absence, student);
-    const errorDetail = String(req.body?.error || '').trim().slice(0, 300);
-    const errorResult = errorDetail ? `Zalo Web: ${errorDetail}` : 'Zalo Web chưa xác nhận tin đã gửi.';
 
-    db.absences[index] = {
-      ...absence,
-      noticeStatus: 'Lỗi gửi',
-      noticeResult: errorResult,
-      noticeSentAt: time,
-      noticeDueAt: '',
-      autoNotice: false,
-      updatedAt: time
-    };
+    const newerAttemptExists = existingLogIndex !== -1 && db.notificationLogs
+      .slice(existingLogIndex + 1).some(log => log.absenceId === absence.id);
+    if (!newerAttemptExists) {
+      db.absences[index] = {
+        ...absence,
+        noticeStatus: 'Lỗi gửi',
+        noticeResult: errorResult,
+        noticeSentAt: time,
+        noticeDueAt: '',
+        autoNotice: false,
+        updatedAt: time
+      };
+    }
 
-    const existingLogIndex = db.notificationLogs.findIndex(l => l.absenceId === absence.id && l.status === 'Chờ gửi thủ công');
-    
     let log;
     if (existingLogIndex !== -1) {
       log = db.notificationLogs[existingLogIndex];
@@ -4159,7 +4197,7 @@ app.post('/api/absences/:id/zalo/manual-error', async (req, res, next) => {
       db.notificationLogs.push(log);
     }
     
-    log.absenceStatus ||= normalizeAbsenceStatus(absence.absenceStatus);
+    log.absenceStatus ||= notificationLogAbsenceStatus(log, absence);
     await saveBranchDb(req, db);
     res.json({ absence: enrichAbsence(db.absences[index], studentByIdMap(db.students)), log });
   } catch (error) {

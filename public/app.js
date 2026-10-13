@@ -1742,7 +1742,7 @@ function renderNoticeHistoryRow(row) {
       </td>
       <td>
         <div class="notice-history-status">
-          <span class="notice-history-reason">${escapeHtml(absenceStatusLabel(row.absenceStatus) || 'Khác')}</span>
+          ${row.absenceStatus && row.absenceStatus !== 'Khác' ? `<span class="notice-history-reason">${escapeHtml(absenceStatusLabel(row.absenceStatus))}</span>` : ''}
           ${row.failedAttempts?.length > 1 ? `
             <details>
               <summary class="badge ${statusClass(row.status)}" style="cursor:pointer;" title="Bấm để xem từng lần gửi lỗi">Lỗi gửi x${row.failedAttempts.length} <i class="fa-solid fa-chevron-down" aria-hidden="true" style="font-size:9px; margin-left:4px;"></i></summary>
@@ -1961,14 +1961,14 @@ function manualPayload(log) {
   return log?.responsePayload || {};
 }
 
-async function sendSingleViaZaloExtension({ id, absenceId, phone, message, link = '' }) {
+async function sendSingleViaZaloExtension({ id, absenceId, phone, studentName = '', className = '', message, link = '' }) {
   if (!phone) {
     toast('Học sinh này chưa có số điện thoại, không thể tìm trên Zalo.', 'error');
     return false;
   }
   // Extension tự tìm hoặc mở một tab Zalo Web và điều khiển tab đó.
   // Không mở zalo:// vì Chrome Extension không thể dán vào ứng dụng Zalo PC.
-  return startZaloExtensionAuto([{ id, absenceId, phone, message }]);
+  return startZaloExtensionAuto([{ id, absenceId, phone, studentName, className, message }]);
 }
 
 async function copyMessageAndOpenZalo(message, link = '') {
@@ -2096,7 +2096,7 @@ function renderManualSendPanel(logs = []) {
       ${rows.map(log => {
         const payload = manualPayload(log);
         return `
-          <article class="manual-send-card" data-absence-id="${escapeHtml(log.absenceId)}" data-phone="${escapeHtml(payload.phone || log.phone1 || '')}">
+          <article class="manual-send-card" data-log-id="${escapeHtml(log.id)}" data-absence-id="${escapeHtml(log.absenceId)}" data-phone="${escapeHtml(payload.phone || log.phone1 || '')}" data-student-name="${escapeHtml(log.studentName || '')}" data-class-name="${escapeHtml(log.className || '')}">
             <div>
               <strong>${escapeHtml(log.studentName)}</strong>
               <span>${escapeHtml(payload.phone || log.phone1 || 'Chưa có SĐT')}</span>
@@ -2150,9 +2150,11 @@ function renderManualSendChatCards(logs = []) {
       openBtn.type = 'button';
       openBtn.textContent = 'Nhắn tin';
       openBtn.addEventListener('click', () => sendSingleViaZaloExtension({
-        id: `single-${log.absenceId}`,
+        id: log.id,
         absenceId: log.absenceId,
         phone: payload.phone || log.phone1 || '',
+        studentName: log.studentName || '',
+        className: log.className || '',
         message: textarea.value || '',
         link: payload.link || ''
       }));
@@ -2214,6 +2216,8 @@ async function sendBulkZalo(button) {
         id: log.id,
         absenceId: log.absenceId,
         phone: log.responsePayload?.phone || log.phone1 || '',
+        studentName: log.studentName || '',
+        className: log.className || '',
         message: log.responsePayload?.message || log.message || ''
       }));
       await startZaloExtensionAuto(items);
@@ -2241,7 +2245,7 @@ function startZaloExtensionAuto(items) {
         reportedItems.add(item.id);
         updateChain = updateChain.then(() => api(`/api/absences/${item.absenceId}/zalo/manual-error`, {
           method: 'POST',
-          body: JSON.stringify({ error: reason || 'Extension không xác nhận được kết quả gửi.' })
+          body: JSON.stringify({ logId: item.id, error: reason || 'Extension không xác nhận được kết quả gửi.' })
         })).catch(error => console.error('Không cập nhật được trạng thái lỗi extension:', error));
       }
       return updateChain;
@@ -2274,7 +2278,7 @@ function startZaloExtensionAuto(items) {
           updateChain = updateChain.then(() =>
             api(`/api/absences/${item.absenceId}/zalo/${data.ok ? 'manual-sent' : 'manual-error'}`, {
               method: 'POST',
-              body: JSON.stringify(data.ok ? { formattingWarning: data.formattingWarning || '' } : { error: data.error || '' })
+              body: JSON.stringify(data.ok ? { logId: item.id, formattingWarning: data.formattingWarning || '' } : { logId: item.id, error: data.error || '' })
             })
           ).catch(error => console.error('Không cập nhật được trạng thái extension:', error));
         }
@@ -2808,14 +2812,14 @@ async function confirmAiAction(button, actionId, card) {
             }
           } else if (ok && log.absenceId) {
             try {
-              await api(`/api/absences/${log.absenceId}/zalo/manual-sent`, { method: 'POST', body: '{}' });
+              await api(`/api/absences/${log.absenceId}/zalo/manual-sent`, { method: 'POST', body: JSON.stringify({ logId: log.id }) });
               log.status = 'Đã gửi';
             } catch (err) {
               console.error('Failed to update status:', err);
             }
           } else if (!ok && log.absenceId) {
             try {
-              await api(`/api/absences/${log.absenceId}/zalo/manual-error`, { method: 'POST', body: '{}' });
+              await api(`/api/absences/${log.absenceId}/zalo/manual-error`, { method: 'POST', body: JSON.stringify({ logId: log.id }) });
               log.status = 'Lỗi gửi';
             } catch (err) {
               console.error('Failed to update error status:', err);
@@ -2996,9 +3000,11 @@ function initEvents() {
       event.preventDefault();
       const text = card.querySelector('textarea')?.value || '';
       await sendSingleViaZaloExtension({
-        id: `single-${card.dataset.absenceId}`,
+        id: card.dataset.logId,
         absenceId: card.dataset.absenceId,
         phone: card.dataset.phone || '',
+        studentName: card.dataset.studentName || '',
+        className: card.dataset.className || '',
         message: text,
         link: event.target.getAttribute('href') || ''
       });
@@ -3095,6 +3101,8 @@ function initEvents() {
             id: log.id,
             absenceId: id,
             phone: log.responsePayload?.phone || log.phone1 || '',
+            studentName: log.studentName || '',
+            className: log.className || '',
             message: log.message || ''
           });
         } else {
