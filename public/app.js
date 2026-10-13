@@ -1698,10 +1698,9 @@ async function loadQuitStudents() {
         </div>
         <div class="student-phone">${escapeHtml(row.phone1 || row.phone2 || '')}</div>
       </td>
-      <td>${escapeHtml(row.parentName)}</td>
       <td>${escapeHtml(row.quitReason || '')}</td>
     </tr>
-  `, 'Không có học sinh nào nghỉ học.', 4);
+  `, 'Không có học sinh nào nghỉ học.', 3);
 }
 
 async function loadRemovedClassStudents() {
