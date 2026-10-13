@@ -55,6 +55,27 @@ function setup(db) {
 
 const withdrawal = { date: '2026-10-06', studentId: 's1', session: 'Tối', absenceStatus: 'Nghỉ học', sendZalo: true };
 
+for (const mode of ['new', 'duplicate', 'update']) {
+  test(`a withdrawal reason is saved in attendance, student history and Excel (${mode})`, async () => {
+    const db = fixture();
+    if (mode !== 'new') db.absences.push({ id: 'a1', studentId: 's1', date: withdrawal.date, session: withdrawal.session, absenceStatus: 'Vắng', note: 'Ghi chú cũ' });
+    const app = setup(db);
+    const reason = 'Chuyển trường theo gia đình.';
+    await app.call(mode === 'update' ? 'put' : 'post', mode === 'update' ? '/api/absences/:id/status' : '/api/absences', {
+      id: 'a1', body: { ...withdrawal, note: `  ${reason}  ` }
+    });
+    assert.equal(db.absences[0].note, reason);
+    assert.equal(db.students[0].quitReason, reason);
+    assert.equal(db.students[0].quitDate, withdrawal.date);
+    assert.equal((await app.call('get', '/api/quit-students')).data[0].quitReason, reason);
+    const file = await app.call('get', '/api/quit-students/export');
+    const workbook = XLSX.read(file.data, { type: 'buffer' });
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets['HS Nghi Hoc']);
+    assert.equal(rows[0]['Lý do'], reason);
+    assert.equal(app.networkCalls(), 0);
+  });
+}
+
 for (const delay of [0, 15]) {
   test(`made-up attendance keeps enrollment and never sends or schedules a notice (delay ${delay})`, async () => {
     const db = fixture();

@@ -1894,6 +1894,49 @@ function queuedMessage(result) {
   return '';
 }
 
+function requestWithdrawalReason(student) {
+  const dialog = $('#withdrawalReasonDialog');
+  const form = $('#withdrawalReasonForm');
+  const input = $('#withdrawalReasonInput');
+  const cancelButton = $('#withdrawalReasonCancel');
+  if (!dialog || !form || !input || !cancelButton) {
+    throw new Error('Không mở được hộp thoại lý do nghỉ học. Vui lòng tải lại trang.');
+  }
+  if (dialog.open) return Promise.resolve(null);
+  $('#withdrawalReasonStudent').textContent = [student.fullName, student.className].filter(Boolean).join(' · ');
+  input.value = '';
+  input.setCustomValidity('');
+  return new Promise(resolve => {
+    const finish = reason => {
+      form.removeEventListener('submit', onSubmit);
+      dialog.removeEventListener('close', onClose);
+      cancelButton.removeEventListener('click', onCancel);
+      input.removeEventListener('input', onInput);
+      dialog.close();
+      resolve(reason);
+    };
+    const onSubmit = event => {
+      event.preventDefault();
+      const reason = input.value.trim();
+      if (!reason) {
+        input.setCustomValidity('Vui lòng nhập lý do nghỉ học.');
+        input.reportValidity();
+        return;
+      }
+      finish(reason);
+    };
+    const onClose = () => finish(null);
+    const onCancel = () => finish(null);
+    const onInput = () => input.setCustomValidity('');
+    form.addEventListener('submit', onSubmit);
+    dialog.addEventListener('close', onClose);
+    cancelButton.addEventListener('click', onCancel);
+    input.addEventListener('input', onInput);
+    dialog.showModal();
+    input.focus();
+  });
+}
+
 async function updateRosterStatus(select) {
   const studentId = select.dataset.studentId;
   const attendanceClass = select.dataset.attendanceClass;
@@ -1933,6 +1976,22 @@ async function updateRosterStatus(select) {
     return;
   }
 
+  let withdrawalReason;
+  let withdrawalDate;
+  let withdrawalDay;
+  if (status === 'Nghỉ học') {
+    const student = state.students.find(row => row.id === studentId);
+    if (!student) throw new Error('Không tìm thấy học sinh. Vui lòng tải lại danh sách.');
+    const currentAbsence = absenceForStudent(studentId, attendanceClass);
+    select.value = currentAbsence ? normalizeAbsenceStatus(currentAbsence.absenceStatus) : 'Đang học';
+    const branchId = getActiveBranch();
+    withdrawalDate = selectedDate();
+    withdrawalDay = selectedDay();
+    withdrawalReason = await requestWithdrawalReason(student);
+    if (withdrawalReason === null) return;
+    if (getActiveBranch() !== branchId) throw new Error('Chi nhánh đã thay đổi. Vui lòng chọn lại học sinh.');
+  }
+
   if (status === 'Đang học') {
     if (absenceId) {
       await api(`/api/absences/${absenceId}`, { method: 'DELETE' });
@@ -1948,6 +2007,7 @@ async function updateRosterStatus(select) {
       body: JSON.stringify({
         absenceStatus: status,
         initialReason: status,
+        ...(status === 'Nghỉ học' ? { note: withdrawalReason } : {}),
         sendZalo: status !== 'Nghỉ học' && status !== 'Đã bù'
       })
     });
@@ -1960,17 +2020,18 @@ async function updateRosterStatus(select) {
 
   const student = state.students.find(s => s.id === studentId);
   const className = attendanceClass || student?.className || '';
-  const sessionInfo = getClassScheduleInfo(className, selectedDate(), selectedDay());
+  const sessionInfo = getClassScheduleInfo(className, withdrawalDate || selectedDate(), withdrawalDay || selectedDay());
 
   const result = await api('/api/absences', {
     method: 'POST',
     body: JSON.stringify({
-      date: selectedDate(),
+      date: withdrawalDate || selectedDate(),
       studentId,
       attendanceClass: className,
       session: sessionInfo.sessionName,
       absenceStatus: status,
       initialReason: status,
+      ...(status === 'Nghỉ học' ? { note: withdrawalReason } : {}),
       sendZalo: status !== 'Nghỉ học' && status !== 'Đã bù'
     })
   });

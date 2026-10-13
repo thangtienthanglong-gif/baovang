@@ -3888,6 +3888,7 @@ app.post('/api/absences', async (req, res, next) => {
       const absenceStatus = normalizeAbsenceStatus(req.body.absenceStatus);
       db.absences[duplicateIndex].absenceStatus = absenceStatus;
       db.absences[duplicateIndex].initialReason = normalizeInitialReason(req.body.initialReason || req.body.reason, absenceStatus);
+      if (req.body.note !== undefined) db.absences[duplicateIndex].note = cleanText(req.body.note);
       if (req.body.evidenceUrl) db.absences[duplicateIndex].evidenceUrl = req.body.evidenceUrl;
       if (absenceStatus === 'Nghỉ học') markStudentWithdrawn(db, student.id, db.absences[duplicateIndex]);
       if (absenceStatus === 'Đã bù') markAbsenceMadeUp(db, db.absences[duplicateIndex]);
@@ -3911,7 +3912,7 @@ app.post('/api/absences', async (req, res, next) => {
       callResult: '',
       caller: '',
       lastCallAt: '',
-      note: '',
+      note: cleanText(req.body.note),
       noticeStatus: shouldAutoSend ? (noticeDelayMinutes > 0 ? 'Chờ gửi' : 'Chưa gửi') : 'Không gửi',
       noticeResult: '',
       noticeSentAt: '',
@@ -3964,6 +3965,7 @@ app.put('/api/absences/:id/status', async (req, res, next) => {
       ...db.absences[index],
       absenceStatus,
       initialReason: normalizeInitialReason(req.body.initialReason || db.absences[index].initialReason, absenceStatus),
+      note: req.body.note !== undefined ? cleanText(req.body.note) : db.absences[index].note,
       noticeStatus: shouldAutoSend ? (noticeDelayMinutes > 0 ? 'Chờ gửi' : db.absences[index].noticeStatus) : (['Chờ gửi', 'Chưa gửi'].includes(db.absences[index].noticeStatus) ? 'Không gửi' : db.absences[index].noticeStatus),
       noticeDueAt: shouldAutoSend && noticeDelayMinutes > 0 ? addMinutesISO(noticeDelayMinutes) : db.absences[index].noticeDueAt,
       noticeDelayMinutes,

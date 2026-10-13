@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <link rel="stylesheet" href="/style.css?v=20261013-history-9">
+  <link rel="stylesheet" href="/style.css?v=20261013-history-10">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     /* Inner Tabs for History - INLINED TO PREVENT CACHE */
@@ -850,8 +850,21 @@
       </div>
     </div>
   </div>
+  <dialog id="withdrawalReasonDialog" class="withdrawal-reason-dialog" aria-labelledby="withdrawalReasonTitle">
+    <form id="withdrawalReasonForm">
+      <h2 id="withdrawalReasonTitle">Ghi nhận nghỉ học</h2>
+      <p id="withdrawalReasonStudent" class="muted"></p>
+      <label for="withdrawalReasonInput">Lý do nghỉ học</label>
+      <textarea id="withdrawalReasonInput" rows="4" maxlength="1000" required autofocus placeholder="Nhập lý do nghỉ học, ví dụ: chuyển trường, thay đổi lịch học..."></textarea>
+      <p class="muted">Lý do sẽ được lưu vào lịch sử học sinh nghỉ học.</p>
+      <div class="withdrawal-reason-actions">
+        <button class="btn secondary" id="withdrawalReasonCancel" type="button">Hủy</button>
+        <button class="btn primary" type="submit">Lưu</button>
+      </div>
+    </form>
+  </dialog>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="/app.js?v=20261013-16"></script>
+  <script src="/app.js?v=20261013-17"></script>
   <script src="/exams.js?v=20261009-2"></script>
   <nav class="bottom-nav">
     <button class="bottom-tab active" data-tab="absenceTab" type="button"><i class="fa-solid fa-clipboard-user"></i><span>Điểm danh</span></button>
