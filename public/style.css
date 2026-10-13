@@ -1633,6 +1633,15 @@ td.empty {
   font-size: 12px;
 }
 
+.call-history-edit {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.call-history-edit:disabled {
+  cursor: wait;
+}
+
 #callHistoryTypeTabs {
   margin-bottom: 12px;
 }

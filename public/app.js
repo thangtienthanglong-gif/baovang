@@ -1612,8 +1612,8 @@ async function loadCallHistory({ preservePage = false } = {}) {
       <td>
         <div class="notice-history-status">
           ${row.absenceStatus && row.absenceStatus !== 'Khác' ? `<span class="notice-history-reason">${escapeHtml(absenceStatusLabel(row.absenceStatus))}</span>` : ''}
-          <span class="badge ${statusClass(row.callStatus)}">${escapeHtml(row.callStatus)}</span>
-        <select class="form-control call-history-result" aria-label="Kết quả gọi điện" data-call-logid="${escapeHtml(row.id)}">
+          <button class="badge call-history-edit ${statusClass(row.callStatus)}" type="button" data-call-edit="${escapeHtml(row.id)}" aria-expanded="${!row.callResult}" aria-controls="call-result-${escapeHtml(row.id)}" title="Bấm để đổi kết quả gọi">${escapeHtml(row.callStatus)}</button>
+        <select class="form-control call-history-result" id="call-result-${escapeHtml(row.id)}" aria-label="Kết quả gọi điện" data-call-logid="${escapeHtml(row.id)}"${row.callResult ? ' hidden' : ''}>
           <option value="" ${!row.callResult ? 'selected' : ''}>-- Chọn --</option>
           <option value="Đã gọi" ${row.callResult === 'Đã gọi' ? 'selected' : ''}>Đã gọi</option>
           <option value="Không bắt máy" ${row.callResult === 'Không bắt máy' ? 'selected' : ''}>Không bắt máy</option>
@@ -1647,7 +1647,15 @@ async function loadTuitionHistory() {
 async function updateCallResult(id, result, select = null) {
   if (select?.disabled) return;
   const branchId = getActiveBranch();
-  if (select) select.disabled = true;
+  const editButton = select?.closest?.('tr')?.querySelector?.('[data-call-edit]');
+  if (select) {
+    select.disabled = true;
+    select.hidden = true;
+  }
+  if (editButton) {
+    editButton.disabled = true;
+    editButton.setAttribute('aria-expanded', 'false');
+  }
   try {
     await api(`/api/call-logs/${encodeURIComponent(id)}/result`, {
       method: 'POST',
@@ -1663,10 +1671,13 @@ async function updateCallResult(id, result, select = null) {
     if (getActiveBranch() === branchId) {
       const previous = historyPages.get('callHistoryPagination')?.rows.find(row => row.id === id);
       if (select && previous) select.value = previous.callResult || '';
+      if (select) select.hidden = false;
+      editButton?.setAttribute('aria-expanded', 'true');
       toast('Không lưu được kết quả gọi: ' + error.message, 'error');
     }
   } finally {
     if (select) select.disabled = false;
+    if (editButton) editButton.disabled = false;
   }
 }
 
@@ -3160,6 +3171,15 @@ function initEvents() {
   };
   $('#noticeRows')?.addEventListener('click', handleNoticeActions);
   $('#historyRows')?.addEventListener('click', handleNoticeActions);
+  $('#callHistoryRows')?.addEventListener('click', event => {
+    const button = event.target.closest('[data-call-edit]');
+    if (!button || button.disabled) return;
+    const select = button.closest('tr')?.querySelector('.call-history-result');
+    if (!select || select.disabled) return;
+    select.hidden = !select.hidden;
+    button.setAttribute('aria-expanded', String(!select.hidden));
+    if (!select.hidden) select.focus();
+  });
   $('#callHistoryRows')?.addEventListener('change', event => {
     const select = event.target.closest('[data-call-logid]');
     if (select) updateCallResult(select.dataset.callLogid, select.value, select);

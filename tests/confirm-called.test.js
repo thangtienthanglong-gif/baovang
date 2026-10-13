@@ -285,7 +285,7 @@ test('call history keeps compact identity and inline editable result without det
   assert.equal((html.match(/<td(?:\s[^>]*)?>/g) || []).length, 3);
   assert.match(html, /mini-chip.*9T2D\+/);
   assert.match(html, /student-phone.*0909630582/);
-  assert.match(html, /class="badge called"[^>]*>Đã gọi/);
+  assert.match(html, /class="badge call-history-edit called"[^>]*>Đã gọi/);
   assert.match(html, /Học phí/);
   assert.doesNotMatch(html, /nhanvien-truc|Đã liên hệ phụ huynh|Chi tiết cuộc gọi|Ngày vắng|<details/);
   assert.match(html, /data-call-logid="call-1"/);
@@ -313,9 +313,11 @@ test('editing no answer on page three preserves the row and inline result and sy
   assert.match(fields.callHistoryPagination.innerHTML, /Hiển thị 31–32 \/ tổng 32/);
   assert.match(fields.callHistoryRows.innerHTML, /HS-32/);
   assert.match(fields.callHistoryRows.innerHTML, /data-call-logid="call-32"/);
-  assert.match(fields.callHistoryRows.innerHTML, /class="badge no-answer"[^>]*>Không nghe máy/);
+  assert.match(fields.callHistoryRows.innerHTML, /class="badge call-history-edit no-answer"[^>]*>Không nghe máy/);
   assert.match(fields.callHistoryRows.innerHTML, /value="Không bắt máy" selected/);
   assert.equal(select.disabled, false);
+  assert.equal(select.hidden, true);
+  assert.match(fields.callHistoryRows.innerHTML, /data-call-logid="call-32" hidden/);
   assert.deepEqual(refreshes, ['loadNotices', 'loadTuitionHistory', 'loadAbsences']);
 });
 
@@ -332,6 +334,7 @@ test('a failed result update keeps the history page and restores the prior selec
   await app.updateCallResult('call-1', select.value, select);
   assert.equal(select.value, 'Đã gọi');
   assert.equal(select.disabled, false);
+  assert.equal(select.hidden, false);
   assert.equal(fields.callHistoryRows.innerHTML, before);
 });
 
