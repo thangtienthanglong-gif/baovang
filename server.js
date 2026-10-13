@@ -524,7 +524,7 @@ function markStudentWithdrawn(db, studentId, event) {
     if (absence.studentId !== studentId) continue;
     absence.autoNotice = false;
     absence.noticeDueAt = '';
-    if (!['Đã gửi', 'Chạy thử'].includes(absence.noticeStatus)) {
+    if (!['Đã gửi', 'Đã gọi', 'Chạy thử'].includes(absence.noticeStatus)) {
       absence.noticeStatus = 'Không gửi';
       absence.noticeResult = result;
     }
@@ -542,7 +542,7 @@ function markAbsenceMadeUp(db, absence) {
   absence.autoNotice = false;
   absence.noticeDueAt = '';
   absence.noticeDelayMinutes = 0;
-  if (!['Đã gửi', 'Chạy thử'].includes(absence.noticeStatus)) {
+  if (!['Đã gửi', 'Đã gọi', 'Chạy thử'].includes(absence.noticeStatus)) {
     absence.noticeStatus = 'Không gửi';
     absence.noticeResult = result;
   }
@@ -630,7 +630,11 @@ function getSummary(absences) {
 function filterCallLogs(db, query) {
   const q = String(query.q || '').toLowerCase().trim();
   const date = query.date || '';
-  let rows = db.callLogs || [];
+  const absences = new Map((db.absences || []).map(absence => [absence.id, absence]));
+  let rows = (db.callLogs || []).map(log => ({
+    ...log,
+    absenceStatus: log.absenceStatus || absences.get(log.absenceId)?.absenceStatus || ''
+  }));
 
   if (date) rows = rows.filter(log => log.date === date);
   if (q) {
@@ -2820,7 +2824,7 @@ app.get('/api/bootstrap', async (req, res, next) => {
       settings: publicSettings(db.settings || defaultSettings()),
       classes,
       statuses: ['ALL', 'Chưa gọi', 'Đã gọi', 'Không nghe máy', 'Hẹn gọi lại', 'Sai số'],
-      noticeStatuses: ['ALL', 'Chờ gửi', 'Chờ gửi thủ công', 'Chưa gửi', 'Chạy thử', 'Đã gửi', 'Lỗi gửi', 'Không gửi'],
+      noticeStatuses: ['ALL', 'Chờ gửi', 'Chờ gửi thủ công', 'Chưa gửi', 'Chạy thử', 'Đã gửi', 'Đã gọi', 'Lỗi gửi', 'Không gửi'],
       absenceStatuses: ABSENCE_STATUSES,
       results: [
         '',
@@ -3280,7 +3284,7 @@ app.post('/api/students/:id/remove-from-class', async (req, res, next) => {
       const result = 'Học sinh đã được xóa khỏi danh sách lớp; không gửi thông báo.';
       for (const absence of db.absences || []) {
         if (absence.studentId !== student.id) continue;
-        if (['Đã gửi', 'Chạy thử'].includes(absence.noticeStatus)) continue;
+        if (['Đã gửi', 'Đã gọi', 'Chạy thử'].includes(absence.noticeStatus)) continue;
         absence.autoNotice = false;
         absence.noticeDueAt = '';
         absence.noticeStatus = 'Không gửi';
@@ -3955,7 +3959,7 @@ function selectBulkZaloCandidates(db, filters) {
   const studentsMap = studentByIdMap(db.students || []);
   const rows = filterAbsences(db, filters || {}).filter(row => normalizeAbsenceStatus(row.absenceStatus) !== 'Đã bù'
     && !isWithdrawnAbsence(row, studentsMap[row.studentId]));
-  const allCandidates = rows.filter(row => row.noticeStatus !== 'Đã gửi');
+  const allCandidates = rows.filter(row => !['Đã gửi', 'Đã gọi'].includes(row.noticeStatus));
   const settings = db.settings || defaultSettings();
   const isPersonalMode = ['personal-test', 'personal-real'].includes(settings.zaloMode);
   const candidates = allCandidates;
@@ -4351,6 +4355,65 @@ app.get('/api/notification-logs', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
     res.json(filterNotificationLogs(db, req.query));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/notification-logs/:id/confirm-called', async (req, res, next) => {
+  try {
+    const db = await getBranchDb(req);
+    const log = (db.notificationLogs || []).find(row => row.id === req.params.id);
+    if (!log) return res.status(404).json({ error: 'Không tìm thấy lượt gửi trong chi nhánh này.' });
+    const existingCall = (db.callLogs || []).find(row => row.id === log.callLogId || row.notificationLogId === log.id);
+    if (log.status === 'Đã gọi' && existingCall) return res.json({ log, callLog: existingCall });
+    if (log.status !== 'Lỗi gửi') return res.status(409).json({ error: 'Chỉ xác nhận đã gọi cho lượt gửi lỗi.' });
+
+    const absence = (db.absences || []).find(row => row.id === log.absenceId);
+    const time = nowISO();
+    const caller = req.user.username;
+    const absenceStatus = notificationLogAbsenceStatus(log, absence);
+    // Resolve precisely the failed attempts displayed as this row's group.
+    // Names alone never identify a group; another session or channel stays intact.
+    const studentKey = row => row.studentId ? `id:${row.studentId}` : row.studentCode ? `code:${row.studentCode}` : '';
+    const related = db.notificationLogs.filter(row => row.id === log.id || (
+      row.status === 'Lỗi gửi' && studentKey(log) && log.absenceId
+      && studentKey(row) === studentKey(log) && row.absenceId === log.absenceId
+      && (row.date || '') === (log.date || '') && (row.className || '') === (log.className || '')
+      && (row.phone1 || '') === (log.phone1 || '') && (row.channel || '') === (log.channel || '')
+      && notificationLogAbsenceStatus(row, absence) === absenceStatus
+    ));
+    const callLog = {
+      id: id('log'), time, date: notificationLogDate({ time }), absenceDate: log.date || '',
+      absenceId: log.absenceId || '', notificationLogId: log.id,
+      notificationLogIds: related.map(row => row.id),
+      studentId: log.studentId || absence?.studentId || '', studentCode: log.studentCode || '',
+      studentName: log.studentName || '', className: log.className || '', parentName: log.parentName || '',
+      phoneCalled: normalizePhone(log.responsePayload?.phone || log.phone1 || ''),
+      absenceStatus, callStatus: 'Đã gọi', callResult: 'Đã gọi', caller,
+      note: `Nhân viên xác nhận đã gọi sau lỗi gửi ${log.channel || 'Zalo'}.`
+    };
+    const result = `Đã gọi điện, nhân viên ${caller} xác nhận.`;
+    for (const attempt of related) {
+      attempt.previousStatus = attempt.status;
+      attempt.previousResult = attempt.result || '';
+      attempt.status = 'Đã gọi';
+      attempt.result = result;
+      attempt.absenceStatus ||= absenceStatus;
+      attempt.calledAt = time;
+      attempt.calledBy = caller;
+      attempt.callLogId = callLog.id;
+    }
+    const latestAttempt = db.notificationLogs.findLast(row => row.absenceId === log.absenceId);
+    if (absence && related.includes(latestAttempt)) {
+      Object.assign(absence, {
+        callStatus: 'Đã gọi', callResult: 'Đã gọi', caller, lastCallAt: time,
+        noticeStatus: 'Đã gọi', noticeResult: result, noticeDueAt: '', autoNotice: false, updatedAt: time
+      });
+    }
+    (db.callLogs ||= []).push(callLog);
+    await saveBranchDb(req, db);
+    res.json({ log, callLog });
   } catch (error) {
     next(error);
   }

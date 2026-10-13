@@ -1,0 +1,222 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const test = require('node:test');
+const vm = require('node:vm');
+
+const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+const frontend = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
+const slice = (source, start, end) => source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
+const time = '2026-10-12T17:05:00Z'; // 00:05 on October 13 in Vietnam.
+
+function fixture() {
+  return {
+    absences: [{ id: 'a1', studentId: 's1', date: '2026-10-01', absenceStatus: 'Vắng', noticeStatus: 'Lỗi gửi', autoNotice: true, noticeDueAt: 'old' }],
+    notificationLogs: [{ id: 'failed', absenceId: 'a1', studentId: 's1', studentName: 'Nguyễn Đặng Thiên (A) Kim', studentCode: 'AUTO-1',
+      className: '9T2D+', date: '2026-10-01', time: '2026-10-12T13:09:00Z', absenceStatus: 'Học phí', phone1: '0909630582',
+      responsePayload: { phone: '0909630582' }, status: 'Lỗi gửi', channel: 'Zalo cá nhân', result: 'Không tìm thấy số điện thoại', message: 'Tin gốc' }],
+    callLogs: []
+  };
+}
+
+function backend(db = fixture()) {
+  const branches = { main: db, other: { absences: [], notificationLogs: [], callLogs: [] } };
+  const routes = new Map();
+  let saves = 0;
+  const context = {
+    app: { post: (route, handler) => routes.set(route, handler) },
+    getBranchDb: async req => branches[req.branch], saveBranchDb: async () => { saves++; },
+    cleanText: value => String(value ?? '').trim(), normalizePhone: value => String(value).replace(/\D/g, ''),
+    nowISO: () => time, id: () => 'call-new',
+    normalizeAbsenceStatus: value => value
+  };
+  vm.createContext(context);
+  vm.runInContext(slice(server, 'function filterCallLogs(', 'function sendWorkbook('), context);
+  vm.runInContext(slice(server, "app.post('/api/notification-logs/:id/confirm-called'", "app.post('/api/notification-logs/:id/mark-unfriended'"), context);
+  return { db, context, saves: () => saves, async confirm(logId = 'failed', branch = 'main') {
+    let data, status = 200;
+    const res = { status(code) { status = code; return this; }, json(value) { data = value; } };
+    await routes.get('/api/notification-logs/:id/confirm-called')(
+      { branch, params: { id: logId }, user: { username: 'nhanvien-truc' }, body: { caller: 'spoofed' } }, res,
+      error => { throw error; }
+    );
+    return { status, data };
+  } };
+}
+
+test('confirming a failed send saves the actual phone, original type and authenticated caller in call history', async () => {
+  const app = backend();
+  const { status, data } = await app.confirm();
+  assert.equal(status, 200);
+  assert.equal(data.log.status, 'Đã gọi');
+  assert.equal(data.log.previousStatus, 'Lỗi gửi');
+  assert.equal(data.log.previousResult, 'Không tìm thấy số điện thoại');
+  assert.equal(data.log.message, 'Tin gốc');
+  assert.equal(data.log.time, '2026-10-12T13:09:00Z');
+  assert.equal(data.log.calledAt, time);
+  assert.equal(data.callLog.caller, 'nhanvien-truc');
+  assert.equal(data.callLog.absenceStatus, 'Học phí');
+  assert.equal(data.callLog.phoneCalled, '0909630582');
+  assert.equal(data.callLog.callStatus, 'Đã gọi');
+  assert.equal(data.callLog.callResult, 'Đã gọi');
+  assert.equal(data.callLog.date, '2026-10-13');
+  assert.equal(data.callLog.absenceDate, '2026-10-01');
+  assert.equal(app.db.absences[0].noticeStatus, 'Đã gọi');
+  assert.equal(app.db.absences[0].callStatus, 'Đã gọi');
+  assert.equal(app.db.absences[0].autoNotice, false);
+  assert.equal(app.db.absences[0].noticeDueAt, '');
+  assert.equal(app.saves(), 1);
+  assert.equal(app.context.filterCallLogs(app.db, { date: '2026-10-13', q: 'nhanvien-truc' }).length, 1);
+  assert.equal(app.context.filterCallLogs(app.db, { date: '2026-10-12' }).length, 0);
+});
+
+test('duplicate confirmation returns the existing call without changing its time or creating another history entry', async () => {
+  const app = backend();
+  await app.confirm();
+  const before = structuredClone(app.db);
+  assert.equal((await app.confirm()).status, 200);
+  assert.deepEqual(structuredClone(app.db), before);
+  assert.equal(app.saves(), 1);
+});
+
+test('confirmation cannot target a different branch, missing log or a non-failed send', async () => {
+  const app = backend();
+  const before = structuredClone(app.db);
+  assert.equal((await app.confirm('missing')).status, 404);
+  assert.equal((await app.confirm('failed', 'other')).status, 404);
+  assert.deepEqual(app.db, before);
+  for (const status of ['Đã gửi', 'Chờ gửi thủ công', 'Chạy thử']) {
+    app.db.notificationLogs[0].status = status;
+    const state = structuredClone(app.db);
+    assert.equal((await app.confirm()).status, 409);
+    assert.deepEqual(app.db, state);
+  }
+  assert.equal(app.saves(), 0);
+});
+
+test('grouped failed attempts resolve together but other students, sessions and channels stay unchanged', async () => {
+  const db = fixture();
+  const original = db.notificationLogs[0];
+  db.notificationLogs.unshift({ ...original, id: 'older', time: '2026-10-12T13:00:00Z' });
+  db.notificationLogs.unshift(
+    { ...original, id: 'different-student', studentId: 's2' },
+    { ...original, id: 'different-session', absenceId: 'a2' },
+    { ...original, id: 'different-channel', channel: 'Zalo OA' },
+    { ...original, id: 'different-type', absenceStatus: 'Vắng' },
+    { ...original, id: 'different-phone', phone1: '0900000000' }
+  );
+  const untouched = structuredClone(db.notificationLogs.slice(0, 5));
+  const app = backend(db);
+  await app.confirm();
+  assert.deepEqual(db.notificationLogs.slice(0, 5), untouched);
+  assert.equal(db.notificationLogs.at(-2).status, 'Đã gọi');
+  assert.equal(db.notificationLogs.at(-1).status, 'Đã gọi');
+  assert.equal((await app.confirm('older')).status, 200);
+  assert.equal(db.callLogs.length, 1);
+});
+
+test('an orphaned historical error can be confirmed without recreating attendance', async () => {
+  const db = fixture(); db.absences = [];
+  const app = backend(db);
+  assert.equal((await app.confirm()).status, 200);
+  assert.equal(db.callLogs[0].studentName, 'Nguyễn Đặng Thiên (A) Kim');
+  assert.deepEqual(db.absences, []);
+});
+
+test('confirming an older failure preserves a newer send and current queue state', async () => {
+  const db = fixture();
+  db.notificationLogs.push({ ...db.notificationLogs[0], id: 'newer', status: 'Chờ gửi thủ công' });
+  const currentAbsence = structuredClone(db.absences[0]);
+  const newestLog = structuredClone(db.notificationLogs[1]);
+  const app = backend(db);
+  await app.confirm();
+  assert.deepEqual(db.absences[0], currentAbsence);
+  assert.deepEqual(db.notificationLogs[1], newestLog);
+  assert.equal(db.callLogs.length, 1);
+});
+
+test('a resolved phone call is excluded from subsequent bulk Zalo sends', async () => {
+  const app = backend();
+  await app.confirm();
+  Object.assign(app.context, {
+    studentByIdMap: () => ({}), filterAbsences: db => db.absences,
+    isWithdrawnAbsence: () => false, defaultSettings: () => ({})
+  });
+  vm.runInContext(slice(server, 'function selectBulkZaloCandidates(', 'async function runBulkZaloAction('), app.context);
+  const selection = app.context.selectBulkZaloCandidates(app.db, {});
+  assert.equal(selection.candidates.length, 0);
+  assert.equal(selection.alreadySent, 1);
+});
+
+function ui() {
+  const events = {}, fields = {}, requests = [], refreshes = [];
+  for (const id of ['noticeRows', 'historyRows', 'callHistoryRows', 'noticePagination', 'callHistoryPagination', 'historyKeyword']) {
+    fields[id] = { value: '', innerHTML: '', addEventListener: (type, handler) => { events[`${id}:${type}`] = handler; } };
+  }
+  const app = {
+    $: selector => fields[selector.slice(1)], escapeHtml: value => String(value ?? '').replace(/</g, '&lt;').replace(/"/g, '&quot;'),
+    formatDateTime: value => value, absenceStatusLabel: value => value, toast() {},
+    getActiveBranch: () => 'main', selectedHistoryDate: () => '2026-10-13', queryString: () => '',
+    api: async (url, options) => { requests.push({ url, options }); return []; }
+  };
+  vm.createContext(app);
+  vm.runInContext(slice(frontend, 'function statusClass(', 'function options('), app);
+  vm.runInContext(slice(frontend, 'async function loadHistory(', 'async function updateCallResult('), app);
+  vm.runInContext(slice(frontend, 'function groupFailedNoticeRows(', 'async function markUnfriended('), app);
+  for (const name of ['loadNotices', 'loadTuitionHistory', 'loadCallHistory', 'loadAbsences']) app[name] = async () => { refreshes.push(name); };
+  vm.runInContext(slice(frontend, '  const handleNoticeActions = async event => {', "  $('#filterClass').addEventListener"), app);
+  return { app, fields, events, requests, refreshes };
+}
+
+test('Zalo and tuition failed rows both offer call confirmation and resolved rows show the green called badge', () => {
+  const { app } = ui();
+  for (const absenceStatus of ['Học phí', 'Vắng']) {
+    const row = { ...fixture().notificationLogs[0], absenceStatus };
+    assert.match(app.renderNoticeHistoryRow(row), /confirm-called-btn/);
+    const resolved = app.renderNoticeHistoryRow({ ...row, status: 'Đã gọi' });
+    assert.match(resolved, /class="badge called"[^>]*>Đã gọi/);
+    assert.doesNotMatch(resolved, /confirm-called-btn|retry-zalo-btn|confirm-zalo-sent-btn/);
+  }
+  assert.match(app.renderNoticeActions({ id: 'orphan', status: 'Lỗi gửi' }), /confirm-called-btn/);
+});
+
+test('both history tables confirm the exact log then refresh calls, tuition, Zalo and queue; disabled buttons are ignored', async () => {
+  const { events, requests, refreshes } = ui();
+  for (const table of ['noticeRows', 'historyRows']) {
+    const button = { dataset: { logid: 'failed' }, disabled: false };
+    const event = { target: { closest: selector => selector === '.confirm-called-btn' ? button : null } };
+    await events[`${table}:click`](event);
+    assert.equal(requests.at(-1).url, '/api/notification-logs/failed/confirm-called');
+    assert.equal(requests.at(-1).options.method, 'POST');
+    const count = requests.length;
+    await events[`${table}:click`](event);
+    assert.equal(requests.length, count);
+  }
+  assert.deepEqual(refreshes, Array(2).fill(['loadNotices', 'loadTuitionHistory', 'loadCallHistory', 'loadAbsences']).flat());
+});
+
+test('a failed confirmation re-enables the button and leaves local history unchanged', async () => {
+  const { app, events, refreshes } = ui();
+  app.api = async () => { throw new Error('Không lưu được'); };
+  const button = { dataset: { logid: 'failed' }, disabled: false };
+  await events['noticeRows:click']({ target: { closest: selector => selector === '.confirm-called-btn' ? button : null } });
+  assert.equal(button.disabled, false);
+  assert.deepEqual(refreshes, []);
+});
+
+test('call history keeps compact identity, original type, caller details and editable result without AUTO codes', async () => {
+  const { app, fields } = ui();
+  app.api = async () => [{ id: 'call-1', studentName: 'Kim', studentCode: 'AUTO-HIDDEN', className: '9T2D+', phoneCalled: '0909630582',
+    absenceStatus: 'Học phí', callStatus: 'Đã gọi', caller: 'nhanvien-truc', callResult: 'Đã gọi', note: 'Đã liên hệ phụ huynh' }];
+  vm.runInContext(slice(frontend, 'async function loadCallHistory(', 'function tuitionHistoryParams('), app);
+  await app.loadCallHistory();
+  const html = fields.callHistoryRows.innerHTML;
+  assert.equal((html.match(/<td(?:\s[^>]*)?>/g) || []).length, 3);
+  assert.match(html, /mini-chip.*9T2D\+/);
+  assert.match(html, /student-phone.*0909630582/);
+  assert.match(html, /class="badge called"[^>]*>Đã gọi/);
+  assert.match(html, /Học phí/);
+  assert.match(html, /nhanvien-truc/);
+  assert.match(html, /data-call-logid="call-1"/);
+  assert.doesNotMatch(html, /AUTO-HIDDEN/);
+});

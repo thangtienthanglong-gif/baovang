@@ -836,6 +836,7 @@ function renderCharts() {
 
 function statusClass(status) {
   return {
+    'Đã gọi': 'called',
     'Chưa gửi': 'pending',
     'Đã gửi': 'called',
     'Không nghe máy': 'no-answer',
@@ -1304,7 +1305,7 @@ function updateBulkSendCount() {
 
 function renderAbsences() {
   const container = $('#absenceRows');
-  const queueAbsences = state.absences.filter(row => row.noticeStatus !== 'Đã gửi'
+  const queueAbsences = state.absences.filter(row => !['Đã gửi', 'Đã gọi'].includes(row.noticeStatus)
     && normalizeAbsenceStatus(row.absenceStatus) !== 'Nghỉ học' && normalizeAbsenceStatus(row.absenceStatus) !== 'Đã bù'
     && row.studentStatus !== 'Nghỉ học' && !row.studentRemovedFromClass);
 
@@ -1587,27 +1588,35 @@ async function loadCallHistory() {
   if (!tbody) return;
   setHistoryRows('callHistoryRows', 'callHistoryPagination', rows, row => `
     <tr>
-      <td>${escapeHtml(formatDateTime(row.time))}</td>
-      <td>${escapeHtml(row.date)}</td>
-      <td>
-        <div class="person-main">${escapeHtml(row.studentName)}</div>
-        <div class="muted">${escapeHtml(row.studentCode)}</div>
+      <td>${escapeHtml(formatDateTime(row.time, 'Asia/Ho_Chi_Minh'))}</td>
+      <td class="notice-history-student">
+        <div class="student-heading">
+          <div class="person-main">${escapeHtml(row.studentName)}</div>
+          ${row.className ? `<span class="mini-chip">${escapeHtml(row.className)}</span>` : ''}
+        </div>
+        <div class="student-phone">${escapeHtml(row.phoneCalled || '')}</div>
       </td>
-      <td>${escapeHtml(row.className)}</td>
-      <td>${escapeHtml(row.phoneCalled)}</td>
-      <td><span class="badge ${statusClass(row.callStatus)}">${escapeHtml(row.callStatus)}</span></td>
       <td>
-        <select class="form-control" onchange="updateCallResult('${row.id}', this.value)" style="width: 150px;">
+        <div class="notice-history-status">
+          ${row.absenceStatus && row.absenceStatus !== 'Khác' ? `<span class="notice-history-reason">${escapeHtml(absenceStatusLabel(row.absenceStatus))}</span>` : ''}
+          <span class="badge ${statusClass(row.callStatus)}" title="${escapeHtml([row.caller, row.note].filter(Boolean).join(' — '))}">${escapeHtml(row.callStatus)}</span>
+        </div>
+        <details class="call-history-details">
+          <summary>Chi tiết cuộc gọi</summary>
+          <div class="muted">Người gọi: ${escapeHtml(row.caller || '')} · Ngày vắng: ${escapeHtml(row.absenceDate || row.date || '')}</div>
+          <div class="muted">${escapeHtml(row.note || '')}</div>
+          <label>Kết quả
+        <select class="form-control" data-call-logid="${escapeHtml(row.id)}">
           <option value="" ${!row.callResult ? 'selected' : ''}>-- Chọn --</option>
           <option value="Đã gọi" ${row.callResult === 'Đã gọi' ? 'selected' : ''}>Đã gọi</option>
           <option value="Không bắt máy" ${row.callResult === 'Không bắt máy' ? 'selected' : ''}>Không bắt máy</option>
           <option value="Không liên lạc được" ${row.callResult === 'Không liên lạc được' ? 'selected' : ''}>Không liên lạc được</option>
         </select>
+          </label>
+        </details>
       </td>
-      <td>${escapeHtml(row.caller)}</td>
-      <td>${escapeHtml(row.note)}</td>
     </tr>
-  `, 'Chưa có lịch sử gọi điện.', 9);
+  `, 'Chưa có lịch sử gọi điện.', 3);
 }
 
 function tuitionHistoryParams() {
@@ -1720,11 +1729,12 @@ function renderNoticeActions(row) {
     ${row.status === 'Chờ gửi thủ công' && row.absenceId && row.channel === 'Zalo cá nhân' ? `
       <button class="btn ghost btn-sm confirm-zalo-sent-btn" type="button" data-id="${escapeHtml(row.absenceId)}" data-logid="${escapeHtml(row.id)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Đánh dấu đã gửi</button>
     ` : ''}
-    ${row.status === 'Lỗi gửi' && row.absenceId ? `
+    ${row.status === 'Lỗi gửi' ? `
       ${(row.failedAttempts || [row]).some(attempt => /Đã bấm Gửi|gửi một phần|chưa xác nhận được nội dung/i.test(attempt.result || ''))
         ? '<span class="muted">Kiểm tra tin trong Zalo trước khi thao tác tiếp</span>'
-        : `<button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${escapeHtml(row.absenceId)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Gửi lại</button>`}
-      ${row.channel === 'Zalo cá nhân' ? `<button class="btn ghost btn-sm confirm-zalo-sent-btn" type="button" data-id="${escapeHtml(row.absenceId)}" data-logid="${escapeHtml(row.id)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Xác nhận đã gửi</button>` : ''}
+        : row.absenceId ? `<button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${escapeHtml(row.absenceId)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Gửi lại</button>` : ''}
+      ${row.absenceId && row.channel === 'Zalo cá nhân' ? `<button class="btn ghost btn-sm confirm-zalo-sent-btn" type="button" data-id="${escapeHtml(row.absenceId)}" data-logid="${escapeHtml(row.id)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Xác nhận đã gửi</button>` : ''}
+      ${row.id ? `<button class="btn ghost btn-sm confirm-called-btn" type="button" data-logid="${escapeHtml(row.id)}">Xác nhận đã gọi</button>` : ''}
     ` : ''}
   `;
 }
@@ -3055,6 +3065,20 @@ function initEvents() {
   });
 
   const handleNoticeActions = async event => {
+    const calledBtn = event.target.closest('.confirm-called-btn');
+    if (calledBtn) {
+      if (calledBtn.disabled) return;
+      calledBtn.disabled = true;
+      try {
+        await api(`/api/notification-logs/${encodeURIComponent(calledBtn.dataset.logid)}/confirm-called`, { method: 'POST', body: '{}' });
+        toast('Đã xác nhận đã gọi và lưu vào lịch sử gọi điện.');
+        await Promise.all([loadNotices(), loadTuitionHistory(), loadCallHistory(), loadAbsences()]);
+      } catch (err) {
+        calledBtn.disabled = false;
+        toast('Không xác nhận được cuộc gọi: ' + err.message, 'error');
+      }
+      return;
+    }
     const copyBtn = event.target.closest('.copy-log-msg-btn');
     if (copyBtn) {
       const msg = copyBtn.dataset.msg;
@@ -3118,6 +3142,10 @@ function initEvents() {
   };
   $('#noticeRows')?.addEventListener('click', handleNoticeActions);
   $('#historyRows')?.addEventListener('click', handleNoticeActions);
+  $('#callHistoryRows')?.addEventListener('change', event => {
+    const select = event.target.closest('[data-call-logid]');
+    if (select) updateCallResult(select.dataset.callLogid, select.value);
+  });
   $('#filterClass').addEventListener('change', loadAbsences);
   $('#filterSession')?.addEventListener('change', async () => {
     queueSessionAuto = false;

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <link rel="stylesheet" href="/style.css?v=20261013-history-2">
+  <link rel="stylesheet" href="/style.css?v=20261013-history-3">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     /* Inner Tabs for History - INLINED TO PREVENT CACHE */
@@ -570,7 +570,7 @@
         </section>
       </div>
 
-      <div id="callHistoryPanel" class="sub-panel" style="display: none;">
+      <div id="callHistoryPanel" class="sub-panel notice-history-panel" style="display: none;">
         <section class="card table-card">
           <div class="section-title history-pagination-header">
             <div><h2>Lịch sử gọi điện</h2></div>
@@ -584,14 +584,8 @@
               <thead>
                 <tr>
                   <th>Thời gian</th>
-                  <th>Ngày vắng</th>
-                  <th>Học sinh</th>
-                  <th>Lớp</th>
-                  <th>SĐT gọi</th>
+                  <th>Họ và tên</th>
                   <th>Trạng thái</th>
-                  <th>Kết quả</th>
-                  <th>Người gọi</th>
-                  <th>Ghi chú</th>
                 </tr>
               </thead>
               <tbody id="callHistoryRows"></tbody>
@@ -856,7 +850,7 @@
     </div>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="/app.js?v=20261013-5"></script>
+  <script src="/app.js?v=20261013-6"></script>
   <script src="/exams.js?v=20261009-2"></script>
   <nav class="bottom-nav">
     <button class="bottom-tab active" data-tab="absenceTab" type="button"><i class="fa-solid fa-clipboard-user"></i><span>Điểm danh</span></button>

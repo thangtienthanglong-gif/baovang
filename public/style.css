@@ -1623,6 +1623,22 @@ td.empty {
   line-height: 1.35;
 }
 
+.call-history-details {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.call-history-details summary {
+  cursor: pointer;
+}
+
+.call-history-details .form-control {
+  width: auto;
+  max-width: 100%;
+  margin-top: 4px;
+}
+
 .pagination {
   display: flex;
   justify-content: space-between;
