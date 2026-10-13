@@ -24,7 +24,7 @@ function backend(db = fixture()) {
   const routes = new Map();
   let saves = 0;
   const context = {
-    app: { post: (route, handler) => routes.set(route, handler) },
+    app: Object.fromEntries(['get', 'post', 'delete'].map(method => [method, (route, handler) => routes.set(`${method} ${route}`, handler)])),
     getBranchDb: async req => branches[req.branch], saveBranchDb: async () => { saves++; },
     cleanText: value => String(value ?? '').trim(), normalizePhone: value => String(value).replace(/\D/g, ''),
     nowISO: () => time, id: () => 'call-new',
@@ -32,20 +32,25 @@ function backend(db = fixture()) {
   };
   vm.createContext(context);
   vm.runInContext(slice(server, 'function filterCallLogs(', 'function sendWorkbook('), context);
+  vm.runInContext(slice(server, "app.get('/api/call-logs'", "app.post('/api/call-logs/:id/result'"), context);
   vm.runInContext(slice(server, "app.post('/api/call-logs/:id/result'", "app.get('/api/notification-logs'"), context);
   vm.runInContext(slice(server, "app.post('/api/notification-logs/:id/confirm-called'", "app.post('/api/notification-logs/:id/mark-unfriended'"), context);
   return { db, context, saves: () => saves, async confirm(logId = 'failed', branch = 'main', result = 'Đã báo', absenceStatus) {
     let data, status = 200;
     const res = { status(code) { status = code; return this; }, json(value) { data = value; } };
-    await routes.get('/api/notification-logs/:id/confirm-called')(
+    await routes.get('post /api/notification-logs/:id/confirm-called')(
       { branch, params: { id: logId }, user: { username: 'nhanvien-truc' }, body: { caller: 'spoofed', result, absenceStatus } }, res,
       error => { throw error; }
     );
     return { status, data };
+  }, async listCalls(query, branch = 'main') {
+    let data;
+    await routes.get('get /api/call-logs')({ branch, query }, { json(value) { data = value; } }, error => { throw error; });
+    return data;
   }, async update(result, callId = 'call-new', branch = 'main') {
     let data, status = 200;
     const res = { status(code) { status = code; return this; }, json(value) { data = value; } };
-    await routes.get('/api/call-logs/:id/result')(
+    await routes.get('post /api/call-logs/:id/result')(
       { branch, params: { id: callId }, user: { username: 'nhanvien-khac' }, body: { result } }, res,
       error => { throw error; }
     );
@@ -68,15 +73,16 @@ test('confirming a failed send saves the actual phone, original type and authent
   assert.equal(data.callLog.phoneCalled, '0909630582');
   assert.equal(data.callLog.callStatus, 'Đã gọi');
   assert.equal(data.callLog.callResult, 'Đã báo');
-  assert.equal(data.callLog.date, '2026-10-13');
+  assert.equal(data.callLog.date, '2026-10-12');
+  assert.equal(data.callLog.time, time);
   assert.equal(data.callLog.absenceDate, '2026-10-01');
   assert.equal(app.db.absences[0].noticeStatus, 'Đã gọi');
   assert.equal(app.db.absences[0].callStatus, 'Đã gọi');
   assert.equal(app.db.absences[0].autoNotice, false);
   assert.equal(app.db.absences[0].noticeDueAt, '');
   assert.equal(app.saves(), 1);
-  assert.equal(app.context.filterCallLogs(app.db, { date: '2026-10-13', q: 'nhanvien-truc' }).length, 1);
-  assert.equal(app.context.filterCallLogs(app.db, { date: '2026-10-12' }).length, 0);
+  assert.equal((await app.listCalls({ date: '2026-10-12', q: 'nhanvien-truc' })).length, 1);
+  assert.equal((await app.listCalls({ date: '2026-10-13' })).length, 0);
 });
 
 test('duplicate confirmation returns the existing call without changing its time or creating another history entry', async () => {
@@ -125,6 +131,55 @@ test('confirming from tuition history records a tuition call even if linked atte
   assert.equal(data.callLog.absenceStatus, 'Học phí');
   assert.equal(app.context.filterCallLogs(app.db, { absenceStatus: 'Học phí' }).length, 1);
   assert.equal(app.context.filterCallLogs(app.db, { excludeAbsenceStatus: 'Học phí' }).length, 0);
+});
+
+test('confirming an October 10 notice on October 13 appears in the correct call-history tab for October 10', async () => {
+  for (const absenceStatus of ['Vắng không phép', 'Học phí']) {
+    for (const result of ['Đã báo', 'Không bắt máy', 'Không liên lạc được']) {
+      const db = fixture();
+      Object.assign(db.notificationLogs[0], { date: '2026-10-10', time: '2026-10-10T01:35:00Z', absenceStatus });
+      const app = backend(db);
+      await app.confirm('failed', 'main', result);
+      const tuition = absenceStatus === 'Học phí';
+      const scope = tuition ? { absenceStatus: 'Học phí' } : { excludeAbsenceStatus: 'Học phí' };
+      const wrongScope = tuition ? { excludeAbsenceStatus: 'Học phí' } : { absenceStatus: 'Học phí' };
+      const rows = await app.listCalls({ date: '2026-10-10', ...scope });
+      assert.equal(rows.length, 1, `${absenceStatus}: ${result}`);
+      assert.equal(rows[0].callResult, result);
+      assert.equal(rows[0].time, time);
+      assert.equal((await app.listCalls({ date: '2026-10-10', ...wrongScope })).length, 0);
+      assert.equal((await app.listCalls({ date: '2026-10-13', ...scope })).length, 0);
+      assert.equal((await app.listCalls({ date: '2026-10-10', ...scope }, 'other')).length, 0);
+    }
+  }
+});
+
+test('already-saved calls filed under the confirmation day are recovered under their source day without rewriting history', async () => {
+  for (const absenceStatus of ['Vắng không phép', 'Học phí']) {
+    const db = fixture();
+    Object.assign(db.notificationLogs[0], { date: '2026-10-10', time: '2026-10-10T01:35:00Z', absenceStatus });
+    const app = backend(db);
+    await app.confirm();
+    db.callLogs[0].date = '2026-10-13'; // Dates saved by the previous endpoint.
+    const before = structuredClone(db);
+    const rows = await app.listCalls({ date: '2026-10-10' });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].date, '2026-10-10');
+    assert.equal(rows[0].time, time);
+    assert.deepEqual(structuredClone(db), before);
+  }
+});
+
+test('absence calls use the attendance day while tuition calls use the source send day in Vietnam', async () => {
+  for (const [absenceStatus, expectedDate] of [['Vắng không phép', '2026-10-08'], ['Học phí', '2026-10-10']]) {
+    const db = fixture();
+    Object.assign(db.notificationLogs[0], { date: '2026-10-08', time: '2026-10-09T17:35:00Z', absenceStatus });
+    const app = backend(db);
+    await app.confirm();
+    assert.equal((await app.listCalls({ date: expectedDate })).length, 1);
+    assert.equal(db.callLogs[0].date, expectedDate);
+    assert.equal(db.callLogs[0].time, time);
+  }
 });
 
 test('missing or invalid call outcomes do not change history', async () => {
@@ -206,7 +261,7 @@ test('changing to no answer keeps call history and synchronizes linked notice an
     assert.equal(app.db.notificationLogs[0].status, status);
     assert.equal(app.db.absences[0].callStatus, status);
     assert.equal(app.db.absences[0].noticeStatus, status);
-    assert.equal(app.context.filterCallLogs(app.db, { date: '2026-10-13' }).length, 1);
+    assert.equal(app.context.filterCallLogs(app.db, { date: '2026-10-12' }).length, 1);
     assert.equal((await app.confirm()).status, 200);
     assert.equal(app.db.callLogs.length, 1);
     assert.equal(app.db.callLogs[0].callStatus, status);

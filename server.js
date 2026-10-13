@@ -632,15 +632,24 @@ function filterCallLogs(db, query) {
   const date = query.date || '';
   const absences = new Map((db.absences || []).map(absence => [absence.id, absence]));
   const notices = new Map((db.notificationLogs || []).map(log => [log.id, log]));
-  let rows = (db.callLogs || []).map(log => ({
-    ...log,
-    callStatus: log.callStatus === 'Lỗi gọi'
-      ? ({ 'Không bắt máy': 'Không nghe máy', 'Không liên lạc được': 'Không liên lạc được' }[log.callResult] || log.callStatus)
-      : log.callStatus,
-    absenceStatus: log.notificationLogId && notices.has(log.notificationLogId)
-      ? notificationLogAbsenceStatus(notices.get(log.notificationLogId), absences.get(log.absenceId))
-      : log.absenceStatus || notificationLogAbsenceStatus(log, absences.get(log.absenceId))
-  }));
+  let rows = (db.callLogs || []).map(log => {
+    const notice = notices.get(log.notificationLogId);
+    const absenceStatus = notice
+      ? notificationLogAbsenceStatus(notice, absences.get(log.absenceId))
+      : log.absenceStatus || notificationLogAbsenceStatus(log, absences.get(log.absenceId));
+    return {
+      ...log,
+      // Call confirmations must stay under the same selected history day as
+      // their source notice, even if staff make the call several days later.
+      date: notice ? notificationCallHistoryDate(notice, absenceStatus) || log.date
+        : log.notificationLogId && normalizeAbsenceStatus(absenceStatus) !== 'Học phí'
+          ? log.absenceDate || log.date : log.date,
+      callStatus: log.callStatus === 'Lỗi gọi'
+        ? ({ 'Không bắt máy': 'Không nghe máy', 'Không liên lạc được': 'Không liên lạc được' }[log.callResult] || log.callStatus)
+        : log.callStatus,
+      absenceStatus
+    };
+  });
 
   if (date) rows = rows.filter(log => log.date === date);
   if (query.absenceStatus && query.absenceStatus !== 'ALL') {
@@ -654,6 +663,12 @@ function filterCallLogs(db, query) {
   }
 
   return rows.sort((a, b) => String(b.time).localeCompare(String(a.time)));
+}
+
+function notificationCallHistoryDate(notice, absenceStatus) {
+  return normalizeAbsenceStatus(absenceStatus) === 'Học phí'
+    ? notificationLogDate(notice)
+    : notice.date || notificationLogDate(notice);
 }
 
 function notificationLogDate(log) {
@@ -4431,7 +4446,7 @@ app.post('/api/notification-logs/:id/confirm-called', async (req, res, next) => 
       && notificationLogAbsenceStatus(row, absence) === absenceStatus
     ));
     const callLog = {
-      id: id('log'), time, date: notificationLogDate({ time }), absenceDate: log.date || '',
+      id: id('log'), time, date: notificationCallHistoryDate(log, absenceStatus) || notificationLogDate({ time }), absenceDate: log.date || '',
       absenceId: log.absenceId || '', notificationLogId: log.id,
       notificationLogIds: related.map(row => row.id),
       studentId: log.studentId || absence?.studentId || '', studentCode: log.studentCode || '',
