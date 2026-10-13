@@ -637,9 +637,9 @@ function filterCallLogs(db, query) {
     callStatus: log.callStatus === 'Lỗi gọi'
       ? ({ 'Không bắt máy': 'Không nghe máy', 'Không liên lạc được': 'Không liên lạc được' }[log.callResult] || log.callStatus)
       : log.callStatus,
-    absenceStatus: log.absenceStatus || notificationLogAbsenceStatus(
-      notices.get(log.notificationLogId) || log, absences.get(log.absenceId)
-    )
+    absenceStatus: log.notificationLogId && notices.has(log.notificationLogId)
+      ? notificationLogAbsenceStatus(notices.get(log.notificationLogId), absences.get(log.absenceId))
+      : log.absenceStatus || notificationLogAbsenceStatus(log, absences.get(log.absenceId))
   }));
 
   if (date) rows = rows.filter(log => log.date === date);
@@ -4415,7 +4415,11 @@ app.post('/api/notification-logs/:id/confirm-called', async (req, res, next) => 
     const absence = (db.absences || []).find(row => row.id === log.absenceId);
     const time = nowISO();
     const caller = req.user.username;
-    const absenceStatus = notificationLogAbsenceStatus(log, absence);
+    const inferredAbsenceStatus = notificationLogAbsenceStatus(log, absence);
+    const requestedAbsenceStatus = cleanText(req.body?.absenceStatus);
+    const absenceStatus = requestedAbsenceStatus === 'Học phí' || requestedAbsenceStatus === 'Trễ học phí'
+      ? 'Học phí'
+      : inferredAbsenceStatus;
     // Resolve precisely the failed attempts displayed as this row's group.
     // Names alone never identify a group; another session or channel stays intact.
     const studentKey = row => row.studentId ? `id:${row.studentId}` : row.studentCode ? `code:${row.studentCode}` : '';
@@ -4442,7 +4446,7 @@ app.post('/api/notification-logs/:id/confirm-called', async (req, res, next) => 
       attempt.previousResult = attempt.result || '';
       attempt.status = callStatus;
       attempt.result = result;
-      attempt.absenceStatus ||= absenceStatus;
+      attempt.absenceStatus = absenceStatus;
       attempt.calledAt = time;
       attempt.calledBy = caller;
       attempt.callLogId = callLog.id;

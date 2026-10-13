@@ -1759,7 +1759,7 @@ function renderNoticeActions(row) {
         ? '<span class="muted">Kiểm tra tin trong Zalo trước khi thao tác tiếp</span>'
         : row.absenceId ? `<button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${escapeHtml(row.absenceId)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Gửi lại</button>` : ''}
       ${row.absenceId && row.channel === 'Zalo cá nhân' ? `<button class="btn ghost btn-sm confirm-zalo-sent-btn" type="button" data-id="${escapeHtml(row.absenceId)}" data-logid="${escapeHtml(row.id)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Xác nhận đã gửi</button>` : ''}
-      ${row.id ? `<button class="btn ghost btn-sm confirm-called-btn" type="button" data-logid="${escapeHtml(row.id)}">Xác nhận đã gọi</button><select class="form-control confirm-called-result" data-logid="${escapeHtml(row.id)}" aria-label="Kết quả cuộc gọi" hidden><option value="">Chọn kết quả gọi</option><option value="Đã báo">Đã báo</option><option value="Không bắt máy">Không bắt máy</option><option value="Không liên lạc được">Không liên lạc được</option></select>` : ''}
+      ${row.id ? `<button class="btn ghost btn-sm confirm-called-btn" type="button" data-logid="${escapeHtml(row.id)}">Xác nhận đã gọi</button><select class="form-control confirm-called-result" data-logid="${escapeHtml(row.id)}" data-absence-status="${row.absenceStatus === 'Học phí' ? 'Học phí' : ''}" aria-label="Kết quả cuộc gọi" hidden><option value="">Chọn kết quả gọi</option><option value="Đã báo">Đã báo</option><option value="Không bắt máy">Không bắt máy</option><option value="Không liên lạc được">Không liên lạc được</option></select>` : ''}
     ` : ''}
   `;
 }
@@ -3168,7 +3168,7 @@ function initEvents() {
     if (button) button.disabled = true;
     try {
       await api(`/api/notification-logs/${encodeURIComponent(select.dataset.logid)}/confirm-called`, {
-        method: 'POST', body: JSON.stringify({ result: select.value })
+        method: 'POST', body: JSON.stringify({ result: select.value, absenceStatus: select.dataset.absenceStatus })
       });
       if (getActiveBranch() !== branchId) return;
       toast('Đã lưu kết quả gọi vào lịch sử.');

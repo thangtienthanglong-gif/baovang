@@ -34,11 +34,11 @@ function backend(db = fixture()) {
   vm.runInContext(slice(server, 'function filterCallLogs(', 'function sendWorkbook('), context);
   vm.runInContext(slice(server, "app.post('/api/call-logs/:id/result'", "app.get('/api/notification-logs'"), context);
   vm.runInContext(slice(server, "app.post('/api/notification-logs/:id/confirm-called'", "app.post('/api/notification-logs/:id/mark-unfriended'"), context);
-  return { db, context, saves: () => saves, async confirm(logId = 'failed', branch = 'main', result = 'Đã báo') {
+  return { db, context, saves: () => saves, async confirm(logId = 'failed', branch = 'main', result = 'Đã báo', absenceStatus) {
     let data, status = 200;
     const res = { status(code) { status = code; return this; }, json(value) { data = value; } };
     await routes.get('/api/notification-logs/:id/confirm-called')(
-      { branch, params: { id: logId }, user: { username: 'nhanvien-truc' }, body: { caller: 'spoofed', result } }, res,
+      { branch, params: { id: logId }, user: { username: 'nhanvien-truc' }, body: { caller: 'spoofed', result, absenceStatus } }, res,
       error => { throw error; }
     );
     return { status, data };
@@ -115,6 +115,16 @@ test('the selected call outcome is saved consistently to call, notice and attend
     assert.equal(app.db.absences[0].noticeStatus, status);
     assert.equal(app.db.notificationLogs[0].status, status);
   }
+});
+
+test('confirming from tuition history records a tuition call even if linked attendance is an absence', async () => {
+  const app = backend();
+  app.db.notificationLogs[0].absenceStatus = 'Vắng không phép';
+  const { status, data } = await app.confirm('failed', 'main', 'Không bắt máy', 'Học phí');
+  assert.equal(status, 200);
+  assert.equal(data.callLog.absenceStatus, 'Học phí');
+  assert.equal(app.context.filterCallLogs(app.db, { absenceStatus: 'Học phí' }).length, 1);
+  assert.equal(app.context.filterCallLogs(app.db, { excludeAbsenceStatus: 'Học phí' }).length, 0);
 });
 
 test('missing or invalid call outcomes do not change history', async () => {
@@ -280,7 +290,7 @@ test('both history tables reveal call outcomes and save the selected result', as
   for (const table of ['noticeRows', 'historyRows']) {
     const previousRequests = requests.length;
     const button = { dataset: { logid: 'failed' }, disabled: false };
-    const select = { dataset: { logid: 'failed' }, disabled: false, hidden: true, value: '', focus() {} };
+    const select = { dataset: { logid: 'failed', absenceStatus: 'Học phí' }, disabled: false, hidden: true, value: '', focus() {} };
     button.parentElement = { querySelector: selector => selector === '.confirm-called-result' ? select : null };
     const event = { target: { closest: selector => selector === '.confirm-called-btn' ? button : null } };
     await events[`${table}:click`](event);
@@ -290,7 +300,7 @@ test('both history tables reveal call outcomes and save the selected result', as
     await events[`${table}:change`]({ target: { closest: selector => selector === '.confirm-called-result' ? select : null } });
     assert.equal(requests.at(-1).url, '/api/notification-logs/failed/confirm-called');
     assert.equal(requests.at(-1).options.method, 'POST');
-    assert.deepEqual(JSON.parse(requests.at(-1).options.body), { result: 'Không bắt máy' });
+    assert.deepEqual(JSON.parse(requests.at(-1).options.body), { result: 'Không bắt máy', absenceStatus: 'Học phí' });
   }
   assert.deepEqual(refreshes, Array(2).fill(['loadNotices', 'loadTuitionHistory', 'loadCallHistory', 'loadAbsences']).flat());
 });
