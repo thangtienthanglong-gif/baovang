@@ -280,11 +280,16 @@ function syncAutomaticDate() {
 
 function syncAutomaticHistoryDate() {
   const input = $('#historyDate');
+  const endInput = $('#historyDateEnd');
   if (!input) return false;
   const today = clientTodayISO();
-  const changed = historyDateAuto && input.value !== today;
+  const changed = historyDateAuto && (input.value !== today || (endInput && endInput.value !== today));
   if (historyDateAuto) input.value = today;
   input.readOnly = historyDateAuto;
+  if (endInput) {
+    if (historyDateAuto) endInput.value = today;
+    endInput.readOnly = historyDateAuto;
+  }
   if ($('#historyDateAuto')) $('#historyDateAuto').checked = historyDateAuto;
   return changed;
 }
@@ -292,6 +297,32 @@ function syncAutomaticHistoryDate() {
 function selectedHistoryDate() {
   syncAutomaticHistoryDate();
   return $('#historyDate')?.value || '';
+}
+
+function historyDateParams() {
+  const dateStart = selectedHistoryDate();
+  const endInput = $('#historyDateEnd');
+  if (!endInput) return { date: dateStart };
+  const dateEnd = endInput.value || '';
+  const error = dateStart && dateEnd && dateStart > dateEnd ? 'Từ ngày phải trước hoặc bằng Đến ngày.' : '';
+  endInput.setCustomValidity(error);
+  const invalidInput = [$('#historyDate'), endInput].find(input => input?.validity?.badInput);
+  if (invalidInput) {
+    invalidInput.reportValidity();
+    throw new Error('Vui lòng nhập ngày lọc lịch sử hợp lệ.');
+  }
+  if (error) {
+    endInput.reportValidity();
+    throw new Error(error);
+  }
+  return { dateStart, dateEnd };
+}
+
+async function reloadHistoryFromFilters() {
+  try {
+    historyDateParams();
+    await Promise.all([loadHistory(), loadNotices(), loadQuitStudents(), loadRemovedClassStudents()]);
+  } catch (error) { toast(error.message, 'error'); }
 }
 
 async function refreshAutomaticDate() {
@@ -1584,7 +1615,7 @@ function handleHistoryPageClick(event) {
 
 function callHistoryParams() {
   return {
-    date: selectedHistoryDate(),
+    ...historyDateParams(),
     q: $('#historyKeyword')?.value.trim() || '',
     ...(callHistoryType === 'tuition' ? { absenceStatus: 'Học phí' } : { excludeAbsenceStatus: 'Học phí' })
   };
@@ -1629,7 +1660,7 @@ async function loadCallHistory({ preservePage = false } = {}) {
 
 function tuitionHistoryParams() {
   return {
-    date: selectedHistoryDate(),
+    ...historyDateParams(),
     q: $('#historyKeyword')?.value.trim() || '',
     absenceStatus: 'Học phí',
     dateBasis: 'time'
@@ -1685,6 +1716,7 @@ async function updateCallResult(id, result, select = null) {
 
 async function loadQuitStudents() {
   const rows = await api('/api/quit-students?' + queryString({
+    ...historyDateParams(),
     q: $('#historyKeyword').value.trim()
   }));
 
@@ -1711,7 +1743,7 @@ async function loadRemovedClassStudents() {
   if (!tbody) return;
   const branchId = getActiveBranch();
   const rows = await api('/api/removed-class-students?' + queryString({
-    date: selectedHistoryDate(), q: $('#historyKeyword').value.trim()
+    ...historyDateParams(), q: $('#historyKeyword').value.trim()
   }));
   if (getActiveBranch() !== branchId) return;
   setHistoryRows('removedClassRows', 'removedClassHistoryPagination', rows, row => `
@@ -1841,7 +1873,7 @@ function renderNoticePage() {
 
 async function loadNotices() {
   let rows = await api('/api/notification-logs?' + queryString({
-    date: selectedHistoryDate(),
+    ...historyDateParams(),
     q: $('#historyKeyword').value.trim(),
     excludeAbsenceStatus: 'Học phí'
   }));
@@ -2431,7 +2463,7 @@ function exportQuitList(params = {}) {
 
 function exportHistory(type) {
   const params = {
-    date: selectedHistoryDate(),
+    ...historyDateParams(),
     q: $('#historyKeyword')?.value.trim() || ''
   };
   switch (type) {
@@ -2444,8 +2476,7 @@ function exportHistory(type) {
     case 'call-tuition':
       return downloadUrl('/api/call-logs/export', { ...params, absenceStatus: 'Học phí' });
     case 'quit':
-      // The withdrawal panel shows all withdrawal dates and filters by keyword.
-      return downloadUrl('/api/quit-students/export', { q: params.q });
+      return downloadUrl('/api/quit-students/export', params);
     case 'removed':
       return downloadUrl('/api/removed-class-students/export', params);
   }
@@ -2453,7 +2484,7 @@ function exportHistory(type) {
 
 async function clearQuitHistory() {
   const params = {
-    date: selectedHistoryDate(),
+    ...historyDateParams(),
     q: $('#historyKeyword')?.value || ''
   };
   await api('/api/quit-students/clear?' + queryString(params), { method: 'DELETE' });
@@ -2464,7 +2495,7 @@ async function clearQuitHistory() {
 async function clearCallHistory() {
   const params = callHistoryParams();
   const typeLabel = callHistoryType === 'tuition' ? 'học phí' : 'vắng';
-  const scope = params.date || params.q ? `lịch sử gọi điện ${typeLabel} đang lọc` : `toàn bộ lịch sử gọi điện ${typeLabel}`;
+  const scope = params.date || params.dateStart || params.dateEnd || params.q ? `lịch sử gọi điện ${typeLabel} đang lọc` : `toàn bộ lịch sử gọi điện ${typeLabel}`;
   if (!confirm(`Xóa ${scope}?`)) return;
   const result = await api('/api/call-logs?' + queryString(params), { method: 'DELETE' });
   toast(`Đã xóa ${result.deleted || 0} dòng lịch sử gọi điện.`);
@@ -2473,7 +2504,7 @@ async function clearCallHistory() {
 
 async function clearTuitionHistory() {
   const params = tuitionHistoryParams();
-  const scope = params.date || params.q ? 'lịch sử học phí đang lọc' : 'toàn bộ lịch sử học phí';
+  const scope = params.date || params.dateStart || params.dateEnd || params.q ? 'lịch sử học phí đang lọc' : 'toàn bộ lịch sử học phí';
   if (!confirm(`Xóa ${scope}?`)) return;
   const result = await api('/api/notification-logs?' + queryString(params), { method: 'DELETE' });
   toast(`Đã xóa ${result.deleted || 0} dòng lịch sử học phí.`);
@@ -2482,11 +2513,11 @@ async function clearTuitionHistory() {
 
 async function clearNoticeHistory() {
   const params = {
-    date: selectedHistoryDate(),
+    ...historyDateParams(),
     q: $('#historyKeyword')?.value.trim() || '',
     excludeAbsenceStatus: 'Học phí'
   };
-  const scope = params.date || params.q ? 'lịch sử vắng đang lọc' : 'toàn bộ lịch sử vắng';
+  const scope = params.date || params.dateStart || params.dateEnd || params.q ? 'lịch sử vắng đang lọc' : 'toàn bộ lịch sử vắng';
   if (!confirm(`Xóa ${scope}?`)) return;
   const result = await api('/api/notification-logs?' + queryString(params), { method: 'DELETE' });
   toast(`Đã xóa ${result.deleted || 0} dòng lịch sử vắng.`);
@@ -3420,17 +3451,14 @@ function initEvents() {
     $(selector)?.addEventListener('change', renderAiStatus);
   });
 
-  $('#historyFilterBtn').addEventListener('click', async () => {
-    await Promise.all([loadHistory(), loadNotices(), loadQuitStudents(), loadRemovedClassStudents()]);
-  });
+  $('#historyFilterBtn').addEventListener('click', reloadHistoryFromFilters);
   $('#historyDateAuto')?.addEventListener('change', async event => {
     historyDateAuto = event.target.checked;
     syncAutomaticHistoryDate();
-    await Promise.all([loadHistory(), loadNotices(), loadQuitStudents(), loadRemovedClassStudents()]);
+    await reloadHistoryFromFilters();
   });
-  $('#historyDate')?.addEventListener('change', async () => {
-    await Promise.all([loadHistory(), loadNotices(), loadQuitStudents(), loadRemovedClassStudents()]);
-  });
+  $('#historyDate')?.addEventListener('change', reloadHistoryFromFilters);
+  $('#historyDateEnd')?.addEventListener('change', reloadHistoryFromFilters);
   
   $('#logFilterBtn')?.addEventListener('click', () => {
     loadTeachingLog();
@@ -3463,7 +3491,8 @@ function initEvents() {
     const button = event.target.closest('[data-history-export]');
     if (!button) return;
     $('#historyExportMenu').style.display = 'none';
-    return exportHistory(button.dataset.historyExport);
+    try { return exportHistory(button.dataset.historyExport); }
+    catch (error) { toast(error.message, 'error'); }
   });
   $('#historyKeyword').addEventListener('keydown', async event => {
     if (event.key === 'Enter') {

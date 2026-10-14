@@ -22,6 +22,7 @@ function backend(db = fixture()) {
     defaultSettings: () => ({}), buildMessage: () => 'Tin mới',
     studentByIdMap: () => ({}), enrichAbsence: value => value
   };
+  Object.assign(context, require('../lib/history-date-range'));
   vm.createContext(context);
   for (const [start, end] of [
     ['function normalizeAbsenceStatus(', 'function normalizeInitialReason('],

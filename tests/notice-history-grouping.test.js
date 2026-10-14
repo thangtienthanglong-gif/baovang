@@ -26,7 +26,7 @@ function setup(rows) {
   const context = {
     api: async () => rows,
     $: selector => selector === '#noticeRows' ? container : { value: '' },
-    selectedHistoryDate: () => '2026-10-10', queryString: () => '',
+    selectedHistoryDate: () => '2026-10-10', historyDateParams: () => ({ date: (() => '2026-10-10')() }), queryString: () => '',
     escapeHtml, formatDateTime: value => value, absenceStatusLabel: value => value,
     statusClass: () => 'wrong'
   };

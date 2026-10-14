@@ -33,13 +33,14 @@ function setup(db) {
     fetch: async () => { networkCalls += 1; throw new Error('Unexpected network send'); },
     XLSX, Date
   };
+  Object.assign(context, require('../lib/history-date-range'));
   vm.createContext(context);
   for (const [start, end] of [
     ['function sanitizeStudent(', 'function getSummary('],
     ['function getSummary(', 'function filterCallLogs('],
     ['function sendWorkbook(', 'function buildMessage('],
     ['async function sendZaloNotice(', 'let noticeSchedulerRunning'],
-    ["app.get('/api/quit-students',", "app.delete('/api/quit-students/clear'"],
+    ['function filterQuitStudents(', "app.delete('/api/quit-students/clear'"],
     ["app.put('/api/students/:id',", "app.post('/api/students/:id/transfer'"],
     ["app.post('/api/absences',", "async function runBulkZaloAction("]
   ]) vm.runInContext(slice(start, end), context);

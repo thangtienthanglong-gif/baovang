@@ -9,10 +9,12 @@ const source = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), '
 function setup() {
   let now = new Date('2026-10-08T16:59:00Z');
   const fields = Object.fromEntries([
-    'filterDate', 'filterDateAuto', 'historyDate', 'historyDateAuto', 'historyKeyword',
+    'filterDate', 'filterDateAuto', 'historyDate', 'historyDateEnd', 'historyDateAuto', 'historyKeyword',
     'historyRows', 'callHistoryRows', 'noticeRows', 'noticePagination', 'quitRows', 'removedClassRows', 'historyExportMenu'
   ].map(id => [id, {
     value: '', listeners: {}, style: { display: 'block' },
+    setCustomValidity(message) { this.validationMessage = message; },
+    reportValidity() { this.reported = true; },
     addEventListener(type, listener) { this.listeners[type] = listener; }
   }]));
   const requests = [];
@@ -25,7 +27,7 @@ function setup() {
     activeTabId: () => 'historyTab', getActiveBranch: () => 'main', renderFilters() {},
     api: async url => { requests.push(url); return []; },
     queryString: params => new URLSearchParams(params).toString(),
-    loadAttendanceAbsences() {}, loadAbsences() {},
+    loadAttendanceAbsences() {}, loadAbsences() {}, toast() {},
     downloadUrl: (path, params) => exports.push({ path, params })
   };
   vm.createContext(context);
@@ -48,9 +50,10 @@ function setup() {
       closest: () => ({ dataset: { historyExport: type } })
     } }),
     setTime: instant => { now = new Date(instant); },
-    manualHistory: date => {
+    manualHistory: (date, end = date) => {
       vm.runInContext('historyDateAuto = false;', context);
       fields.historyDate.value = date;
+      fields.historyDateEnd.value = end;
       context.syncAutomaticHistoryDate();
     }
   };
@@ -59,18 +62,20 @@ function setup() {
 test('history defaults to today and its live tab reloads at Vietnam midnight', async () => {
   const app = setup();
   assert.equal(app.fields.historyDate.value, '2026-10-08');
+  assert.equal(app.fields.historyDateEnd.value, '2026-10-08');
   assert.equal(app.fields.historyDate.readOnly, true);
   app.setTime('2026-10-08T17:01:00Z');
   await app.context.refreshAutomaticDate();
   assert.equal(app.fields.historyDate.value, '2026-10-09');
   assert.equal(app.requests.length, 5);
-  for (const route of ['/api/call-logs', '/api/notification-logs', '/api/removed-class-students']) {
+  for (const route of ['/api/call-logs', '/api/notification-logs', '/api/removed-class-students', '/api/quit-students']) {
     const request = app.requests.map(url => new URL(url, 'https://example.test')).find(url => url.pathname === route);
-    assert.equal(request.searchParams.get('date'), '2026-10-09');
+    assert.equal(request.searchParams.get('dateStart'), '2026-10-09');
+    assert.equal(request.searchParams.get('dateEnd'), '2026-10-09');
   }
   const tuitionRequest = app.requests.map(url => new URL(url, 'https://example.test'))
     .find(url => url.searchParams.get('absenceStatus') === 'Học phí');
-  assert.equal(tuitionRequest.searchParams.get('date'), '2026-10-09');
+  assert.equal(tuitionRequest.searchParams.get('dateStart'), '2026-10-09');
   assert.equal(tuitionRequest.searchParams.get('dateBasis'), 'time');
 });
 
@@ -84,7 +89,7 @@ test('manual history dates and all-date searches survive automatic queue rollove
   assert.equal(app.fields.historyDate.readOnly, false);
   assert.equal(app.requests.length, 0);
   await app.context.loadHistory();
-  assert.equal(new URL(app.requests[0], 'https://example.test').searchParams.get('date'), '2026-09-28');
+  assert.equal(new URL(app.requests[0], 'https://example.test').searchParams.get('dateStart'), '2026-09-28');
   app.fields.historyDate.value = '';
   assert.equal(app.context.selectedHistoryDate(), '');
 });
@@ -97,8 +102,8 @@ test('history exports use the current automatic date even before the polling tim
   assert.equal(app.exports.length, 6);
   for (const result of app.exports) {
     assert.equal(result.params.q, 'Ngọc');
-    // Withdrawal history intentionally shows every date, as its panel does.
-    assert.equal(result.params.date, result.path === '/api/quit-students/export' ? undefined : '2027-01-01');
+    assert.equal(result.params.dateStart, '2027-01-01');
+    assert.equal(result.params.dateEnd, '2027-01-01');
   }
   assert.equal(app.exports[0].params.excludeAbsenceStatus, 'Học phí');
   assert.equal(app.exports[1].params.absenceStatus, 'Học phí');
@@ -110,7 +115,7 @@ test('history exports use the current automatic date even before the polling tim
   assert.equal(app.fields.historyExportMenu.style.display, 'none');
   app.manualHistory('2026-09-28');
   app.exportType('call-absence');
-  assert.equal(app.exports.at(-1).params.date, '2026-09-28');
+  assert.equal(app.exports.at(-1).params.dateStart, '2026-09-28');
 });
 
 test('automatic history and manual queue dates operate independently', async () => {
@@ -122,4 +127,40 @@ test('automatic history and manual queue dates operate independently', async () 
   assert.equal(app.fields.filterDate.value, '2026-09-20');
   assert.equal(app.fields.historyDate.value, '2026-10-09');
   assert.equal(app.requests.length, 5);
+});
+
+test('every history and all six exports use the same manual date interval and keyword', async () => {
+  const app = setup();
+  app.manualHistory('2026-10-01', '2026-10-14');
+  app.fields.historyKeyword.value = 'Ngọc';
+  await app.context.reloadHistoryFromFilters();
+  assert.equal(app.requests.length, 5);
+  for (const request of app.requests) {
+    const params = new URL(request, 'https://example.test').searchParams;
+    assert.equal(params.get('dateStart'), '2026-10-01');
+    assert.equal(params.get('dateEnd'), '2026-10-14');
+    assert.equal(params.get('q'), 'Ngọc');
+  }
+  for (const type of ['absence', 'tuition', 'call-absence', 'call-tuition', 'quit', 'removed']) app.exportType(type);
+  assert.equal(app.exports.length, 6);
+  for (const result of app.exports) {
+    assert.equal(result.params.dateStart, '2026-10-01');
+    assert.equal(result.params.dateEnd, '2026-10-14');
+  }
+});
+
+test('reversed dates block loading and exporting; clearing either endpoint permits an open interval', async () => {
+  const app = setup();
+  app.manualHistory('2026-10-14', '2026-10-01');
+  await app.context.reloadHistoryFromFilters();
+  assert.equal(app.requests.length, 0);
+  assert.equal(app.fields.historyDateEnd.reported, true);
+  assert.throws(() => app.context.exportHistory('absence'), /Từ ngày/);
+  assert.equal(app.exports.length, 0);
+  app.manualHistory('', '2026-10-14');
+  assert.equal(app.context.historyDateParams().dateStart, '');
+  assert.equal(app.context.historyDateParams().dateEnd, '2026-10-14');
+  app.manualHistory('2026-10-01', '');
+  assert.equal(app.context.historyDateParams().dateEnd, '');
+  assert.equal(app.fields.historyDateEnd.validationMessage, '');
 });

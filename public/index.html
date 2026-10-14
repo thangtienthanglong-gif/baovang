@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <link rel="stylesheet" href="/style.css?v=20261014-alerts-2">
+  <link rel="stylesheet" href="/style.css?v=20261014-history-range-1">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     /* Inner Tabs for History - INLINED TO PREVENT CACHE */
@@ -497,14 +497,15 @@
       </dialog>
 
     <section id="historyTab" class="tab-panel">
-      <section class="card filters" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+      <section class="card history-filter-bar">
         <div class="field" style="margin: 0;">
           <div class="date-filter-heading">
-            <label for="historyDate">Ngày</label>
+            <label for="historyDate">Từ ngày</label>
             <label class="date-auto-toggle" for="historyDateAuto" title="Tự động dùng ngày hôm nay"><input id="historyDateAuto" type="checkbox" checked> Hôm nay</label>
           </div>
           <input id="historyDate" type="date" readonly>
         </div>
+        <div class="field"><label for="historyDateEnd">Đến ngày</label><input id="historyDateEnd" type="date" readonly></div>
         <div class="field grow" style="margin: 0;">
           <label for="historyKeyword">Tìm kiếm</label>
           <input id="historyKeyword" type="search" placeholder="Tên, lớp, phụ huynh, SĐT, trạng thái...">
@@ -879,7 +880,7 @@
     </form>
   </dialog>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="/app.js?v=20261014-20"></script>
+  <script src="/app.js?v=20261014-21"></script>
   <script src="/attendance-alerts.js?v=20261014-2"></script>
   <script src="/exams.js?v=20261009-2"></script>
   <nav class="bottom-nav">

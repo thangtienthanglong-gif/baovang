@@ -40,6 +40,7 @@ function setupServer() {
     normalizeSearchText: value => String(value || '').toLowerCase(),
     nowISO: () => '2026-10-09T04:00:00Z', console
   };
+  Object.assign(context, require('../lib/history-date-range'));
   vm.createContext(context);
   for (const [start, end] of [
     ['const dbSnapshots = new WeakMap();', 'function defaultSettings()'],

@@ -32,7 +32,7 @@ function setup(initialRows) {
     $: selector => fields[selector.slice(1)],
     api: async url => { requests.push(url); return rows; },
     queryString: params => new URLSearchParams(params).toString(),
-    selectedHistoryDate: () => fields.historyDate.value,
+    selectedHistoryDate: () => fields.historyDate.value, historyDateParams: () => ({ date: (() => fields.historyDate.value)() }),
     escapeHtml: value => String(value ?? '').replace(/[&<>"']/g, character => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     })[character]),

@@ -8,6 +8,7 @@ const source = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
 const frontend = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
 function setup() {
   const context = { cleanText: value => String(value ?? '').trim(), ABSENCE_STATUSES: ['Vắng', 'Có phép', 'Học phí'] };
+  Object.assign(context, require('../lib/history-date-range'));
   vm.createContext(context);
   for (const [start, end] of [
     ['function normalizeAbsenceStatus(', 'function normalizeInitialReason('],

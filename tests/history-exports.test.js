@@ -21,6 +21,7 @@ function setup(db) {
     getBranchDb: async req => req.headers['x-branch-id'] === 'other' ? {} : db,
     cleanText: value => String(value ?? '').replace(/\s+/g, ' ').trim()
   };
+  Object.assign(context, require('../lib/history-date-range'));
   vm.createContext(context);
   vm.runInContext(source.match(/^const ABSENCE_STATUSES = .*;$/m)[0], context);
   for (const [start, end] of [
@@ -29,7 +30,7 @@ function setup(db) {
     ['function quitStudentDetails(', 'function markStudentWithdrawn('],
     ['function filterCallLogs(', 'function buildMessage('],
     ['function filterRemovedClassStudents(', "app.post('/api/students/:id/remove-from-class'"],
-    ["app.get('/api/quit-students/export'", "app.delete('/api/quit-students/clear'"],
+    ['function filterQuitStudents(', "app.delete('/api/quit-students/clear'"],
     ["app.get('/api/call-logs/export'", "app.delete('/api/call-logs'"],
     ["app.get('/api/notification-logs/export'", "app.get('/api/notification-logs'"]
   ]) vm.runInContext(slice(start, end), context);
@@ -143,4 +144,32 @@ test('withdrawal Excel keeps all dates shown in its panel and exports the saved 
   assert.equal(file.rows[0]['Ngày nghỉ'], '30/09/2026');
   assert.equal(file.rows[0]['Lý do'], 'Chuyển trường');
   assert.equal(file.rows[0]['SĐT'], '0901234567');
+});
+
+test('all history Excel exports include both interval boundaries and exclude outside records', async () => {
+  const dates = ['2026-10-09', '2026-10-10', '2026-10-11', '2026-10-12', '2026-10-13'];
+  const exportFile = setup({
+    notificationLogs: dates.flatMap((date, i) => [
+      notice({ id: `absence${i}`, date, time: `${date}T10:00:00Z` }),
+      notice({ id: `tuition${i}`, date: '2026-09-01', time: `${date}T10:00:00Z`, absenceStatus: 'Học phí' })
+    ]),
+    callLogs: dates.flatMap((date, i) => [
+      { id: `call${i}`, date, time: `${date}T10:00:00Z`, studentName: 'An', absenceStatus: 'Vắng' },
+      { id: `fee-call${i}`, date, time: `${date}T10:00:00Z`, studentName: 'An', absenceStatus: 'Học phí' }
+    ]),
+    students: dates.map((date, i) => ({ id: `s${i}`, status: 'Nghỉ học', fullName: 'An', quitDate: date, quitReason: 'Chuyển trường' })),
+    classRemovalHistory: dates.map((date, i) => ({ id: `removed${i}`, fullName: 'An', removedDate: date, removedAt: `${date}T10:00:00Z` }))
+  });
+  const range = { dateStart: '2026-10-10', dateEnd: '2026-10-12' };
+  for (const [route, type] of [
+    ['/api/notification-logs/export', { excludeAbsenceStatus: 'Học phí' }],
+    ['/api/notification-logs/export', { absenceStatus: 'Học phí', dateBasis: 'time' }],
+    ['/api/call-logs/export', { excludeAbsenceStatus: 'Học phí' }],
+    ['/api/call-logs/export', { absenceStatus: 'Học phí' }],
+    ['/api/quit-students/export', {}], ['/api/removed-class-students/export', {}]
+  ]) {
+    const file = await exportFile(route, { ...range, ...type });
+    assert.equal(file.rows.length, 3, route);
+    assert.match(file.filename, /2026-10-10_den_2026-10-12\.xlsx/);
+  }
 });

@@ -48,6 +48,7 @@ function setupServer(db = fixture()) {
     studentByIdMap: () => ({}), enrichAbsence: absence => absence,
     getZaloRuntimeConfig: () => ({ mode: 'personal-test' }), isWithdrawnAbsence: () => false
   };
+  Object.assign(context, require('../lib/history-date-range'));
   vm.createContext(context);
   for (const [start, end] of [
     ['function normalizeAbsenceStatus(', 'function normalizeInitialReason('],
@@ -147,7 +148,7 @@ function setupFrontend() {
   let branch = 'main';
   let confirmed = true;
   const context = {
-    $: selector => fields[selector.slice(1)], selectedHistoryDate: () => '2026-10-12',
+    $: selector => fields[selector.slice(1)], selectedHistoryDate: () => '2026-10-12', historyDateParams: () => ({ date: (() => '2026-10-12')() }),
     getActiveBranch: () => branch, queryString: params => new URLSearchParams(params).toString(),
     escapeHtml: value => String(value ?? '').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
     formatDateTime: value => value, statusClass: () => 'sent', absenceStatusLabel: value => value,

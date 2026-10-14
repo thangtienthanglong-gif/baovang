@@ -30,6 +30,7 @@ function backend(db = fixture()) {
     nowISO: () => time, id: () => 'call-new',
     normalizeAbsenceStatus: value => value
   };
+  Object.assign(context, require('../lib/history-date-range'));
   vm.createContext(context);
   vm.runInContext(slice(server, 'function filterCallLogs(', 'function sendWorkbook('), context);
   vm.runInContext(slice(server, "app.get('/api/call-logs'", "app.post('/api/call-logs/:id/result'"), context);
@@ -336,7 +337,7 @@ function ui() {
   const app = {
     $: selector => fields[selector.slice(1)], escapeHtml: value => String(value ?? '').replace(/</g, '&lt;').replace(/"/g, '&quot;'),
     formatDateTime: value => value, absenceStatusLabel: value => value, toast() {},
-    getActiveBranch: () => 'main', selectedHistoryDate: () => '2026-10-13', queryString: () => '',
+    getActiveBranch: () => 'main', selectedHistoryDate: () => '2026-10-13', historyDateParams: () => ({ date: (() => '2026-10-13')() }), queryString: () => '',
     api: async (url, options) => { requests.push({ url, options }); return []; }
   };
   vm.createContext(app);

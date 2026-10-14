@@ -559,6 +559,11 @@ main {
   overflow: hidden;
 }
 
+.history-filter-bar { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.history-filter-bar .field { flex: 0 1 170px; margin: 0; }
+.history-filter-bar .field.grow { flex: 1 1 230px; }
+.history-filter-bar input[type="date"] { width: 100%; min-width: 0; }
+
 .history-export-menu button {
   display: block;
   width: 100%;

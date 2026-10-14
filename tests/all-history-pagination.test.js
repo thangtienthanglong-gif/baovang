@@ -33,7 +33,7 @@ function setup() {
   const requests = [];
   const context = {
     $: selector => fields[selector.slice(1)], getActiveBranch: () => 'main',
-    selectedHistoryDate: () => '2026-10-12', queryString: params => new URLSearchParams(params).toString(),
+    selectedHistoryDate: () => '2026-10-12', historyDateParams: () => ({ date: (() => '2026-10-12')() }), queryString: params => new URLSearchParams(params).toString(),
     api: async url => { requests.push(url); return data.get(new URL(url, 'http://localhost').pathname); },
     escapeHtml: value => String(value ?? '').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
     formatDateTime: value => value, statusClass: () => 'sent', absenceStatusLabel: value => value

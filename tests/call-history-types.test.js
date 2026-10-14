@@ -25,6 +25,7 @@ function setup() {
     getBranchDb: async req => branches[req.branch], saveBranchDb: async () => {},
     cleanText: value => String(value ?? '').trim(), ABSENCE_STATUSES: ['Vắng', 'Học phí', 'Trễ học phí']
   };
+  Object.assign(context, require('../lib/history-date-range'));
   vm.createContext(context);
   vm.runInContext(slice('function normalizeAbsenceStatus(', 'function normalizeInitialReason('), context);
   vm.runInContext(slice('function filterCallLogs(', 'function sendWorkbook('), context);

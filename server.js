@@ -13,6 +13,7 @@ const { spawn } = require('child_process');
 const multer = require('multer');
 const XLSX = require('xlsx-js-style');
 const { buildAttendanceAlerts, subjectForClass, registerAttendanceAlertRoutes } = require('./lib/attendance-alerts');
+const { historyDateRange, matchesHistoryDate, historyExportSuffix } = require('./lib/history-date-range');
 
 const app = express();
 const sessionLocks = new Set();
@@ -635,7 +636,7 @@ function getSummary(absences) {
 
 function filterCallLogs(db, query) {
   const q = String(query.q || '').toLowerCase().trim();
-  const date = query.date || '';
+  const range = historyDateRange(query);
   const absences = new Map((db.absences || []).map(absence => [absence.id, absence]));
   const notices = new Map((db.notificationLogs || []).map(log => [log.id, log]));
   let rows = (db.callLogs || []).map(log => {
@@ -657,7 +658,7 @@ function filterCallLogs(db, query) {
     };
   });
 
-  if (date) rows = rows.filter(log => log.date === date);
+  rows = rows.filter(log => matchesHistoryDate(log.date, range));
   if (query.absenceStatus && query.absenceStatus !== 'ALL') {
     rows = rows.filter(log => normalizeAbsenceStatus(log.absenceStatus) === normalizeAbsenceStatus(query.absenceStatus));
   }
@@ -706,7 +707,7 @@ function notificationLogAbsenceStatus(log, absence) {
 
 function filterNotificationLogs(db, query) {
   const q = String(query.q || '').toLowerCase().trim();
-  const date = query.date || '';
+  const range = historyDateRange(query);
   const absenceStatus = query.absenceStatus && query.absenceStatus !== 'ALL'
     ? normalizeAbsenceStatus(query.absenceStatus) : '';
   const excludeAbsenceStatus = query.excludeAbsenceStatus
@@ -724,7 +725,7 @@ function filterNotificationLogs(db, query) {
   // Resolved phone contacts belong to call history; retain their source
   // notices in storage for the call's original type and selected date.
   rows = rows.filter(log => !log.callLogId);
-  if (date) rows = rows.filter(log => (query.dateBasis === 'time' ? notificationLogDate(log) : log.date) === date);
+  rows = rows.filter(log => matchesHistoryDate(query.dateBasis === 'time' ? notificationLogDate(log) : log.date, range));
   if (absenceStatus) rows = rows.filter(log => normalizeAbsenceStatus(log.absenceStatus) === absenceStatus);
   if (excludeAbsenceStatus) rows = rows.filter(log => normalizeAbsenceStatus(log.absenceStatus) !== excludeAbsenceStatus);
   if (q) {
@@ -3078,28 +3079,20 @@ app.options('/api/local-zalo/open-paste', (req, res) => {
   res.sendStatus(200);
 });
 
+function filterQuitStudents(db, query) {
+  const q = normalizeSearchText(query.q || '');
+  const range = historyDateRange(query);
+  return (db.students || []).filter(student => student.status === 'Nghỉ học')
+    .map(student => ({ ...student, ...quitStudentDetails(db, student) }))
+    .filter(student => matchesHistoryDate(student.quitDate, range)
+      && (!q || normalizeSearchText(`${student.code} ${student.fullName} ${student.className} ${student.parentName} ${student.phone1} ${student.phone2}`).includes(q)))
+    .sort((a, b) => b.quitDate.localeCompare(a.quitDate));
+}
+
 app.get('/api/quit-students', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
-    const q = normalizeSearchText(req.query.q || '');
-    
-    let quitStudents = (db.students || []).filter(s => s.status === 'Nghỉ học');
-    
-    if (q) {
-      quitStudents = quitStudents.filter(student => {
-        const text = normalizeSearchText(`${student.code} ${student.fullName} ${student.className} ${student.parentName} ${student.phone1} ${student.phone2}`);
-        return text.includes(q);
-      });
-    }
-
-    const enrichedRows = quitStudents.map(student => {
-      return {
-        ...student,
-        ...quitStudentDetails(db, student)
-      };
-    });
-
-    res.json(enrichedRows.sort((a, b) => b.quitDate.localeCompare(a.quitDate)));
+    res.json(filterQuitStudents(db, req.query));
   } catch (error) {
     next(error);
   }
@@ -3108,18 +3101,7 @@ app.get('/api/quit-students', async (req, res, next) => {
 app.get('/api/quit-students/export', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
-    const q = normalizeSearchText(req.query.q || '');
-    let quitStudents = (db.students || []).filter(s => s.status === 'Nghỉ học');
-    
-    if (q) {
-      quitStudents = quitStudents.filter(student => {
-        const text = normalizeSearchText(`${student.code} ${student.fullName} ${student.className} ${student.parentName} ${student.phone1} ${student.phone2}`);
-        return text.includes(q);
-      });
-    }
-
-    const rows = quitStudents.map(student => ({ ...student, ...quitStudentDetails(db, student) }))
-      .sort((a, b) => b.quitDate.localeCompare(a.quitDate)).map(student => {
+    const rows = filterQuitStudents(db, req.query).map(student => {
       return {
         'Ngày nghỉ': student.quitDate ? student.quitDate.split('-').reverse().join('/') : '',
         'Học sinh': student.fullName,
@@ -3130,8 +3112,7 @@ app.get('/api/quit-students/export', async (req, res, next) => {
       };
     });
 
-    const d = new Date();
-    const suffix = `${d.getFullYear()}${(d.getMonth()+1).toString().padStart(2,'0')}${d.getDate().toString().padStart(2,'0')}`;
+    const suffix = historyExportSuffix(req.query);
     sendWorkbook(res, `hoc-sinh-nghi-hoc-${suffix}.xlsx`, [
       { name: 'HS Nghi Hoc', rows }
     ]);
@@ -3143,7 +3124,8 @@ app.get('/api/quit-students/export', async (req, res, next) => {
 app.delete('/api/quit-students/clear', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
-    db.students = (db.students || []).filter(s => s.status !== 'Nghỉ học');
+    const ids = new Set(filterQuitStudents(db, req.query).map(student => student.id));
+    db.students = (db.students || []).filter(student => !ids.has(student.id));
     await saveBranchDb(req, db);
     res.json({ success: true });
   } catch (err) {
@@ -3278,9 +3260,9 @@ app.put('/api/students/:id', async (req, res, next) => {
 
 function filterRemovedClassStudents(db, query) {
   const q = normalizeSearchText(query.q || '');
-  const date = query.date || '';
+  const range = historyDateRange(query);
   return (db.classRemovalHistory || []).filter(row => {
-    if (date && row.removedDate !== date) return false;
+    if (!matchesHistoryDate(row.removedDate, range)) return false;
     return !q || normalizeSearchText(`${row.fullName} ${row.className} ${row.parentName} ${row.phone1} ${row.phone2}`).includes(q);
   }).sort((a, b) => b.removedAt.localeCompare(a.removedAt));
 }
@@ -3305,7 +3287,7 @@ app.get('/api/removed-class-students/export', async (req, res, next) => {
       'Lớp': row.className || '',
       'SĐT': row.phone1 || row.phone2 || ''
     }));
-    const suffix = req.query.date ? cleanText(req.query.date) : 'tat-ca';
+    const suffix = historyExportSuffix(req.query);
     sendWorkbook(res, `lich-su-xoa-khoi-lop-${suffix}.xlsx`, [{ name: 'Da Xoa Khoi Lop', rows }]);
   } catch (error) {
     next(error);
@@ -4380,7 +4362,7 @@ app.get('/api/call-logs/export', async (req, res, next) => {
       'Kết quả gọi điện': row.callResult || '',
       'Ghi chú': row.note || ''
     }));
-    const suffix = req.query.date ? cleanText(req.query.date) : 'tat-ca';
+    const suffix = historyExportSuffix(req.query);
     const tuition = normalizeAbsenceStatus(req.query.absenceStatus) === 'Học phí';
     sendWorkbook(res, `lich-su-goi-${tuition ? 'hoc-phi' : 'vang'}-${suffix}.xlsx`, [
       { name: tuition ? 'Goi Hoc Phi' : 'Goi Vang', rows }
@@ -4461,7 +4443,7 @@ app.get('/api/notification-logs/export', async (req, res, next) => {
       'Trạng thái gửi': row.status || '',
       'Kết quả': row.result || ''
     }));
-    const suffix = req.query.date ? cleanText(req.query.date) : 'tat-ca';
+    const suffix = historyExportSuffix(req.query);
     sendWorkbook(res, `lich-su-${tuition ? 'hoc-phi' : 'vang'}-${suffix}.xlsx`, [
       { name: tuition ? 'Lich Su Hoc Phi' : 'Lich Su Vang', rows }
     ]);
