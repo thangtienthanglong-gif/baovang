@@ -12,6 +12,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 const multer = require('multer');
 const XLSX = require('xlsx-js-style');
+const { buildAttendanceAlerts, subjectForClass, registerAttendanceAlertRoutes } = require('./lib/attendance-alerts');
 
 const app = express();
 const sessionLocks = new Set();
@@ -319,6 +320,11 @@ async function saveBranchDb(req, branchDb) {
   const rootDb = await readDb();
   const branchId = resolveValidBranchId(req, rootDb);
   if (!rootDb.branches) rootDb.branches = {};
+  // Alert resolutions use their own transaction; an older attendance read
+  // must not replace a teacher's newer resolution when saving the branch.
+  if (rootDb.branches[branchId]?.attendanceAlertActions !== undefined) {
+    branchDb.attendanceAlertActions = rootDb.branches[branchId].attendanceAlertActions;
+  }
   rootDb.branches[branchId] = branchDb;
   await writeDb(rootDb);
 }
@@ -3145,6 +3151,20 @@ app.delete('/api/quit-students/clear', async (req, res, next) => {
   }
 });
 
+async function saveHandledAttendanceAlert(req, action) {
+  const rootDb = await readDb();
+  const branchId = resolveValidBranchId(req, rootDb);
+  // Update only alert resolutions so concurrent attendance saves stay intact.
+  await getDatabase().ref(`/branches/${branchId}/attendanceAlertActions`).transaction(current => {
+    const actions = (Array.isArray(current) ? current : Object.values(current || {})).filter(Boolean);
+    const keys = JSON.stringify([...action.sessionKeys].sort());
+    if (actions.some(row => row.alertId === action.alertId && JSON.stringify([...(row.sessionKeys || [])].sort()) === keys)) return;
+    return [...actions, action];
+  });
+}
+
+registerAttendanceAlertRoutes(app, { getBranchDb, saveHandledAlert: saveHandledAttendanceAlert, id, nowISO });
+
 app.get('/api/students', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
@@ -3158,19 +3178,14 @@ app.get('/api/students', async (req, res, next) => {
       });
     }
 
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
-
-    const absences = db.absences || [];
-
+    const alerts = buildAttendanceAlerts(db).alerts;
     const enrichedRows = rows.map(student => {
-      const recentAbsences = absences.filter(a => 
-        a.studentId === student.id && 
-        a.date >= thirtyDaysAgoStr &&
-        ['Vắng', 'Không phép', 'Vắng không phép', 'Đi trễ'].includes(a.absenceStatus)
-      );
-      return { ...student, recentAbsenceCount: recentAbsences.length };
+      const attendanceAlerts = alerts.filter(alert => alert.studentIds.includes(student.id)).map(alert => ({
+        id: alert.id, subjectKey: alert.subjectKey, subject: alert.subject, count: alert.count,
+        level: alert.level, handled: alert.handled
+      }));
+      const classAlert = attendanceAlerts.find(alert => alert.subjectKey === subjectForClass(student.className).key);
+      return { ...student, attendanceAlerts, recentAbsenceCount: classAlert?.count || 0 };
     });
 
     enrichedRows.sort((a, b) => `${a.className} ${a.fullName}`.localeCompare(`${b.className} ${b.fullName}`, 'vi'));

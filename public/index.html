@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <link rel="stylesheet" href="/style.css?v=20261013-history-12">
+  <link rel="stylesheet" href="/style.css?v=20261014-alerts-2">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     /* Inner Tabs for History - INLINED TO PREVENT CACHE */
@@ -484,6 +484,18 @@
       </section>
     </section>
 
+      <dialog id="attendanceAlertDialog" class="attendance-alert-dialog" aria-labelledby="attendanceAlertDialogTitle" aria-describedby="attendanceAlertDialogStudent">
+        <form id="attendanceAlertActionForm">
+          <h2 id="attendanceAlertDialogTitle"></h2>
+          <p id="attendanceAlertDialogStudent" class="muted"></p>
+          <div id="attendanceAlertDates"></div>
+          <p id="attendanceAlertHandledInfo" class="muted" hidden></p>
+          <div class="field" id="attendanceAlertNoteField"><label for="attendanceAlertNote">Ghi chú xử lý (không bắt buộc)</label><textarea id="attendanceAlertNote" rows="3" maxlength="1000" placeholder="Nội dung đã trao đổi hoặc biện pháp theo dõi"></textarea></div>
+          <p id="attendanceAlertActionError" role="alert" hidden></p>
+          <div class="attendance-alert-actions"><button class="btn ghost" id="attendanceAlertCancel" type="button">Đóng</button><button class="btn primary" id="attendanceAlertSave" type="submit">Đã xử lý</button></div>
+        </form>
+      </dialog>
+
     <section id="historyTab" class="tab-panel">
       <section class="card filters" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
         <div class="field" style="margin: 0;">
@@ -867,7 +879,8 @@
     </form>
   </dialog>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="/app.js?v=20261013-18"></script>
+  <script src="/app.js?v=20261014-20"></script>
+  <script src="/attendance-alerts.js?v=20261014-2"></script>
   <script src="/exams.js?v=20261009-2"></script>
   <nav class="bottom-nav">
     <button class="bottom-tab active" data-tab="absenceTab" type="button"><i class="fa-solid fa-clipboard-user"></i><span>Điểm danh</span></button>

@@ -1204,6 +1204,9 @@ function renderRosterStudent(student) {
   const absence = absenceForStudent(student.id, student.className);
   const currentStatus = absence ? normalizeAbsenceStatus(absence.absenceStatus) : 'Đang học';
   const phone = student.phone1 || student.phone2 || 'Chưa có SĐT';
+  const attendanceAlert = (student.attendanceAlerts || []).find(alert =>
+    alert.subjectKey === getClassSubjectKey(student.className)
+    || alert.subjectKey === `OTHER:${String(student.className || '').trim().toUpperCase()}`);
   const rosterDate = selectedDate();
   const rosterDay = selectedDay();
   const scheduleNotes = (state.scheduleExceptions || []).filter(e => scheduleExceptionMatchesStudent(e, student));
@@ -1227,12 +1230,11 @@ function renderRosterStudent(student) {
   const isLocked = hasStuckNote;
 
   return `
-    <article class="student-card ${absence && currentStatus !== 'Đã bù' ? 'is-absent' : ''} ${student.isMakeupAttendance ? 'is-makeup' : ''} ${hasStuckNote ? 'is-stuck' : ''}">
+    <article class="student-card ${attendanceAlert ? 'has-attendance-alert' : ''} ${absence && currentStatus !== 'Đã bù' ? 'is-absent' : ''} ${student.isMakeupAttendance ? 'is-makeup' : ''} ${hasStuckNote ? 'is-stuck' : ''}">
       <div class="student-main">
         <div>
           <div class="person-main clickable-name" onclick="openStudentProfile('${escapeHtml(student.id)}')">
             ${escapeHtml(student.fullName)}
-            ${student.recentAbsenceCount >= 3 ? `<span title="Vắng ${student.recentAbsenceCount} buổi trong 30 ngày qua" style="color: #ef4444; font-size: 14px; margin-left: 4px;">⚠️ (${student.recentAbsenceCount})</span>` : ''}
           </div>
           <div class="student-phone">${escapeHtml(phone)}</div>
           ${student.isMakeupAttendance
@@ -1240,6 +1242,7 @@ function renderRosterStudent(student) {
             : scheduleNotes.map(e => `<div class="schedule-note schedule-note-stuck"><i class="fa-solid fa-repeat"></i> Kẹt ${scheduleDayLabel(e.stuckDay)} ➔ ${e.type === 'hoc_bu' ? 'Học bù' : 'Bù tạm'} ${scheduleDayLabel(e.makeupDay)} (${escapeHtml(e.makeupClass)})</div>`).join('')}
         </div>
       </div>
+      ${attendanceAlert ? `<div class="student-attendance-alert"><button class="attendance-alert-badge ${attendanceAlert.handled ? 'handled' : `${attendanceAlert.level === 'danger' ? 'danger' : 'warning'} is-pending`}" type="button" data-attendance-alert-id="${escapeHtml(attendanceAlert.id)}" aria-haspopup="dialog" aria-label="${escapeHtml(`${attendanceAlert.subject}: vắng không phép ${attendanceAlert.count} buổi trong 30 ngày gần nhất. Bấm để xem và xử lý.`)}"><span aria-hidden="true">●</span> ${attendanceAlert.handled ? 'Đã xử lý' : 'Cần xử lý'} · ${attendanceAlert.count} buổi</button></div>` : ''}
       <div class="student-status-control">
         <label for="status-${escapeHtml(student.id)}-${escapeHtml(student.className)}">Trạng thái</label>
         <select id="status-${escapeHtml(student.id)}-${escapeHtml(student.className)}" class="roster-status-select" data-student-id="${escapeHtml(student.id)}" data-attendance-class="${escapeHtml(student.className)}" data-absence-id="${escapeHtml(absence?.id || '')}" title="${isLocked ? 'Học sinh bị kẹt lịch. Chọn Đã bù nếu đã học bù trước buổi này.' : ''}">
