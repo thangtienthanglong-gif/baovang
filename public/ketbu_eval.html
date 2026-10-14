@@ -25,6 +25,7 @@
 
         .btn-primary { width: 100%; padding: 12px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .btn-primary:hover { background: #2563eb; }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-success { width: 100%; padding: 12px; background: #10b981; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .btn-success:hover { background: #059669; }
         .btn-danger { width: 100%; padding: 12px; background: #ef4444; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; margin-top: 10px; }
@@ -228,10 +229,12 @@
             <select id="className">
                 <option value="">-- Đang tải danh sách lớp --</option>
             </select>
+            <p id="classLoadError" role="alert" hidden style="color:#b91c1c; font-size:14px; line-height:1.5;"></p>
+            <button type="button" class="btn-primary" id="retryLoadClassesBtn" onclick="loadClasses()" hidden>Thử tải lại danh sách lớp</button>
         </div>
         
 
-        <button class="btn-primary" id="startBtn" onclick="startShift()">Bắt đầu vào lớp</button>
+        <button class="btn-primary" id="startBtn" onclick="startShift()" disabled>Bắt đầu vào lớp</button>
     </div>
 
     <div id="screen-2">
@@ -302,8 +305,7 @@
         const token = getToken();
         const headers = {
             'Content-Type': 'application/json',
-            'x-branch-id': getBranchId(),
-            'X-Branch-Id': getBranchId()
+            'x-branch-id': getBranchId()
         };
         if (token) {
             headers['Authorization'] = 'Bearer ' + token;
@@ -312,13 +314,14 @@
         if (body) options.body = JSON.stringify(body);
         const res = await fetch(endpoint, options);
         if (!res.ok) {
-            let errMsg = 'API Error';
+            let errMsg = `Không tải được dữ liệu (HTTP ${res.status}).`;
             let errData = {};
             try {
                 errData = await res.json();
                 if (errData.error) errMsg = errData.error;
             } catch(e) {}
             const err = new Error(errMsg);
+            err.status = res.status;
             err.data = errData;
             throw err;
         }
@@ -465,13 +468,25 @@
             : '<option value="">-- Không có lớp phù hợp --</option>';
 
         if (filteredClasses.includes(preferredClass)) select.value = preferredClass;
+        const startButton = document.getElementById('startBtn');
+        if (startButton) startButton.disabled = filteredClasses.length === 0;
     }
 
     async function loadClasses() {
         const select = document.getElementById('className');
         if (!select) return;
+        const startButton = document.getElementById('startBtn');
+        const errorMessage = document.getElementById('classLoadError');
+        const retryButton = document.getElementById('retryLoadClassesBtn');
+        if (startButton) startButton.disabled = true;
+        if (errorMessage) { errorMessage.hidden = true; errorMessage.textContent = ''; }
+        if (retryButton) { retryButton.hidden = true; retryButton.disabled = true; }
+        window.allStudentsList = [];
+        select.innerHTML = '<option value="">-- Đang tải danh sách lớp --</option>';
         try {
+            const branchId = getBranchId();
             let res = await apiRequest('/api/students');
+            if (getBranchId() !== branchId) throw new Error('Chi nhánh đã thay đổi. Vui lòng tải lại danh sách lớp.');
             let rawList = Array.isArray(res) ? res : (res ? res.students : []);
             if (!Array.isArray(rawList)) rawList = [];
 
@@ -488,10 +503,8 @@
             setCurrentScheduleFilters();
             const savedClass = localStorage.getItem('savedClassName');
             renderClassOptions(savedClass && classNames.includes(savedClass) ? savedClass : classNames[0] || '');
-            gradeFilter?.addEventListener('change', () => renderClassOptions());
-            subjectFilter?.addEventListener('change', () => renderClassOptions());
-            document.getElementById('dayFilter')?.addEventListener('change', () => renderClassOptions());
-            document.getElementById('sessionFilter')?.addEventListener('change', () => renderClassOptions());
+            [gradeFilter, subjectFilter, document.getElementById('dayFilter'), document.getElementById('sessionFilter')]
+                .filter(Boolean).forEach(filter => { filter.onchange = () => renderClassOptions(); });
 
             const tInput = document.getElementById('teacherName');
             if (tInput && localStorage.getItem('savedTeacherName')) tInput.value = localStorage.getItem('savedTeacherName');
@@ -502,6 +515,12 @@
         } catch(e) {
             console.error('Lỗi loadClasses:', e);
             if (select) select.innerHTML = '<option value="">-- Lỗi tải danh sách lớp --</option>';
+            window.allStudentsList = [];
+            if (startButton) startButton.disabled = true;
+            if (errorMessage) { errorMessage.textContent = `Không tải được danh sách lớp: ${e.message || 'Lỗi kết nối.'}`; errorMessage.hidden = false; }
+            if (retryButton) retryButton.hidden = false;
+        } finally {
+            if (retryButton) retryButton.disabled = false;
         }
     }
 
