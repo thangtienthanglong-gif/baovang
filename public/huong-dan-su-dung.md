@@ -35,6 +35,7 @@ Cập nhật ngày 14/10/2026. Dành cho giáo viên, nhân viên trực và qu�
 | Đã bù | Học sinh đã học bù trước buổi học chính; không tạo yêu cầu báo vắng cho buổi đó. |
 | Nghỉ học | Học sinh ngừng theo học. App yêu cầu nhập lý do và lưu vào lịch sử học sinh nghỉ học. |
 | Trễ học phí | Ghi nhận trường hợp cần nhắc học phí. Kiểm tra liên hệ ở Lịch sử học phí. |
+| Kiểm tra định kì / Đăng ký mới | Mở bản xem trước thông báo, chọn gửi ngay hoặc thêm vào hàng xử lý. Giữ nguyên trạng thái điểm danh. |
 | Xóa khỏi danh sách lớp | Loại học sinh khỏi lớp đang chọn; có thông tin tại Đã xóa khỏi lớp. |
 
 **Vắng một buổi** dùng Vắng có phép hoặc Vắng không phép. **Nghỉ học** dùng khi học sinh ngừng theo học, không dùng thay cho báo vắng một buổi.
@@ -47,6 +48,16 @@ Khi chọn **Nghỉ học**, nhập lý do cụ thể vào hộp thoại rồi l
 - Bấm nhãn để xem các buổi nghỉ, ngày, buổi và lớp. Trao đổi với học sinh hoặc phụ huynh, nhập ghi chú nếu cần, rồi bấm **Đã xử lý**.
 - App lưu người xử lý và thời gian; nhãn chuyển sang **Đã xử lý**, ngừng nhấp nháy. Khi có thêm buổi vắng không phép được tính vào cảnh báo, học sinh sẽ cần xử lý lại.
 - Vắng có phép và Đã bù không tính vào ngưỡng này. Gửi lại tin nhắn hay gọi nhiều lần không làm tăng số buổi vắng.
+
+### Gửi thông báo kiểm tra định kì hoặc đăng ký mới
+
+1. Vào **Zalo**, điền **Mẫu thông báo kiểm tra định kì** hoặc **Mẫu thông báo đăng ký mới** rồi **Lưu cấu hình**. Thay các phần `[Nhập ...]` bằng lịch kiểm tra, nội dung ôn tập hoặc tên khóa học, thời hạn và cách đăng ký thực tế.
+2. Trong danh sách lớp, ở **Trạng thái** của học sinh, chọn **Kiểm tra định kì** hoặc **Đăng ký mới**.
+3. Kiểm tra người nhận và nội dung trong hộp thoại. Chọn **Gửi ngay** để gửi qua chế độ Zalo đang cấu hình; chọn **Thêm vào hàng xử lý** nếu muốn gom danh sách gửi hàng loạt. **Hủy** không tạo thông báo.
+4. Để gửi hàng loạt, mở Hàng xử lý, chọn đúng Ngày/Buổi, lọc **Nội dung liên hệ** theo loại thông báo, tích người nhận rồi bấm **Gửi Zalo hàng loạt**.
+5. Xem kết quả tại **Lịch sử liên hệ → Thông báo**. Ngày lọc của lịch sử thông báo là ngày ghi nhận lượt gửi; có thể xuất Excel theo khoảng ngày.
+
+Thông báo được lưu riêng, giữ nguyên buổi vắng hoặc trạng thái đang học. Nội dung đã duyệt được giữ trong hàng xử lý; sửa mẫu sau đó không thay nội dung của thông báo đã xếp. Chọn lại cùng loại, cùng nội dung và ngày sẽ dùng lại thông báo đã tạo.
 
 ### Hồ sơ, quản lý lớp và điểm thi
 
@@ -61,7 +72,7 @@ Khi chọn **Nghỉ học**, nhập lý do cụ thể vào hộp thoại rồi l
 Đây là nơi theo dõi các trường hợp báo vắng còn cần xử lý liên hệ.
 
 1. Kiểm tra **Ngày**. Khi bật **Hôm nay**, app theo ngày hiện tại; bỏ chọn để tra ngày khác.
-2. Chọn **Buổi**, **Lớp**, **Trạng thái vắng**, **Zalo** hoặc nhập từ khóa, rồi bấm **Lọc**.
+2. Chọn **Buổi**, **Lớp**, **Nội dung liên hệ**, **Zalo** hoặc nhập từ khóa, rồi bấm **Lọc**.
 3. Tích chọn những học sinh cần gửi. Bấm **Gửi Zalo hàng loạt (N)**; số N là số học sinh đang được chọn để gửi.
 4. Theo dõi trạng thái và thông báo kết quả. Trường hợp lỗi cần kiểm tra số điện thoại, Zalo và nội dung trước khi gửi lại hoặc gửi thủ công.
 5. Bấm **Xếp lịch bù** trên học sinh cần bố trí buổi bù, kiểm tra thông tin được điền sẵn rồi chọn lớp phù hợp.
@@ -76,6 +87,7 @@ Sau khi liên hệ được ghi nhận hoàn tất, bản ghi được đưa v�
 | --- | --- |
 | Lịch sử vắng | Thông báo Zalo liên quan đến vắng, đi trễ, về sớm; xem kết quả gửi và xử lý lỗi. |
 | Lịch sử học phí | Thông báo nhắc học phí và kết quả gửi. |
+| Thông báo | Kết quả gửi thông báo kiểm tra định kì, đăng ký mới và thông báo chung. |
 | Lịch sử gọi điện → Gọi vắng | Kết quả gọi về các trường hợp vắng học. |
 | Lịch sử gọi điện → Gọi học phí | Kết quả gọi nhắc học phí. |
 | Học sinh nghỉ học | Ngày ngừng theo học, học sinh, các lớp và lý do. |
@@ -111,7 +123,7 @@ Nếu cùng một thông báo có nhiều lần gửi thất bại, app có th�
 
 ### Xuất và xóa lịch sử
 
-Bấm **Xuất Excel**, chọn một trong sáu loại: **Lịch sử vắng**, **Lịch sử học phí**, **Gọi vắng**, **Gọi học phí**, **Học sinh nghỉ học**, **Đã xóa khỏi lớp**. File lấy toàn bộ kết quả phù hợp với khoảng ngày và từ khóa, không chỉ trang đang xem. Xuất học sinh nghỉ học còn áp dụng bộ lọc Khối, Môn và cách gom học sinh như trên màn hình.
+Bấm **Xuất Excel**, chọn một trong bảy loại: **Lịch sử vắng**, **Lịch sử học phí**, **Thông báo**, **Gọi vắng**, **Gọi học phí**, **Học sinh nghỉ học**, **Đã xóa khỏi lớp**. File lấy toàn bộ kết quả phù hợp với khoảng ngày và từ khóa, không chỉ trang đang xem. Xuất học sinh nghỉ học còn áp dụng bộ lọc Khối, Môn và cách gom học sinh như trên màn hình.
 
 Nút xóa tác động đến loại lịch sử và phạm vi đang lọc. Kiểm tra khoảng ngày, từ khóa, Khối/Môn và xuất Excel trước nếu cần giữ bản lưu. Riêng **Xóa lịch sử** trong Học sinh nghỉ học xóa các hồ sơ nghỉ học phù hợp bộ lọc khỏi hệ thống; đây không phải thao tác chỉ ẩn dòng.
 
@@ -163,11 +175,11 @@ Khi nạp bổ sung, để trống tùy chọn **Xóa sạch học sinh cũ (Ch�
 
 1. Mở **Zalo**, nhập **Tên trường**, chọn **Zalo cá nhân** hoặc **Zalo OA**.
 2. Cài đặt thời gian chờ và các thông số của chế độ đang dùng. Với Zalo cá nhân, có thể đặt số học sinh mỗi chu kì và số phút nghỉ giữa chu kì.
-3. Sửa **Mẫu báo vắng/trễ**, **Mẫu nhắc học phí** hoặc **Mẫu thông báo định kì/khóa mới**. Giữ đúng các biến trong dấu ngoặc nhọn, ví dụ **{studentName}**, **{className}**, **{absenceStatus}**.
+3. Sửa **Mẫu báo vắng/trễ**, **Mẫu nhắc học phí**, **Mẫu thông báo kiểm tra định kì**, **Mẫu thông báo đăng ký mới** hoặc **Mẫu thông báo chung**. Giữ đúng các biến trong dấu ngoặc nhọn, ví dụ **{studentName}**, **{className}**, **{absenceStatus}**.
 4. Kiểm tra **Xem trước tin nhắn**; đây là dữ liệu mẫu, tin gửi thật lấy thông tin của từng học sinh. Với báo vắng, chọn thử cả Vắng có phép và Vắng không phép.
 5. Bấm **Lưu cấu hình** trước khi gửi.
 
-Mẫu thông báo định kì có vùng dán ảnh bằng **Ctrl+V** và ô nhập văn bản; kiểm tra ảnh/nội dung đã lưu trước khi sử dụng. Với OA, quản trị viên cấu hình endpoint, access token và **Bật gửi thật OA**; cần thông tin người nhận phù hợp với OA. Để trống access token nếu muốn giữ token hiện có.
+Mẫu thông báo chung có vùng dán ảnh bằng **Ctrl+V** và ô nhập văn bản; kiểm tra ảnh/nội dung đã lưu trước khi sử dụng. Hai mẫu kiểm tra định kì và đăng ký mới sử dụng nội dung văn bản đã nhập riêng. Với OA, quản trị viên cấu hình endpoint, access token và **Bật gửi thật OA**; cần thông tin người nhận phù hợp với OA. Để trống access token nếu muốn giữ token hiện có.
 
 ### Cài và dùng BaoVang - Auto Zalo Web
 

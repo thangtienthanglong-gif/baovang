@@ -6,6 +6,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
 const tables = [
+  ['loadGeneralNotificationHistory', 'generalHistoryRows', 'generalHistoryPagination', '/api/notification-logs'],
   ['loadTuitionHistory', 'historyRows', 'tuitionHistoryPagination', '/api/notification-logs'],
   ['loadCallHistory', 'callHistoryRows', 'callHistoryPagination', '/api/call-logs'],
   ['loadQuitStudents', 'quitRows', 'quitHistoryPagination', '/api/quit-students'],

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <link rel="stylesheet" href="/style.css?v=20261014-guide-1">
+  <link rel="stylesheet" href="/style.css?v=20261014-notifications-1">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     /* Inner Tabs for History - INLINED TO PREVENT CACHE */
@@ -252,8 +252,8 @@
       <section class="card queue-card">
         <div class="section-title inline-title">
           <div>
-            <h2>Hàng xử lý báo vắng</h2>
-            <p>Theo dõi trạng thái gửi Zalo theo danh sách báo vắng trong ngày.</p>
+            <h2>Hàng xử lý liên hệ</h2>
+            <p>Theo dõi báo vắng, học phí và thông báo cần gửi trong ngày.</p>
           </div>
           <div class="section-actions">
             <button class="btn" id="bulkSendZaloBtn" type="button">Gửi Zalo hàng loạt</button>
@@ -281,7 +281,7 @@
             <select id="filterClass"></select>
           </div>
           <div class="field">
-            <label for="filterAbsenceStatus">Trạng thái vắng</label>
+            <label for="filterAbsenceStatus">Nội dung liên hệ</label>
             <select id="filterAbsenceStatus"></select>
           </div>
           <div class="field">
@@ -406,7 +406,17 @@
             <span class="muted">Biến: {schoolName}, {date}, {studentName}, {className}, {tuitionDebt}</span>
           </div>
           <div class="field span-4">
-            <label>Mẫu thông báo định kì/khóa mới</label>
+            <label for="examNoticeTemplate">Mẫu thông báo kiểm tra định kì</label>
+            <textarea id="examNoticeTemplate" rows="5" placeholder="Nhập lịch kiểm tra, nội dung ôn tập và lưu cấu hình trước khi gửi."></textarea>
+            <span class="muted">Biến: {schoolName}, {date}, {studentName}, {className}. Điền lịch kiểm tra và nội dung ôn tập trước khi gửi.</span>
+          </div>
+          <div class="field span-4">
+            <label for="enrollmentNoticeTemplate">Mẫu thông báo đăng ký mới</label>
+            <textarea id="enrollmentNoticeTemplate" rows="5" placeholder="Nhập khóa học, thời hạn và cách đăng ký, rồi lưu cấu hình."></textarea>
+            <span class="muted">Biến: {schoolName}, {date}, {studentName}, {className}. Điền tên khóa học, thời hạn và cách đăng ký trước khi gửi.</span>
+          </div>
+          <div class="field span-4">
+            <label>Mẫu thông báo chung</label>
             <div id="periodicPasteArea" tabindex="0" style="border: 2px dashed #cbd5e1; border-radius: 6px; padding: 16px; text-align: center; cursor: text; min-height: 80px; display: flex; flex-direction: column; justify-content: center; align-items: center;">
               <span class="muted">Bấm vào đây và nhấn Ctrl+V để dán ảnh thông báo</span>
               <img id="periodicImagePreview" style="max-height: 150px; display: none; margin-top: 8px; border-radius: 4px;">
@@ -422,7 +432,9 @@
               <select id="previewTypeSelect" style="max-width: 200px;">
                 <option value="absence">Mẫu báo vắng/trễ</option>
                 <option value="tuition">Mẫu nhắc học phí</option>
-                <option value="periodic">Mẫu định kì/khóa mới</option>
+                <option value="periodic">Thông báo chung</option>
+                <option value="exam-notice">Kiểm tra định kì</option>
+                <option value="enrollment-notice">Đăng ký mới</option>
               </select>
               <select id="previewAbsenceStatusSelect" aria-label="Trạng thái vắng học xem trước" style="max-width: 200px;">
                 <option value="Vắng không phép">Vắng không phép</option>
@@ -518,6 +530,7 @@
           <div class="dropdown-menu history-export-menu" id="historyExportMenu" style="display: none;">
             <button type="button" data-history-export="absence">Lịch sử vắng</button>
             <button type="button" data-history-export="tuition">Lịch sử học phí</button>
+            <button type="button" data-history-export="general">Thông báo</button>
             <button type="button" data-history-export="call-absence">Gọi vắng</button>
             <button type="button" data-history-export="call-tuition">Gọi học phí</button>
             <button type="button" data-history-export="quit">Học sinh nghỉ học</button>
@@ -529,6 +542,7 @@
       <div class="inner-tabs" style="margin-bottom: 16px; display: flex; gap: 8px; overflow-x: auto;">
         <button class="inner-tab active" data-subtab="zaloHistoryPanel" type="button">Lịch sử vắng</button>
         <button class="inner-tab" data-subtab="tuitionHistoryPanel" type="button">Lịch sử học phí</button>
+        <button class="inner-tab" data-subtab="generalHistoryPanel" type="button">Thông báo</button>
         <button class="inner-tab" data-subtab="callHistoryPanel" type="button">Lịch sử gọi điện</button>
         <button class="inner-tab" data-subtab="quitHistoryPanel" type="button">Học sinh nghỉ học</button>
         <button class="inner-tab" data-subtab="removedClassHistoryPanel" type="button">Đã xóa khỏi lớp</button>
@@ -583,6 +597,13 @@
               <tbody id="historyRows"></tbody>
             </table>
           </div>
+        </section>
+      </div>
+
+      <div id="generalHistoryPanel" class="sub-panel notice-history-panel" style="display: none;">
+        <section class="card table-card">
+          <div class="section-title history-pagination-header"><div><h2>Lịch sử thông báo</h2></div><div class="pagination" id="generalHistoryPagination"></div></div>
+          <div class="table-wrap"><table><thead><tr><th>Thời gian</th><th>Họ và tên</th><th>Loại thông báo / Trạng thái</th></tr></thead><tbody id="generalHistoryRows"></tbody></table></div>
         </section>
       </div>
 
@@ -740,6 +761,7 @@
 <tr><td>Đã bù</td><td>Học sinh đã học bù trước buổi học chính; không tạo yêu cầu báo vắng cho buổi đó.</td></tr>
 <tr><td>Nghỉ học</td><td>Học sinh ngừng theo học. App yêu cầu nhập lý do và lưu vào lịch sử học sinh nghỉ học.</td></tr>
 <tr><td>Trễ học phí</td><td>Ghi nhận trường hợp cần nhắc học phí. Kiểm tra liên hệ ở Lịch sử học phí.</td></tr>
+<tr><td>Kiểm tra định kì / Đăng ký mới</td><td>Mở bản xem trước thông báo, chọn gửi ngay hoặc thêm vào hàng xử lý. Giữ nguyên trạng thái điểm danh.</td></tr>
 <tr><td>Xóa khỏi danh sách lớp</td><td>Loại học sinh khỏi lớp đang chọn; có thông tin tại Đã xóa khỏi lớp.</td></tr>
 </tbody></table></div>
 <p><strong>Vắng một buổi</strong> dùng Vắng có phép hoặc Vắng không phép. <strong>Nghỉ học</strong> dùng khi học sinh ngừng theo học, không dùng thay cho báo vắng một buổi.</p>
@@ -751,6 +773,15 @@
 <li>App lưu người xử lý và thời gian; nhãn chuyển sang <strong>Đã xử lý</strong>, ngừng nhấp nháy. Khi có thêm buổi vắng không phép được tính vào cảnh báo, học sinh sẽ cần xử lý lại.</li>
 <li>Vắng có phép và Đã bù không tính vào ngưỡng này. Gửi lại tin nhắn hay gọi nhiều lần không làm tăng số buổi vắng.</li>
 </ul>
+<h4>Gửi thông báo kiểm tra định kì hoặc đăng ký mới</h4>
+<ol>
+<li>Vào <strong>Zalo</strong>, điền <strong>Mẫu thông báo kiểm tra định kì</strong> hoặc <strong>Mẫu thông báo đăng ký mới</strong> rồi <strong>Lưu cấu hình</strong>. Thay các phần [Nhập ...] bằng lịch kiểm tra, nội dung ôn tập hoặc tên khóa học, thời hạn và cách đăng ký thực tế.</li>
+<li>Trong danh sách lớp, ở <strong>Trạng thái</strong> của học sinh, chọn <strong>Kiểm tra định kì</strong> hoặc <strong>Đăng ký mới</strong>.</li>
+<li>Kiểm tra người nhận và nội dung trong hộp thoại. Chọn <strong>Gửi ngay</strong> để gửi qua chế độ Zalo đang cấu hình; chọn <strong>Thêm vào hàng xử lý</strong> để gom danh sách gửi hàng loạt. <strong>Hủy</strong> không tạo thông báo.</li>
+<li>Để gửi hàng loạt, mở Hàng xử lý, chọn đúng Ngày/Buổi, lọc <strong>Nội dung liên hệ</strong> theo loại thông báo, tích người nhận rồi bấm <strong>Gửi Zalo hàng loạt</strong>.</li>
+<li>Xem kết quả tại <strong>Lịch sử liên hệ → Thông báo</strong>. Ngày lọc là ngày ghi nhận lượt gửi; có thể xuất Excel theo khoảng ngày.</li>
+</ol>
+<p>Thông báo được lưu riêng, giữ nguyên buổi vắng hoặc trạng thái đang học. Nội dung đã duyệt được giữ trong hàng xử lý; sửa mẫu sau đó không thay nội dung của thông báo đã xếp. Chọn lại cùng loại, cùng nội dung và ngày sẽ dùng lại thông báo đã tạo.</p>
 <h4>Hồ sơ, quản lý lớp và điểm thi</h4>
 <ul>
 <li>Hồ sơ hiển thị thông tin liên hệ, trường chính và lịch sử của học sinh. Dùng <strong>Sửa</strong> để cập nhật thông tin; dùng <strong>Chuyển lớp</strong> để chọn lớp đích và xác nhận người thực hiện.</li>
@@ -764,7 +795,7 @@
 <p>Đây là nơi theo dõi các trường hợp báo vắng còn cần xử lý liên hệ.</p>
 <ol>
 <li>Kiểm tra <strong>Ngày</strong>. Khi bật <strong>Hôm nay</strong>, app theo ngày hiện tại; bỏ chọn để tra ngày khác.</li>
-<li>Chọn <strong>Buổi</strong>, <strong>Lớp</strong>, <strong>Trạng thái vắng</strong>, <strong>Zalo</strong> hoặc nhập từ khóa, rồi bấm <strong>Lọc</strong>.</li>
+<li>Chọn <strong>Buổi</strong>, <strong>Lớp</strong>, <strong>Nội dung liên hệ</strong>, <strong>Zalo</strong> hoặc nhập từ khóa, rồi bấm <strong>Lọc</strong>.</li>
 <li>Tích chọn những học sinh cần gửi. Bấm <strong>Gửi Zalo hàng loạt (N)</strong>; số N là số học sinh đang được chọn để gửi.</li>
 <li>Theo dõi trạng thái và thông báo kết quả. Trường hợp lỗi cần kiểm tra số điện thoại, Zalo và nội dung trước khi gửi lại hoặc gửi thủ công.</li>
 <li>Bấm <strong>Xếp lịch bù</strong> trên học sinh cần bố trí buổi bù, kiểm tra thông tin được điền sẵn rồi chọn lớp phù hợp.</li>
@@ -778,6 +809,7 @@
 </tr></thead><tbody>
 <tr><td>Lịch sử vắng</td><td>Thông báo Zalo liên quan đến vắng, đi trễ, về sớm; xem kết quả gửi và xử lý lỗi.</td></tr>
 <tr><td>Lịch sử học phí</td><td>Thông báo nhắc học phí và kết quả gửi.</td></tr>
+<tr><td>Thông báo</td><td>Kết quả gửi thông báo kiểm tra định kì, đăng ký mới và thông báo chung.</td></tr>
 <tr><td>Lịch sử gọi điện → Gọi vắng</td><td>Kết quả gọi về các trường hợp vắng học.</td></tr>
 <tr><td>Lịch sử gọi điện → Gọi học phí</td><td>Kết quả gọi nhắc học phí.</td></tr>
 <tr><td>Học sinh nghỉ học</td><td>Ngày ngừng theo học, học sinh, các lớp và lý do.</td></tr>
@@ -809,7 +841,7 @@
 <li>Dữ liệu nghỉ học cũ có thể chưa có lý do; app không tự suy đoán. Các lần chọn Nghỉ học mới yêu cầu nhập lý do trước khi lưu.</li>
 </ul>
 <h4>Xuất và xóa lịch sử</h4>
-<p>Bấm <strong>Xuất Excel</strong>, chọn một trong sáu loại: <strong>Lịch sử vắng</strong>, <strong>Lịch sử học phí</strong>, <strong>Gọi vắng</strong>, <strong>Gọi học phí</strong>, <strong>Học sinh nghỉ học</strong>, <strong>Đã xóa khỏi lớp</strong>. File lấy toàn bộ kết quả phù hợp với khoảng ngày và từ khóa, không chỉ trang đang xem. Xuất học sinh nghỉ học còn áp dụng bộ lọc Khối, Môn và cách gom học sinh như trên màn hình.</p>
+<p>Bấm <strong>Xuất Excel</strong>, chọn một trong bảy loại: <strong>Lịch sử vắng</strong>, <strong>Lịch sử học phí</strong>, <strong>Thông báo</strong>, <strong>Gọi vắng</strong>, <strong>Gọi học phí</strong>, <strong>Học sinh nghỉ học</strong>, <strong>Đã xóa khỏi lớp</strong>. File lấy toàn bộ kết quả phù hợp với khoảng ngày và từ khóa, không chỉ trang đang xem. Xuất học sinh nghỉ học còn áp dụng bộ lọc Khối, Môn và cách gom học sinh như trên màn hình.</p>
 <p>Nút xóa tác động đến loại lịch sử và phạm vi đang lọc. Kiểm tra khoảng ngày, từ khóa, Khối/Môn và xuất Excel trước nếu cần giữ bản lưu. Riêng <strong>Xóa lịch sử</strong> trong Học sinh nghỉ học xóa các hồ sơ nghỉ học phù hợp bộ lọc khỏi hệ thống; đây không phải thao tác chỉ ẩn dòng.</p>
 <a class="guide-back" href="#guideContents">Về mục lục ↑</a></section>
 <section class="guide-section" id="guide-section-5" aria-labelledby="guide-section-5-title"><h3 id="guide-section-5-title">5. Lịch học bù</h3>
@@ -857,11 +889,11 @@
 <ol>
 <li>Mở <strong>Zalo</strong>, nhập <strong>Tên trường</strong>, chọn <strong>Zalo cá nhân</strong> hoặc <strong>Zalo OA</strong>.</li>
 <li>Cài đặt thời gian chờ và các thông số của chế độ đang dùng. Với Zalo cá nhân, có thể đặt số học sinh mỗi chu kì và số phút nghỉ giữa chu kì.</li>
-<li>Sửa <strong>Mẫu báo vắng/trễ</strong>, <strong>Mẫu nhắc học phí</strong> hoặc <strong>Mẫu thông báo định kì/khóa mới</strong>. Giữ đúng các biến trong dấu ngoặc nhọn, ví dụ <strong>{studentName}</strong>, <strong>{className}</strong>, <strong>{absenceStatus}</strong>.</li>
+<li>Sửa <strong>Mẫu báo vắng/trễ</strong>, <strong>Mẫu nhắc học phí</strong>, <strong>Mẫu thông báo kiểm tra định kì</strong>, <strong>Mẫu thông báo đăng ký mới</strong> hoặc <strong>Mẫu thông báo chung</strong>. Giữ đúng các biến trong dấu ngoặc nhọn, ví dụ <strong>{studentName}</strong>, <strong>{className}</strong>, <strong>{absenceStatus}</strong>.</li>
 <li>Kiểm tra <strong>Xem trước tin nhắn</strong>; đây là dữ liệu mẫu, tin gửi thật lấy thông tin của từng học sinh. Với báo vắng, chọn thử cả Vắng có phép và Vắng không phép.</li>
 <li>Bấm <strong>Lưu cấu hình</strong> trước khi gửi.</li>
 </ol>
-<p>Mẫu thông báo định kì có vùng dán ảnh bằng <strong>Ctrl+V</strong> và ô nhập văn bản; kiểm tra ảnh/nội dung đã lưu trước khi sử dụng. Với OA, quản trị viên cấu hình endpoint, access token và <strong>Bật gửi thật OA</strong>; cần thông tin người nhận phù hợp với OA. Để trống access token nếu muốn giữ token hiện có.</p>
+<p>Mẫu thông báo chung có vùng dán ảnh bằng <strong>Ctrl+V</strong> và ô nhập văn bản; kiểm tra ảnh/nội dung đã lưu trước khi sử dụng. Hai mẫu kiểm tra định kì và đăng ký mới sử dụng nội dung văn bản đã nhập riêng. Với OA, quản trị viên cấu hình endpoint, access token và <strong>Bật gửi thật OA</strong>; cần thông tin người nhận phù hợp với OA. Để trống access token nếu muốn giữ token hiện có.</p>
 <h4>Cài và dùng BaoVang - Auto Zalo Web</h4>
 <ol>
 <li>Mở trang quản lý tiện ích của Chrome hoặc Edge, bật <strong>Chế độ nhà phát triển</strong>.</li>
@@ -1036,6 +1068,20 @@
       </div>
     </div>
   </div>
+  <dialog id="studentNotificationDialog" class="withdrawal-reason-dialog student-notification-dialog" aria-labelledby="studentNotificationTitle" aria-describedby="studentNotificationStudent">
+    <form id="studentNotificationForm">
+      <h2 id="studentNotificationTitle">Thông báo</h2>
+      <p id="studentNotificationStudent" class="muted"></p>
+      <p>Kiểm tra nội dung trước khi gửi. Thông báo giữ nguyên trạng thái điểm danh của học sinh.</p>
+      <div id="studentNotificationMessage" class="preview-box student-notification-message"></div>
+      <div class="withdrawal-reason-actions student-notification-actions">
+        <button class="btn ghost" type="button" id="studentNotificationCancel">Hủy</button>
+        <button class="btn secondary" type="submit" value="queue">Thêm vào hàng xử lý</button>
+        <button class="btn primary" type="submit" value="send">Gửi ngay</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="withdrawalReasonDialog" class="withdrawal-reason-dialog" aria-labelledby="withdrawalReasonTitle">
     <form id="withdrawalReasonForm">
       <h2 id="withdrawalReasonTitle">Ghi nhận nghỉ học</h2>
@@ -1050,7 +1096,7 @@
     </form>
   </dialog>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="/app.js?v=20261014-24"></script>
+  <script src="/app.js?v=20261014-25"></script>
   <script src="/attendance-alerts.js?v=20261014-2"></script>
   <script src="/exams.js?v=20261009-2"></script>
   <nav class="bottom-nav">

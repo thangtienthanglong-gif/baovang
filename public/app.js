@@ -8,6 +8,7 @@ const state = {
   results: [],
   students: [],
   absences: [],
+  contactRequests: [],
   summary: {},
   aiConversationId: ''
 };
@@ -357,6 +358,7 @@ function selectedClass() {
 
 function getFilters() {
   return {
+    includeNotifications: true,
     date: selectedDate(),
     session: selectedQueueSession(),
     className: $('#filterClass')?.value || 'ALL',
@@ -545,7 +547,7 @@ function renderFilters() {
   const currentAbsenceStatus = normalizeAbsenceStatus($('#filterAbsenceStatus')?.value || 'ALL');
   if ($('#filterAbsenceStatus')) {
     $('#filterAbsenceStatus').innerHTML = [
-      '<option value="ALL">Tất cả trạng thái vắng</option>',
+      '<option value="ALL">Tất cả nội dung liên hệ</option>',
       ...state.absenceStatuses.filter(s => s !== 'Cả ngày').map(status => `<option value="${escapeHtml(status)}">${escapeHtml(absenceStatusLabel(status))}</option>`)
     ].join('');
     $('#filterAbsenceStatus').value = state.absenceStatuses.includes(currentAbsenceStatus) ? currentAbsenceStatus : 'ALL';
@@ -568,7 +570,7 @@ function renderFilters() {
   $('#filterNoticeStatus').value = state.noticeStatuses.includes(currentNotice) ? currentNotice : 'ALL';
 
   if ($('#absenceStatus')) {
-    $('#absenceStatus').innerHTML = state.absenceStatuses.filter(s => s !== 'Cả ngày').map(status => `<option value="${escapeHtml(status)}">${escapeHtml(absenceStatusLabel(status))}</option>`).join('');
+    $('#absenceStatus').innerHTML = state.absenceStatuses.filter(s => !['Cả ngày', 'Kiểm tra định kì', 'Đăng ký mới'].includes(s)).map(status => `<option value="${escapeHtml(status)}">${escapeHtml(absenceStatusLabel(status))}</option>`).join('');
   }
 }
 
@@ -597,6 +599,8 @@ function renderSettings() {
   $('#messageTemplate').value = settings.messageTemplate || '';
   if ($('#tuitionTemplate')) $('#tuitionTemplate').value = settings.tuitionTemplate || '';
   if ($('#periodicTemplate')) $('#periodicTemplate').value = settings.periodicTemplate || '';
+  if ($('#examNoticeTemplate')) $('#examNoticeTemplate').value = settings.examNoticeTemplate || '';
+  if ($('#enrollmentNoticeTemplate')) $('#enrollmentNoticeTemplate').value = settings.enrollmentNoticeTemplate || '';
   if ($('#periodicImageBase64')) {
     $('#periodicImageBase64').value = settings.periodicImageBase64 || '';
     if (settings.periodicImageBase64) {
@@ -623,6 +627,8 @@ function renderMessagePreview() {
   let templateId = 'messageTemplate';
   if (previewType === 'tuition') templateId = 'tuitionTemplate';
   if (previewType === 'periodic') templateId = 'periodicTemplate';
+  if (previewType === 'exam-notice') templateId = 'examNoticeTemplate';
+  if (previewType === 'enrollment-notice') templateId = 'enrollmentNoticeTemplate';
 
   const template = $('#' + templateId)?.value || '';
   const previewBox = $('#messagePreview');
@@ -645,7 +651,7 @@ function renderMessagePreview() {
     studentName: 'Vũ Phương Hướng Nam',
     className: dummyClass,
     session: dummySession !== 'Khác' ? dummySession : 'Sáng',
-    absenceStatus: previewStatusSelect?.value || 'Vắng không phép',
+    absenceStatus: previewType === 'exam-notice' ? 'Kiểm tra định kì' : previewType === 'enrollment-notice' ? 'Đăng ký mới' : previewStatusSelect?.value || 'Vắng không phép',
     reason: 'Không có lý do',
     parentName: 'Phụ huynh HS',
     phone: '0901234567',
@@ -920,7 +926,7 @@ function matchesRosterKeyword(student, keyword) {
 
 function absenceForStudent(studentId, className) {
   return state.absences.find(row =>
-    row.studentId === studentId && row.date === selectedDate() && (!className || row.className === className)
+    !row.notificationOnly && row.studentId === studentId && row.date === selectedDate() && (!className || row.className === className)
   );
 }
 
@@ -1062,7 +1068,7 @@ function renderClassDropdown() {
   if (!dropdown) return;
 
   const validStudents = rows.filter(s => validClasses.includes(s.className || 'Chưa có lớp'));
-  const validAbsences = state.absences.filter(a => a.absenceStatus !== 'Đã bù' && !a.studentRemovedFromClass && validClasses.includes(a.className));
+  const validAbsences = state.absences.filter(a => !a.notificationOnly && a.absenceStatus !== 'Đã bù' && !a.studentRemovedFromClass && validClasses.includes(a.className));
 
   const optionsHtml = [`<option value="ALL">Tất cả lớp (${validStudents.length} học sinh)</option>`];
   
@@ -1252,7 +1258,7 @@ function renderRosterStudent(student) {
   ];
   if (!student.isMakeupAttendance) {
     statusOptions.splice(3, 0, ['Đã bù', 'Đã bù']);
-    statusOptions.push(['Nghỉ học', 'Nghỉ học'], ['Học phí', 'Trễ học phí'], ['REMOVE_FROM_CLASS', 'Xóa khỏi danh sách lớp']);
+    statusOptions.push(['Nghỉ học', 'Nghỉ học'], ['Học phí', 'Trễ học phí'], ['Kiểm tra định kì', 'Kiểm tra định kì'], ['Đăng ký mới', 'Đăng ký mới'], ['REMOVE_FROM_CLASS', 'Xóa khỏi danh sách lớp']);
   }
   if (!statusOptions.some(([value]) => value === currentStatus)) {
     statusOptions.push([currentStatus, currentStatus]);
@@ -1268,6 +1274,7 @@ function renderRosterStudent(student) {
             ${escapeHtml(student.fullName)}
           </div>
           <div class="student-phone">${escapeHtml(phone)}</div>
+          ${(state.contactRequests || []).filter(row => row.studentId === student.id && row.date === rosterDate && row.className === student.className).map(row => `<div class="muted">${escapeHtml(row.absenceStatus)} · ${escapeHtml(row.noticeStatus)}</div>`).join('')}
           ${student.isMakeupAttendance
             ? `<div class="schedule-note schedule-note-makeup"><i class="fa-solid fa-repeat"></i> Học bù từ lớp ${escapeHtml(student.makeupOriginalClass)}</div>`
             : scheduleNotes.map(e => `<div class="schedule-note schedule-note-stuck"><i class="fa-solid fa-repeat"></i> Kẹt ${scheduleDayLabel(e.stuckDay)} ➔ ${e.type === 'hoc_bu' ? 'Học bù' : 'Bù tạm'} ${scheduleDayLabel(e.makeupDay)} (${escapeHtml(e.makeupClass)})</div>`).join('')}
@@ -1277,7 +1284,7 @@ function renderRosterStudent(student) {
       <div class="student-status-control">
         <label for="status-${escapeHtml(student.id)}-${escapeHtml(student.className)}">Trạng thái</label>
         <select id="status-${escapeHtml(student.id)}-${escapeHtml(student.className)}" class="roster-status-select" data-student-id="${escapeHtml(student.id)}" data-attendance-class="${escapeHtml(student.className)}" data-absence-id="${escapeHtml(absence?.id || '')}" title="${isLocked ? 'Học sinh bị kẹt lịch. Chọn Đã bù nếu đã học bù trước buổi này.' : ''}">
-          ${statusOptions.map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === currentStatus ? 'selected' : ''} ${isLocked && value !== currentStatus && value !== 'Đã bù' && !(currentStatus === 'Đã bù' && value === 'Đang học') ? 'disabled' : ''}>${escapeHtml(label)}</option>`).join('')}
+          ${statusOptions.map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === currentStatus ? 'selected' : ''} ${isLocked && !['Kiểm tra định kì', 'Đăng ký mới'].includes(value) && value !== currentStatus && value !== 'Đã bù' && !(currentStatus === 'Đã bù' && value === 'Đang học') ? 'disabled' : ''}>${escapeHtml(label)}</option>`).join('')}
         </select>
       </div>
     </article>
@@ -1386,7 +1393,7 @@ function renderAbsences() {
       </div>
 
       <div class="absence-controls">
-        <label>Trạng thái vắng</label>
+        <label>${row.notificationOnly ? 'Loại thông báo' : 'Trạng thái vắng'}</label>
         <span class="absence-status-pill">${escapeHtml(absenceStatusLabel(row.absenceStatus) || 'Không rõ')}</span>
         ${row.initialReason && absenceStatusLabel(row.initialReason) !== absenceStatusLabel(row.absenceStatus) ? `<span class="muted">${escapeHtml(row.initialReason)}</span>` : ''}
         ${row.evidenceUrl ? `<a href="${row.evidenceUrl}" target="_blank" style="font-size: 11px; display: inline-block; margin-top: 4px; color: #3b82f6; text-decoration: none;"><i class="fa-solid fa-image"></i> Xem ảnh</a>` : ''}
@@ -1405,11 +1412,11 @@ function renderAbsences() {
         <span class="notice-time subtle">${noticeTimeLine(row)}</span>
       </div>
       <div class="absence-actions">
-        <button class="btn primary btn-sm schedule-makeup-btn" type="button"
+        ${!row.notificationOnly ? `<button class="btn primary btn-sm schedule-makeup-btn" type="button"
           data-url="${escapeHtml(scheduleMakeupUrl(row))}"
           onclick="window.open(this.dataset.url, '_blank')">
           Xếp lịch bù
-        </button>
+        </button>` : ''}
       </div>
     </article>
   `;
@@ -1556,7 +1563,7 @@ async function loadTeachingLog() {
 }
 
 async function loadHistory() {
-  await Promise.all([loadCallHistory(), loadTuitionHistory()]);
+  await Promise.all([loadCallHistory(), loadTuitionHistory(), loadGeneralNotificationHistory()]);
 }
 
 const historyPages = new Map();
@@ -1677,6 +1684,18 @@ async function loadTuitionHistory() {
     renderNoticeHistoryRow, 'Chưa có lịch sử học phí trong thời gian đã chọn.', 3);
 }
 
+async function loadGeneralNotificationHistory() {
+  if (!$('#generalHistoryRows')) return;
+  const branchId = getActiveBranch();
+  const rows = await api('/api/notification-logs?' + queryString({
+    ...historyDateParams(), q: $('#historyKeyword')?.value.trim() || '',
+    notificationType: 'general', dateBasis: 'time'
+  }));
+  if (getActiveBranch() !== branchId) return;
+  setHistoryRows('generalHistoryRows', 'generalHistoryPagination', groupFailedNoticeRows(rows),
+    renderNoticeHistoryRow, 'Chưa có lịch sử thông báo trong thời gian đã chọn.', 3);
+}
+
 async function updateCallResult(id, result, select = null) {
   if (select?.disabled) return;
   const branchId = getActiveBranch();
@@ -1791,13 +1810,13 @@ function groupFailedNoticeRows(rows) {
       continue;
     }
     const studentKey = row.studentId ? ['id', row.studentId] : row.studentCode ? ['code', row.studentCode] : null;
-    const sendDate = row.absenceStatus === 'Học phí' && row.time && Number.isFinite(Date.parse(row.time))
+    const sendDate = ['Học phí', 'Kiểm tra định kì', 'Đăng ký mới'].includes(row.absenceStatus) && row.time && Number.isFinite(Date.parse(row.time))
       ? new Date(row.time).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }) : '';
     // An absence identifies one attendance session. Names alone are not unique.
     const key = studentKey && row.absenceId ? JSON.stringify([
       studentKey, row.absenceId, row.date || '', row.className || '', row.phone1 || '',
       row.channel || '', row.absenceStatus || '', row.status,
-      // Tuition uses the send day, unlike attendance's original absence day.
+      // Tuition and general notifications use the actual send day.
       sendDate
     ]) : null;
     const attemptsField = row.status === 'Lỗi gửi' ? 'failedAttempts' : 'sentAttempts';
@@ -1826,7 +1845,7 @@ function renderNoticeActions(row) {
         ? '<span class="muted">Kiểm tra tin trong Zalo trước khi thao tác tiếp</span>'
         : row.absenceId ? `<button class="btn ghost btn-sm retry-zalo-btn" type="button" data-id="${escapeHtml(row.absenceId)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Gửi lại</button>` : ''}
       ${row.absenceId && row.channel === 'Zalo cá nhân' ? `<button class="btn ghost btn-sm confirm-zalo-sent-btn" type="button" data-id="${escapeHtml(row.absenceId)}" data-logid="${escapeHtml(row.id)}" style="font-size: 11px; padding: 2px 4px; white-space: nowrap;">Xác nhận đã gửi</button>` : ''}
-      ${row.id ? `<button class="btn ghost btn-sm confirm-called-btn" type="button" data-logid="${escapeHtml(row.id)}">Xác nhận đã gọi</button><select class="form-control confirm-called-result" data-logid="${escapeHtml(row.id)}" data-absence-status="${row.absenceStatus === 'Học phí' ? 'Học phí' : ''}" aria-label="Kết quả cuộc gọi" hidden><option value="">Chọn kết quả gọi</option><option value="Đã báo">Đã báo</option><option value="Không bắt máy">Không bắt máy</option><option value="Không liên lạc được">Không liên lạc được</option></select>` : ''}
+      ${row.id && !row.notificationOnly && !['Kiểm tra định kì', 'Đăng ký mới'].includes(row.absenceStatus) ? `<button class="btn ghost btn-sm confirm-called-btn" type="button" data-logid="${escapeHtml(row.id)}">Xác nhận đã gọi</button><select class="form-control confirm-called-result" data-logid="${escapeHtml(row.id)}" data-absence-status="${row.absenceStatus === 'Học phí' ? 'Học phí' : ''}" aria-label="Kết quả cuộc gọi" hidden><option value="">Chọn kết quả gọi</option><option value="Đã báo">Đã báo</option><option value="Không bắt máy">Không bắt máy</option><option value="Không liên lạc được">Không liên lạc được</option></select>` : ''}
     ` : ''}
   `;
 }
@@ -1905,7 +1924,7 @@ async function loadNotices() {
   let rows = await api('/api/notification-logs?' + queryString({
     ...historyDateParams(),
     q: $('#historyKeyword').value.trim(),
-    excludeAbsenceStatus: 'Học phí'
+    excludeAbsenceStatus: 'Học phí', excludeGeneralNotifications: true
   }));
 
   rows = rows.filter(row => !row.callLogId && (
@@ -1959,6 +1978,33 @@ function queuedMessage(result) {
   return '';
 }
 
+function requestStudentNotificationPreview(preview) {
+  const dialog = $('#studentNotificationDialog');
+  const form = $('#studentNotificationForm');
+  const cancel = $('#studentNotificationCancel');
+  if (!dialog || !form || !cancel || dialog.open) throw new Error('Không mở được bản xem trước. Vui lòng tải lại trang.');
+  $('#studentNotificationTitle').textContent = preview.type;
+  $('#studentNotificationStudent').textContent = [preview.studentName, preview.className, preview.phone].filter(Boolean).join(' · ');
+  $('#studentNotificationMessage').textContent = preview.message;
+  return new Promise(resolve => {
+    const finish = action => {
+      form.removeEventListener('submit', onSubmit);
+      dialog.removeEventListener('close', onClose);
+      cancel.removeEventListener('click', onCancel);
+      dialog.close();
+      resolve(action);
+    };
+    const onSubmit = event => { event.preventDefault(); finish(event.submitter?.value === 'send' ? 'send' : 'queue'); };
+    const onClose = () => finish(null);
+    const onCancel = () => finish(null);
+    form.addEventListener('submit', onSubmit);
+    dialog.addEventListener('close', onClose);
+    cancel.addEventListener('click', onCancel);
+    dialog.showModal();
+    cancel.focus();
+  });
+}
+
 function requestWithdrawalReason(student) {
   const dialog = $('#withdrawalReasonDialog');
   const form = $('#withdrawalReasonForm');
@@ -2007,6 +2053,39 @@ async function updateRosterStatus(select) {
   const attendanceClass = select.dataset.attendanceClass;
   const absenceId = select.dataset.absenceId;
   const status = normalizeAbsenceStatus(select.value);
+
+  if (['Kiểm tra định kì', 'Đăng ký mới'].includes(status)) {
+    const student = state.students.find(row => row.id === studentId);
+    const current = absenceForStudent(studentId, attendanceClass);
+    select.value = current ? normalizeAbsenceStatus(current.absenceStatus) : 'Đang học';
+    if (!student || student.className !== attendanceClass) throw new Error('Vui lòng tạo thông báo từ lớp chính của học sinh.');
+    const branchId = getActiveBranch();
+    const date = selectedDate();
+    const session = getClassScheduleInfo(student.className, date, selectedDay()).sessionName;
+    const url = `/api/students/${encodeURIComponent(studentId)}/notifications`;
+    const preview = await api(`${url}/preview?` + queryString({ type: status, date, session }));
+    if (getActiveBranch() !== branchId) throw new Error('Chi nhánh đã thay đổi. Vui lòng chọn lại học sinh.');
+    const action = await requestStudentNotificationPreview(preview);
+    if (!action) return;
+    if (getActiveBranch() !== branchId) throw new Error('Chi nhánh đã thay đổi. Vui lòng chọn lại học sinh.');
+    const result = await api(url, { method: 'POST', body: JSON.stringify({
+      type: status, date, session, message: preview.message, sendNow: action === 'send'
+    }) });
+    if (getActiveBranch() !== branchId) return;
+    const log = result.noticeLog;
+    if (log?.status === 'Chờ gửi thủ công' && state.settings?.zaloMode === 'personal-real') {
+      await sendSingleViaZaloExtension({ id: log.id, absenceId: result.request.id,
+        phone: log.responsePayload?.phone || log.phone1 || '', studentName: log.studentName || student.fullName,
+        className: log.className || student.className, message: log.message || '' });
+    } else {
+      toast(log ? `${status}: ${log.status}.` : result.request?.noticeStatus === 'Đã gửi'
+        ? 'Thông báo này đã gửi trước đó.' : 'Đã thêm thông báo vào Hàng xử lý.');
+    }
+    if (getActiveBranch() !== branchId) return;
+    await loadBootstrap();
+    await loadGeneralNotificationHistory();
+    return;
+  }
 
   if (select.value === 'REMOVE_FROM_CLASS') {
     const student = state.students.find(row => row.id === studentId);
@@ -2499,9 +2578,11 @@ function exportHistory(type) {
   };
   switch (type) {
     case 'absence':
-      return downloadUrl('/api/notification-logs/export', { ...params, excludeAbsenceStatus: 'Học phí' });
+      return downloadUrl('/api/notification-logs/export', { ...params, excludeAbsenceStatus: 'Học phí', excludeGeneralNotifications: true });
     case 'tuition':
       return downloadUrl('/api/notification-logs/export', { ...params, absenceStatus: 'Học phí', dateBasis: 'time' });
+    case 'general':
+      return downloadUrl('/api/notification-logs/export', { ...params, notificationType: 'general', dateBasis: 'time' });
     case 'call-absence':
       return downloadUrl('/api/call-logs/export', { ...params, excludeAbsenceStatus: 'Học phí' });
     case 'call-tuition':
@@ -2543,7 +2624,7 @@ async function clearNoticeHistory() {
   const params = {
     ...historyDateParams(),
     q: $('#historyKeyword')?.value.trim() || '',
-    excludeAbsenceStatus: 'Học phí'
+    excludeAbsenceStatus: 'Học phí', excludeGeneralNotifications: true
   };
   const scope = params.date || params.dateStart || params.dateEnd || params.q ? 'lịch sử vắng đang lọc' : 'toàn bộ lịch sử vắng';
   if (!confirm(`Xóa ${scope}?`)) return;
@@ -2915,6 +2996,8 @@ function buildSettingsPayload() {
     messageTemplate: $('#messageTemplate').value,
     tuitionTemplate: $('#tuitionTemplate')?.value || '',
     periodicTemplate: $('#periodicTemplate')?.value || '',
+    examNoticeTemplate: $('#examNoticeTemplate')?.value || '',
+    enrollmentNoticeTemplate: $('#enrollmentNoticeTemplate')?.value || '',
     periodicImageBase64: $('#periodicImageBase64')?.value || ''
   };
 }
@@ -3307,6 +3390,10 @@ function initEvents() {
   };
   $('#noticeRows')?.addEventListener('click', handleNoticeActions);
   $('#historyRows')?.addEventListener('click', handleNoticeActions);
+  $('#generalHistoryRows')?.addEventListener('click', async event => {
+    try { await handleNoticeActions(event); await loadGeneralNotificationHistory(); }
+    catch (error) { toast(error.message, 'error'); }
+  });
   const handleConfirmCallResult = async event => {
     const select = event.target.closest('.confirm-called-result');
     if (!select || !select.value || select.disabled) return;
@@ -3367,6 +3454,8 @@ function initEvents() {
   $('#messageTemplate')?.addEventListener('input', renderMessagePreview);
   $('#tuitionTemplate')?.addEventListener('input', renderMessagePreview);
   $('#periodicTemplate')?.addEventListener('input', renderMessagePreview);
+  $('#examNoticeTemplate')?.addEventListener('input', renderMessagePreview);
+  $('#enrollmentNoticeTemplate')?.addEventListener('input', renderMessagePreview);
   $('#previewTypeSelect')?.addEventListener('change', renderMessagePreview);
   $('#previewAbsenceStatusSelect')?.addEventListener('change', renderMessagePreview);
   $('#schoolName')?.addEventListener('input', renderMessagePreview);

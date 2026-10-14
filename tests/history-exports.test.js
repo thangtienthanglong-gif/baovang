@@ -63,6 +63,22 @@ function notice(overrides = {}) {
   };
 }
 
+test('general notification export keeps its send-day range and excludes attendance and tuition notices', async () => {
+  const exportFile = setup({ absences: [], notificationLogs: [
+    notice({ id: 'exam', absenceStatus: 'Kiểm tra định kì', date: '2026-10-01' }),
+    notice({ id: 'registration', absenceStatus: 'Đăng ký mới', date: '2026-10-01' }),
+    notice({ id: 'yesterday', absenceStatus: 'Kiểm tra định kì', time: '2026-10-11T13:00:00Z' }),
+    notice({ id: 'attendance' }), notice({ id: 'tuition', absenceStatus: 'Học phí' })
+  ] });
+  const general = await exportFile('/api/notification-logs/export', { notificationType: 'general', dateBasis: 'time', date: '2026-10-12' });
+  assert.equal(general.rows.length, 2);
+  assert.equal(general.sheet, 'Thong Bao');
+  assert.match(general.filename, /lich-su-thong-bao-2026-10-12/);
+  const attendance = await exportFile('/api/notification-logs/export', { excludeAbsenceStatus: 'Học phí', excludeGeneralNotifications: true });
+  assert.equal(attendance.rows.length, 1);
+  assert.equal(attendance.rows[0]['Loại thông báo'], 'Vắng không phép');
+});
+
 test('absence Excel exports all matching history beyond one page and excludes calls and tuition', async () => {
   const exportFile = setup({
     notificationLogs: [

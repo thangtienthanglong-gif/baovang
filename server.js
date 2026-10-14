@@ -15,6 +15,7 @@ const XLSX = require('xlsx-js-style');
 const { buildAttendanceAlerts, subjectForClass, registerAttendanceAlertRoutes } = require('./lib/attendance-alerts');
 const { historyDateRange, matchesHistoryDate, historyExportSuffix } = require('./lib/history-date-range');
 const { groupQuitStudents } = require('./lib/quit-history');
+const { registerStudentNotificationRoutes } = require('./lib/student-notifications');
 
 const app = express();
 const sessionLocks = new Set();
@@ -93,7 +94,7 @@ const DEFAULT_AI_PROVIDER = 'internal';
 const DEFAULT_OPENAI_MODEL = 'gpt-5.5';
 const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
 const DEFAULT_GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
-const ABSENCE_STATUSES = ['Vắng', 'Có phép', 'Đã bù', 'Đi trễ', 'Về sớm', 'Cả ngày', 'Nghỉ học', 'Học phí', 'Trễ học phí'];
+const ABSENCE_STATUSES = ['Vắng', 'Có phép', 'Đã bù', 'Đi trễ', 'Về sớm', 'Cả ngày', 'Nghỉ học', 'Học phí', 'Trễ học phí', 'Kiểm tra định kì', 'Đăng ký mới'];
 const MAKEUP_ATTENDANCE_STATUSES = new Set(['Vắng', 'Có phép', 'Đi trễ', 'Về sớm']);
 const DEFAULT_ABSENCE_MESSAGE_TEMPLATE = 'Kính gửi Quý phụ huynh, {schoolName} thông báo học sinh {studentName}, lớp {className}.\nHọc sinh: {absenceStatus} - {session} ngày {date}.\nPhụ huynh vui lòng phản hồi với nhà trường nếu cần bổ sung thông tin.';
 const OLD_ABSENCE_MESSAGE_TEMPLATE = 'Kính gửi Quý phụ huynh, {schoolName} thông báo học sinh {studentName}, lớp {className}.\nVắng học {session} ngày {date}.\nHọc sinh: {absenceStatus}.\nPhụ huynh vui lòng phản hồi với nhà trường nếu cần bổ sung thông tin.';
@@ -357,6 +358,8 @@ function defaultSettings() {
     messageTemplate: DEFAULT_ABSENCE_MESSAGE_TEMPLATE,
     tuitionTemplate: 'Kính gửi Quý phụ huynh, {schoolName} thông báo học phí/tiền nợ của em {studentName}, lớp {className} hiện tại là: {tuitionDebt}.\nVui lòng hoàn thành sớm. Trân trọng!',
     periodicTemplate: 'Kính gửi Quý phụ huynh, {schoolName} gửi thông báo định kì/khóa mới cho em {studentName}, lớp {className}.',
+    examNoticeTemplate: 'Kính gửi Quý phụ huynh, {schoolName} thông báo kiểm tra định kì cho em {studentName}, lớp {className}.\nLịch kiểm tra: [Nhập ngày, giờ].\nNội dung ôn tập: [Nhập nội dung].\nTrân trọng!',
+    enrollmentNoticeTemplate: 'Kính gửi Quý phụ huynh, {schoolName} thông báo đăng ký khóa học mới cho em {studentName}, lớp {className}.\nKhóa học: [Nhập tên khóa học].\nThời hạn và cách đăng ký: [Nhập hướng dẫn].\nTrân trọng!',
     periodicImageBase64: ''
   };
 }
@@ -397,6 +400,8 @@ function publicSettings(settings) {
     messageTemplate: resolveAbsenceMessageTemplate(settings.messageTemplate),
     tuitionTemplate: settings.tuitionTemplate || defaultSettings().tuitionTemplate,
     periodicTemplate: settings.periodicTemplate || defaultSettings().periodicTemplate,
+    examNoticeTemplate: settings.examNoticeTemplate || defaultSettings().examNoticeTemplate,
+    enrollmentNoticeTemplate: settings.enrollmentNoticeTemplate || defaultSettings().enrollmentNoticeTemplate,
     periodicImageBase64: settings.periodicImageBase64 || ''
   };
 }
@@ -595,7 +600,9 @@ function filterAbsences(db, query) {
   const keyword = String(query.q || '').toLowerCase().trim();
   const session = query.session || 'ALL';
 
-  return (db.absences || [])
+  const records = query.includeNotifications === true || query.includeNotifications === 'true'
+    ? [...(db.absences || []), ...(db.contactRequests || [])] : (db.absences || []);
+  return records
     .map(absence => enrichAbsence(absence, studentsMap))
     .filter(absence => {
       let matchesDate = true;
@@ -617,7 +624,7 @@ function filterAbsences(db, query) {
 }
 
 function getSummary(absences) {
-  const actionable = absences.filter(row => normalizeAbsenceStatus(row.absenceStatus) !== 'Đã bù'
+  const actionable = absences.filter(row => !row.notificationOnly && normalizeAbsenceStatus(row.absenceStatus) !== 'Đã bù'
     && !isWithdrawnAbsence(row, { status: row.studentStatus, removedFromClass: row.studentRemovedFromClass }));
   const count = status => actionable.filter(row => row.callStatus === status).length;
   const notice = status => actionable.filter(row => row.noticeStatus === status).length;
@@ -702,7 +709,7 @@ function notificationLogAbsenceStatus(log, absence) {
     return normalizeAbsenceStatus(label[0].toLocaleUpperCase('vi') + label.slice(1));
   }
   if (/thông báo\s+học phí\s*\/\s*tiền nợ\s+của em\b/iu.test(message)) return 'Học phí';
-  if (/gửi thông báo định kỳ\s*\/\s*khóa mới cho em\b/iu.test(message)) return 'Định kỳ';
+  if (/gửi thông báo định k[ỳì]\s*\/\s*khóa mới cho em\b/iu.test(message)) return 'Định kỳ';
   return cleanText(absence?.absenceStatus) || 'Khác';
 }
 
@@ -713,7 +720,7 @@ function filterNotificationLogs(db, query) {
     ? normalizeAbsenceStatus(query.absenceStatus) : '';
   const excludeAbsenceStatus = query.excludeAbsenceStatus
     ? normalizeAbsenceStatus(query.excludeAbsenceStatus) : '';
-  const absences = new Map((db.absences || []).map(absence => [absence.id, absence]));
+  const absences = new Map([...(db.absences || []), ...(db.contactRequests || [])].map(absence => [absence.id, absence]));
   let rows = (db.notificationLogs || []).map(log => {
     const absence = absences.get(log.absenceId);
     return {
@@ -729,6 +736,11 @@ function filterNotificationLogs(db, query) {
   rows = rows.filter(log => matchesHistoryDate(query.dateBasis === 'time' ? notificationLogDate(log) : log.date, range));
   if (absenceStatus) rows = rows.filter(log => normalizeAbsenceStatus(log.absenceStatus) === absenceStatus);
   if (excludeAbsenceStatus) rows = rows.filter(log => normalizeAbsenceStatus(log.absenceStatus) !== excludeAbsenceStatus);
+  const generalTypes = ['Kiểm tra định kì', 'Đăng ký mới', 'Định kỳ', 'Định kì', 'Khóa mới', 'Thông báo chung'];
+  if (query.notificationType === 'general') rows = rows.filter(log => generalTypes.includes(log.absenceStatus));
+  if (query.excludeGeneralNotifications === true || query.excludeGeneralNotifications === 'true') {
+    rows = rows.filter(log => !generalTypes.includes(log.absenceStatus));
+  }
   if (q) {
     rows = rows.filter(log => `${log.studentCode} ${log.studentName} ${log.className} ${log.parentName} ${log.phone1} ${log.zaloUserId} ${log.status} ${log.result}`.toLowerCase().includes(q));
   }
@@ -815,6 +827,10 @@ function buildMessage(settings, absence, student) {
   let template = resolveAbsenceMessageTemplate(settings.messageTemplate);
   if (status === 'Học phí' || status === 'Trễ học phí') {
     template = settings.tuitionTemplate || 'Kính gửi Quý phụ huynh, {schoolName} thông báo học phí/tiền nợ của em {studentName}, lớp {className} hiện tại là: {tuitionDebt}.\nVui lòng hoàn thành sớm. Trân trọng!';
+  } else if (status === 'Kiểm tra định kì') {
+    template = settings.examNoticeTemplate || defaultSettings().examNoticeTemplate;
+  } else if (status === 'Đăng ký mới') {
+    template = settings.enrollmentNoticeTemplate || defaultSettings().enrollmentNoticeTemplate;
   } else if (['Định kỳ', 'Định kì', 'Khóa mới', 'Thông báo chung'].includes(status)) {
     template = settings.periodicTemplate || 'Kính gửi Quý phụ huynh, {schoolName} gửi thông báo định kỳ/khóa mới cho em {studentName}, lớp {className}.';
   }
@@ -2082,7 +2098,8 @@ function getZaloRuntimeConfig(settings) {
 }
 
 async function sendZaloNotice(db, absenceId, reason = 'auto') {
-  const absence = db.absences.find(row => row.id === absenceId);
+  const records = db.absences.some(row => row.id === absenceId) ? db.absences : (db.contactRequests || []);
+  const absence = records.find(row => row.id === absenceId);
   if (!absence) {
     const err = new Error('Không tìm thấy bản ghi vắng học để gửi Zalo.');
     err.status = 404;
@@ -2091,7 +2108,7 @@ async function sendZaloNotice(db, absenceId, reason = 'auto') {
   const student = db.students.find(row => row.id === absence.studentId) || {};
   const settings = db.settings || defaultSettings();
   const config = getZaloRuntimeConfig(settings);
-  const message = buildMessage(settings, absence, student);
+  const message = absence.notificationOnly ? absence.message : buildMessage(settings, absence, student);
   const time = nowISO();
 
   const baseLog = {
@@ -2100,6 +2117,7 @@ async function sendZaloNotice(db, absenceId, reason = 'auto') {
     absenceId: absence.id,
     date: absence.date,
     absenceStatus: normalizeAbsenceStatus(absence.absenceStatus),
+    notificationOnly: Boolean(absence.notificationOnly),
     studentId: student.id || '',
     studentCode: student.code || '',
     studentName: student.fullName || '',
@@ -2115,13 +2133,13 @@ async function sendZaloNotice(db, absenceId, reason = 'auto') {
   function finish(status, result, responsePayload) {
     const log = { ...baseLog, status, result, responsePayload: responsePayload || null };
     db.notificationLogs.push(log);
-    const index = db.absences.findIndex(row => row.id === absence.id);
+    const index = records.findIndex(row => row.id === absence.id);
     if (index !== -1) {
-      db.absences[index] = {
-        ...db.absences[index],
+      records[index] = {
+        ...records[index],
         noticeStatus: status,
         noticeResult: result,
-        noticeSentAt: ['Đã gửi', 'Chạy thử'].includes(status) ? time : db.absences[index].noticeSentAt,
+        noticeSentAt: ['Đã gửi', 'Chạy thử'].includes(status) ? time : records[index].noticeSentAt,
         noticeDueAt: '',
         autoNotice: false,
         updatedAt: time
@@ -2864,6 +2882,7 @@ app.get('/api/bootstrap', async (req, res, next) => {
       statuses: ['ALL', 'Chưa gọi', 'Đã gọi', 'Không nghe máy', 'Không liên lạc được', 'Hẹn gọi lại', 'Sai số'],
       noticeStatuses: ['ALL', 'Chờ gửi', 'Chờ gửi thủ công', 'Chưa gửi', 'Chạy thử', 'Đã gửi', 'Đã gọi', 'Không nghe máy', 'Không liên lạc được', 'Cần gọi điện', 'Lỗi gửi', 'Không gửi'],
       absenceStatuses: ABSENCE_STATUSES,
+      contactRequests: filterAbsences(db, { date: req.query.date, includeNotifications: true }).filter(row => row.notificationOnly),
       results: [
         '',
         'Phụ huynh xác nhận nghỉ có phép',
@@ -2916,7 +2935,9 @@ app.put('/api/settings', async (req, res, next) => {
       cozeUserId: cleanText(req.body.cozeUserId) || 'bao-vang-teacher',
       messageTemplate: cleanMultilineText(req.body.messageTemplate) || defaultSettings().messageTemplate,
       tuitionTemplate: cleanMultilineText(req.body.tuitionTemplate) || defaultSettings().tuitionTemplate,
-      periodicTemplate: cleanMultilineText(req.body.periodicTemplate) || defaultSettings().periodicTemplate
+      periodicTemplate: cleanMultilineText(req.body.periodicTemplate) || defaultSettings().periodicTemplate,
+      examNoticeTemplate: req.body.examNoticeTemplate === undefined ? (db.settings?.examNoticeTemplate || defaultSettings().examNoticeTemplate) : cleanMultilineText(req.body.examNoticeTemplate) || defaultSettings().examNoticeTemplate,
+      enrollmentNoticeTemplate: req.body.enrollmentNoticeTemplate === undefined ? (db.settings?.enrollmentNoticeTemplate || defaultSettings().enrollmentNoticeTemplate) : cleanMultilineText(req.body.enrollmentNoticeTemplate) || defaultSettings().enrollmentNoticeTemplate
     };
     if (req.body.zaloAccessToken !== undefined && String(req.body.zaloAccessToken).trim() !== '') {
       db.settings.zaloAccessToken = String(req.body.zaloAccessToken).trim();
@@ -3865,9 +3886,16 @@ app.get('/api/absences/export-failed-zalo', async (req, res, next) => {
   }
 });
 
+registerStudentNotificationRoutes(app, { getBranchDb, saveBranchDb, buildMessage, sendZaloNotice, id, nowISO });
+
 app.post('/api/absences', async (req, res, next) => {
   try {
     requireFields(req.body, ['date', 'studentId', 'session', 'absenceStatus']);
+    if (['Kiểm tra định kì', 'Đăng ký mới'].includes(req.body.absenceStatus)) {
+      const error = new Error('Vui lòng tạo thông báo riêng; không dùng trạng thái thông báo để ghi nhận điểm danh.');
+      error.status = 400;
+      throw error;
+    }
     const db = await getBranchDb(req);
     const student = db.students.find(row => row.id === req.body.studentId);
     if (!student) {
@@ -3967,6 +3995,11 @@ app.post('/api/absences', async (req, res, next) => {
 app.put('/api/absences/:id/status', async (req, res, next) => {
   try {
     requireFields(req.body, ['absenceStatus']);
+    if (['Kiểm tra định kì', 'Đăng ký mới'].includes(req.body.absenceStatus)) {
+      const error = new Error('Vui lòng tạo thông báo riêng; không thay đổi bản ghi điểm danh thành thông báo.');
+      error.status = 400;
+      throw error;
+    }
     const db = await getBranchDb(req);
     const index = db.absences.findIndex(absence => absence.id === req.params.id);
     if (index === -1) {
@@ -4100,14 +4133,15 @@ app.post('/api/absences/zalo/bulk', async (req, res, next) => {
 app.post('/api/absences/:id/zalo/manual-sent', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
-    const index = db.absences.findIndex(absence => absence.id === req.params.id);
+    const records = db.absences.some(row => row.id === req.params.id) ? db.absences : (db.contactRequests || []);
+    const index = records.findIndex(absence => absence.id === req.params.id);
     if (index === -1) {
       const err = new Error('Không tìm thấy bản ghi vắng học.');
       err.status = 404;
       throw err;
     }
 
-    const absence = db.absences[index];
+    const absence = records[index];
     const requestedLogId = String(req.body?.logId || '');
     const matchesAttempt = log => log.absenceId === absence.id && log.channel === 'Zalo cá nhân';
     const existingLogIndex = requestedLogId
@@ -4137,7 +4171,7 @@ app.post('/api/absences/:id/zalo/manual-sent', async (req, res, next) => {
     const newerAttemptExists = existingLogIndex !== -1 && db.notificationLogs
       .slice(existingLogIndex + 1).some(log => log.absenceId === absence.id);
     if (!newerAttemptExists) {
-      db.absences[index] = {
+      records[index] = {
         ...absence,
         noticeStatus: 'Đã gửi',
         noticeResult: sentResult,
@@ -4179,7 +4213,7 @@ app.post('/api/absences/:id/zalo/manual-sent', async (req, res, next) => {
     
     log.absenceStatus ||= notificationLogAbsenceStatus(log, absence);
     await saveBranchDb(req, db);
-    res.json({ absence: enrichAbsence(db.absences[index], studentByIdMap(db.students)), log });
+    res.json({ absence: enrichAbsence(records[index], studentByIdMap(db.students)), log });
   } catch (error) {
     next(error);
   }
@@ -4188,7 +4222,8 @@ app.post('/api/absences/:id/zalo/manual-sent', async (req, res, next) => {
 app.post('/api/absences/:id/zalo/manual-error', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
-    const index = db.absences.findIndex(absence => absence.id === req.params.id);
+    const records = db.absences.some(row => row.id === req.params.id) ? db.absences : (db.contactRequests || []);
+    const index = records.findIndex(absence => absence.id === req.params.id);
     const requestedLogId = String(req.body?.logId || '');
     const time = nowISO();
     const errorDetail = String(req.body?.error || '').trim().slice(0, 300);
@@ -4219,7 +4254,7 @@ app.post('/api/absences/:id/zalo/manual-error', async (req, res, next) => {
       throw err;
     }
 
-    const absence = db.absences[index];
+    const absence = records[index];
     const student = db.students.find(row => row.id === absence.studentId) || {};
     const settings = db.settings || defaultSettings();
     const message = buildMessage(settings, absence, student);
@@ -4227,7 +4262,7 @@ app.post('/api/absences/:id/zalo/manual-error', async (req, res, next) => {
     const newerAttemptExists = existingLogIndex !== -1 && db.notificationLogs
       .slice(existingLogIndex + 1).some(log => log.absenceId === absence.id);
     if (!newerAttemptExists) {
-      db.absences[index] = {
+      records[index] = {
         ...absence,
         noticeStatus: 'Lỗi gửi',
         noticeResult: errorResult,
@@ -4269,7 +4304,7 @@ app.post('/api/absences/:id/zalo/manual-error', async (req, res, next) => {
     
     log.absenceStatus ||= notificationLogAbsenceStatus(log, absence);
     await saveBranchDb(req, db);
-    res.json({ absence: enrichAbsence(db.absences[index], studentByIdMap(db.students)), log });
+    res.json({ absence: enrichAbsence(records[index], studentByIdMap(db.students)), log });
   } catch (error) {
     next(error);
   }
@@ -4443,6 +4478,7 @@ app.get('/api/notification-logs/export', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
     const tuition = normalizeAbsenceStatus(req.query.absenceStatus) === 'Học phí';
+    const general = req.query.notificationType === 'general';
     let logs = filterNotificationLogs(db, req.query);
     if (!tuition) {
       logs = logs.filter(row => row.status !== 'Chưa kết bạn - Cần gọi'
@@ -4460,8 +4496,8 @@ app.get('/api/notification-logs/export', async (req, res, next) => {
       'Kết quả': row.result || ''
     }));
     const suffix = historyExportSuffix(req.query);
-    sendWorkbook(res, `lich-su-${tuition ? 'hoc-phi' : 'vang'}-${suffix}.xlsx`, [
-      { name: tuition ? 'Lich Su Hoc Phi' : 'Lich Su Vang', rows }
+    sendWorkbook(res, `lich-su-${general ? 'thong-bao' : tuition ? 'hoc-phi' : 'vang'}-${suffix}.xlsx`, [
+      { name: general ? 'Thong Bao' : tuition ? 'Lich Su Hoc Phi' : 'Lich Su Vang', rows }
     ]);
   } catch (error) {
     next(error);
@@ -4482,6 +4518,9 @@ app.post('/api/notification-logs/:id/confirm-called', async (req, res, next) => 
     const db = await getBranchDb(req);
     const log = (db.notificationLogs || []).find(row => row.id === req.params.id);
     if (!log) return res.status(404).json({ error: 'Không tìm thấy lượt gửi trong chi nhánh này.' });
+    if (log.notificationOnly || ['Kiểm tra định kì', 'Đăng ký mới'].includes(log.absenceStatus)) {
+      return res.status(409).json({ error: 'Thông báo kiểm tra/đăng ký được quản lý trong lịch sử Thông báo.' });
+    }
     const existingCall = (db.callLogs || []).find(row => row.id === log.callLogId || row.notificationLogId === log.id);
     if (log.callLogId && existingCall) return res.json({ log, callLog: existingCall });
     if (log.status !== 'Lỗi gửi') return res.status(409).json({ error: 'Chỉ xác nhận đã gọi cho lượt gửi lỗi.' });
