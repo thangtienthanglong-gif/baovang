@@ -35,6 +35,7 @@ function setup(db) {
   };
   Object.assign(context, require('../lib/history-date-range'));
   context.subjectForClass = require('../lib/attendance-alerts').subjectForClass;
+  context.groupQuitStudents = require('../lib/quit-history').groupQuitStudents;
   vm.createContext(context);
   for (const [start, end] of [
     ['function sanitizeStudent(', 'function getSummary('],

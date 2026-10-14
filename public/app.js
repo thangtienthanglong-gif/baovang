@@ -1749,15 +1749,15 @@ async function loadQuitStudents() {
 
   setHistoryRows('quitRows', 'quitHistoryPagination', rows, row => `
     <tr>
-      <td>${escapeHtml(row.quitDate ? row.quitDate.split('-').reverse().join('/') : '')}</td>
+      <td>${(row.quitDates || [row.quitDate]).filter(Boolean).map(date => `<div>${escapeHtml(date.split('-').reverse().join('/'))}</div>`).join('')}</td>
       <td class="notice-history-student">
         <div class="student-heading">
           <div class="person-main">${escapeHtml(row.fullName)}</div>
-          ${row.className ? `<span class="mini-chip">${escapeHtml(row.className)}</span>` : ''}
+          ${(row.classNames || [row.className]).filter(Boolean).map(className => `<span class="mini-chip">${escapeHtml(className)}</span>`).join('')}
         </div>
         <div class="student-phone">${escapeHtml(row.phone1 || row.phone2 || '')}</div>
       </td>
-      <td>${escapeHtml(row.quitReason || '')}</td>
+      <td class="quit-history-reason">${escapeHtml(row.quitReason || '')}</td>
     </tr>
   `, 'Không có học sinh nào nghỉ học.', 3);
 }

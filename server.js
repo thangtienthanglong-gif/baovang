@@ -14,6 +14,7 @@ const multer = require('multer');
 const XLSX = require('xlsx-js-style');
 const { buildAttendanceAlerts, subjectForClass, registerAttendanceAlertRoutes } = require('./lib/attendance-alerts');
 const { historyDateRange, matchesHistoryDate, historyExportSuffix } = require('./lib/history-date-range');
+const { groupQuitStudents } = require('./lib/quit-history');
 
 const app = express();
 const sessionLocks = new Set();
@@ -3097,7 +3098,7 @@ function filterQuitStudents(db, query) {
 app.get('/api/quit-students', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
-    res.json(filterQuitStudents(db, req.query));
+    res.json(groupQuitStudents(filterQuitStudents(db, req.query)));
   } catch (error) {
     next(error);
   }
@@ -3106,9 +3107,9 @@ app.get('/api/quit-students', async (req, res, next) => {
 app.get('/api/quit-students/export', async (req, res, next) => {
   try {
     const db = await getBranchDb(req);
-    const rows = filterQuitStudents(db, req.query).map(student => {
+    const rows = groupQuitStudents(filterQuitStudents(db, req.query)).map(student => {
       return {
-        'Ngày nghỉ': student.quitDate ? student.quitDate.split('-').reverse().join('/') : '',
+        'Ngày nghỉ': student.quitDates.map(date => date.split('-').reverse().join('/')).join('\n'),
         'Học sinh': student.fullName,
         'Lớp': student.className,
         'Phụ huynh': student.parentName,

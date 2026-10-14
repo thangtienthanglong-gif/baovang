@@ -24,6 +24,7 @@ function setup() {
     app: Object.fromEntries(['get', 'delete'].map(method => [method, (route, handler) => routes.set(`${method} ${route}`, handler)]))
   };
   context.subjectForClass = require('../lib/attendance-alerts').subjectForClass;
+  context.groupQuitStudents = require('../lib/quit-history').groupQuitStudents;
   vm.createContext(context);
   for (const [start, end] of [
     ['function quitStudentDetails(', 'function markStudentWithdrawn('],
@@ -113,4 +114,18 @@ test('withdrawals can be filtered by grade alone, subject alone or both, includi
   assert.ok(app.branches.main.students.some(student => student.className === '7KS4M'));
   assert.ok(app.branches.main.students.some(student => student.className === '8VT2'));
   assert.deepEqual(app.branches.other, before);
+});
+
+test('grouping is a display operation and deletion still respects each enrollment date', async () => {
+  const app = setup();
+  app.branches.main.students = [
+    { id: 's1', status: 'Nghỉ học', fullName: 'Thái Song Quang', className: '8T3M+', phone1: '0908332401', quitDate: '2026-10-13' },
+    { id: 's2', status: 'Nghỉ học', fullName: 'Thái Song Quang', className: '8NT7M', phone1: '0908332401', quitDate: '2026-10-10' },
+    { id: 's3', status: 'Đang học', fullName: 'Thái Song Quang', className: '8AT2', phone1: '0908332401' }
+  ];
+  const records = app.context.filterQuitStudents(app.branches.main, { dateStart: '2026-10-10', dateEnd: '2026-10-13', subject: 'TOAN' });
+  assert.equal(app.context.groupQuitStudents(records).length, 1);
+  assert.equal(app.branches.main.students.length, 3);
+  await app.remove('/api/quit-students/clear', { date: '2026-10-13' });
+  assert.deepEqual(app.branches.main.students.map(row => row.id), ['s2', 's3']);
 });

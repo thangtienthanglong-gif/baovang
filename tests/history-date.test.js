@@ -199,3 +199,19 @@ test('a response for an earlier withdrawal filter cannot overwrite the newer sel
   assert.match(app.fields.quitRows.innerHTML, /Khối 8/);
   assert.doesNotMatch(app.fields.quitRows.innerHTML, /Khối 7/);
 });
+
+test('grouped withdrawal rows show both class chips and dates within one paginated row', async () => {
+  const app = setup();
+  app.context.api = async () => [{
+    fullName: 'Thái Song Quang', phone1: '0908332401',
+    classNames: ['8T3M+', '8NT7M'], quitDates: ['2026-10-13', '2026-10-10'], quitReason: 'Lý do 1\nLý do 2'
+  }];
+  await app.context.loadQuitStudents();
+  const html = app.fields.quitRows.innerHTML;
+  assert.equal((html.match(/<tr>/g) || []).length, 1);
+  assert.equal((html.match(/class="mini-chip"/g) || []).length, 2);
+  assert.match(html, /13\/10\/2026/);
+  assert.match(html, /10\/10\/2026/);
+  assert.match(html, /quit-history-reason/);
+  assert.match(html, /0908332401/);
+});

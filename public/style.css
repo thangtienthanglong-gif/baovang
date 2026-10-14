@@ -566,6 +566,7 @@ main {
 
 .quit-history-filters { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
 .quit-history-filters .field { flex: 0 1 190px; margin: 0; }
+.quit-history-reason { white-space: pre-line; }
 @media (max-width: 760px) { .quit-history-filters .field { flex: 1 1 130px; } }
 
 .history-export-menu button {

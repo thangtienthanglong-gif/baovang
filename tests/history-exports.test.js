@@ -23,6 +23,7 @@ function setup(db) {
   };
   Object.assign(context, require('../lib/history-date-range'));
   context.subjectForClass = require('../lib/attendance-alerts').subjectForClass;
+  context.groupQuitStudents = require('../lib/quit-history').groupQuitStudents;
   vm.createContext(context);
   vm.runInContext(source.match(/^const ABSENCE_STATUSES = .*;$/m)[0], context);
   for (const [start, end] of [
@@ -188,4 +189,19 @@ test('withdrawal Excel combines grade, subject, date and keyword and preserves r
   assert.equal(file.rows[0]['Lớp'], '8KS4M');
   assert.equal(file.rows[0]['Lý do'], 'Học mệt');
   assert.equal(file.rows[0]['SĐT'], '0901234567');
+});
+
+test('withdrawal Excel exports one grouped math student with every selected class, date and reason', async () => {
+  const db = { students: [
+    { id: 's1', status: 'Nghỉ học', code: 'AUTO-1', fullName: 'Thái Song Quang', className: '8T3M+', phone1: '0908332401', quitDate: '2026-10-13', quitReason: 'Bận lịch' },
+    { id: 's2', status: 'Nghỉ học', code: 'AUTO-2', fullName: 'Thái Song Quang', className: '8NT7M', phone1: '0908332401', quitDate: '2026-10-10', quitReason: 'Chuyển trường' }
+  ] };
+  const file = await setup(db)('/api/quit-students/export', { grade: '8', subject: 'TOAN', dateStart: '2026-10-10', dateEnd: '2026-10-13' });
+  assert.equal(file.rows.length, 1);
+  assert.equal(file.rows[0]['Ngày nghỉ'], '13/10/2026\n10/10/2026');
+  assert.equal(file.rows[0]['Lớp'], '8T3M+, 8NT7M');
+  assert.match(file.rows[0]['Lý do'], /Bận lịch/);
+  assert.match(file.rows[0]['Lý do'], /Chuyển trường/);
+  const singleDate = await setup(db)('/api/quit-students/export', { date: '2026-10-13' });
+  assert.equal(singleDate.rows[0]['Lớp'], '8T3M+');
 });
