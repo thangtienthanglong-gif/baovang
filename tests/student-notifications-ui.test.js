@@ -43,7 +43,7 @@ function setup(type = 'Kiểm tra định kì') {
   return { fields, requests, sends, refreshes, context, select, student, attendance, flush, setBranch: value => { branch = value; } };
 }
 
-for (const type of ['Kiểm tra định kì', 'Đăng ký mới']) {
+for (const type of ['Đăng ký mới']) {
   for (const action of ['queue', 'send']) {
     test(`${type}: selecting ${action} reviews the student and message without changing the existing absence`, async () => {
       const app = setup(type), original = structuredClone(app.attendance);
@@ -70,9 +70,49 @@ for (const type of ['Kiểm tra định kì', 'Đăng ký mới']) {
   }
 }
 
+test('selecting periodic exam automatically queues its saved content without a dialog or immediate Zalo send', async () => {
+  const app = setup('Kiểm tra định kì');
+  const original = structuredClone(app.attendance);
+  app.context.requestStudentNotificationPreview = () => assert.fail('Exam notices must not open a dialog');
+  await app.context.updateRosterStatus(app.select);
+  assert.equal(app.fields.studentNotificationDialog.open, false);
+  assert.equal(app.requests.length, 2);
+  assert.match(app.requests[1].url, /^\/api\/students\/s1\/notifications$/);
+  const body = JSON.parse(app.requests[1].options.body);
+  assert.equal(body.type, 'Kiểm tra định kì');
+  assert.equal(body.sendNow, false);
+  assert.equal(body.message, 'Kiểm tra ngày 20/10');
+  assert.equal(body.date, '2026-10-14');
+  assert.equal(body.session, 'Tối');
+  assert.equal(app.sends.length, 0);
+  assert.equal(app.select.value, 'Vắng');
+  assert.deepEqual(app.attendance, original);
+  assert.deepEqual(app.refreshes, ['bootstrap', 'history']);
+});
+
+test('a failed template load or a changed branch cannot create an automatic exam notification', async () => {
+  for (const variant of ['template-error', 'branch-change']) {
+    const app = setup('Kiểm tra định kì');
+    const originalApi = app.context.api;
+    app.context.api = async (...args) => {
+      const result = await originalApi(...args);
+      if (variant === 'template-error') throw new Error('Không tải được mẫu thông báo');
+      app.setBranch('other');
+      return result;
+    };
+    await assert.rejects(app.context.updateRosterStatus(app.select), variant === 'template-error' ? /mẫu thông báo/ : /Chi nhánh/);
+    assert.equal(app.requests.length, 1);
+    assert.equal(app.sends.length, 0);
+    assert.equal(app.fields.studentNotificationDialog.open, false);
+    assert.equal(app.select.value, 'Vắng');
+    assert.equal(app.attendance.absenceStatus, 'Vắng');
+    assert.deepEqual(app.refreshes, []);
+  }
+});
+
 test('cancelling preview or changing branches while reviewing creates no notification and sends nothing', async () => {
   for (const action of ['cancel', 'escape', 'branch']) {
-    const app = setup();
+    const app = setup('Đăng ký mới');
     const pending = app.context.updateRosterStatus(app.select);
     await app.flush();
     if (action === 'cancel') app.fields.studentNotificationCancel.emit('click');

@@ -35,7 +35,8 @@ Cập nhật ngày 14/10/2026. Dành cho giáo viên, nhân viên trực và qu�
 | Đã bù | Học sinh đã học bù trước buổi học chính; không tạo yêu cầu báo vắng cho buổi đó. |
 | Nghỉ học | Học sinh ngừng theo học. App yêu cầu nhập lý do và lưu vào lịch sử học sinh nghỉ học. |
 | Trễ học phí | Ghi nhận trường hợp cần nhắc học phí. Kiểm tra liên hệ ở Lịch sử học phí. |
-| Kiểm tra định kì / Đăng ký mới | Mở bản xem trước thông báo, chọn gửi ngay hoặc thêm vào hàng xử lý. Giữ nguyên trạng thái điểm danh. |
+| Kiểm tra định kì | Tự đưa thông báo vào Hàng xử lý, không mở hộp thoại và không gửi ngay. Giữ nguyên trạng thái điểm danh. |
+| Đăng ký mới | Mở bản xem trước thông báo, chọn gửi ngay hoặc thêm vào hàng xử lý. Giữ nguyên trạng thái điểm danh. |
 | Xóa khỏi danh sách lớp | Loại học sinh khỏi lớp đang chọn; có thông tin tại Đã xóa khỏi lớp. |
 
 **Vắng một buổi** dùng Vắng có phép hoặc Vắng không phép. **Nghỉ học** dùng khi học sinh ngừng theo học, không dùng thay cho báo vắng một buổi.
@@ -53,7 +54,7 @@ Khi chọn **Nghỉ học**, nhập lý do cụ thể vào hộp thoại rồi l
 
 1. Vào **Zalo**, điền **Mẫu thông báo kiểm tra định kì** hoặc **Mẫu thông báo đăng ký mới** rồi **Lưu cấu hình**. Thay các phần `[Nhập ...]` bằng lịch kiểm tra, nội dung ôn tập hoặc tên khóa học, thời hạn và cách đăng ký thực tế.
 2. Trong danh sách lớp, ở **Trạng thái** của học sinh, chọn **Kiểm tra định kì** hoặc **Đăng ký mới**.
-3. Kiểm tra người nhận và nội dung trong hộp thoại. Chọn **Gửi ngay** để gửi qua chế độ Zalo đang cấu hình; chọn **Thêm vào hàng xử lý** nếu muốn gom danh sách gửi hàng loạt. **Hủy** không tạo thông báo.
+3. Với **Kiểm tra định kì**, app tự thêm thông báo vào **Hàng xử lý**, không mở hộp thoại và chưa gửi Zalo. Với **Đăng ký mới**, kiểm tra người nhận và nội dung trong hộp thoại; chọn **Gửi ngay** hoặc **Thêm vào hàng xử lý**. **Hủy** không tạo thông báo đăng ký.
 4. Để gửi hàng loạt, mở Hàng xử lý, chọn đúng Ngày/Buổi, lọc **Nội dung liên hệ** theo loại thông báo, tích người nhận rồi bấm **Gửi Zalo hàng loạt**.
 5. Xem kết quả tại **Lịch sử liên hệ → Thông báo**. Ngày lọc của lịch sử thông báo là ngày ghi nhận lượt gửi; có thể xuất Excel theo khoảng ngày.
 

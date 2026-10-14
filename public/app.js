@@ -2065,7 +2065,7 @@ async function updateRosterStatus(select) {
     const url = `/api/students/${encodeURIComponent(studentId)}/notifications`;
     const preview = await api(`${url}/preview?` + queryString({ type: status, date, session }));
     if (getActiveBranch() !== branchId) throw new Error('Chi nhánh đã thay đổi. Vui lòng chọn lại học sinh.');
-    const action = await requestStudentNotificationPreview(preview);
+    const action = status === 'Kiểm tra định kì' ? 'queue' : await requestStudentNotificationPreview(preview);
     if (!action) return;
     if (getActiveBranch() !== branchId) throw new Error('Chi nhánh đã thay đổi. Vui lòng chọn lại học sinh.');
     const result = await api(url, { method: 'POST', body: JSON.stringify({
