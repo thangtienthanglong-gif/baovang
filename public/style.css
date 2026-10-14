@@ -21,6 +21,44 @@
   --shadow-hover: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
+/* User guide: scoped to its panel, with the same colors as the app. */
+.app-guide { line-height: 1.7; }
+.app-guide .guide-header { align-items: flex-start; gap: 16px; }
+.app-guide .guide-header p { max-width: 72ch; margin: 8px 0 0; color: var(--muted); }
+.app-guide .guide-header .btn { flex-shrink: 0; text-decoration: none; }
+.guide-toc { padding: 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
+.guide-toc h3 { margin: 0 0 12px; font-size: 16px; }
+.guide-toc ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 28px; margin: 0; padding-left: 24px; }
+.guide-toc a, .guide-back { color: var(--primary); text-decoration: none; }
+.guide-toc a { display: block; padding: 3px 0; }
+.guide-toc a:hover, .guide-back:hover { text-decoration: underline; }
+.app-guide a:focus-visible, .guide-table-wrap:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; border-radius: 4px; }
+.guide-toc, .guide-section { scroll-margin-top: 100px; }
+.guide-section { padding: 28px 0; border-bottom: 1px solid var(--line); }
+.guide-section:last-child { padding-bottom: 0; border-bottom: 0; }
+.guide-section h3 { margin: 0 0 16px; font-size: 20px; color: var(--text); }
+.guide-section h4 { margin: 24px 0 10px; font-size: 16px; color: var(--text); }
+.guide-section p { margin: 12px 0; max-width: 90ch; }
+.guide-section ul, .guide-section ol { margin: 12px 0; padding-left: 24px; }
+.guide-section li { margin: 8px 0; max-width: 90ch; }
+.guide-table-wrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: 10px; }
+.guide-table { width: 100%; min-width: 440px; border-collapse: collapse; }
+.guide-table th, .guide-table td { padding: 12px 16px; text-align: left; vertical-align: top; white-space: normal; }
+.guide-table th { background: var(--surface-soft); color: var(--text); }
+.guide-table td { border-top: 1px solid var(--line); }
+.guide-table th:first-child, .guide-table td:first-child { width: 30%; }
+.guide-back { display: inline-block; margin-top: 12px; font-size: 13px; }
+@media (max-width: 1100px) {
+  .guide-toc ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .app-guide .guide-header { flex-direction: column; }
+  .guide-toc { padding: 16px; }
+  .guide-toc ol { grid-template-columns: minmax(0, 1fr); }
+  .guide-section { padding: 22px 0; }
+  .guide-section h3 { font-size: 18px; }
+}
+
 * { box-sizing: border-box; }
 
 [hidden] {

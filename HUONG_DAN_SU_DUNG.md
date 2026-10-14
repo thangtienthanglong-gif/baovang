@@ -1,72 +1,208 @@
-# HƯỚNG DẪN SỬ DỤNG HỆ THỐNG QUẢN LÝ & XẾP LỊCH HỌC BÙ
+# Hướng dẫn sử dụng BaoVang
 
-Tài liệu này hướng dẫn các thao tác sử dụng phần mềm dành cho bộ phận Văn phòng, bao gồm từ việc tra cứu thông tin học sinh, xem lịch sử vắng học, đến việc tìm và xếp lịch học bù tự động.
+Cập nhật ngày 14/10/2026. Dành cho giáo viên, nhân viên trực và quản trị viên; trình bày theo thứ tự menu hiện tại của app.
 
----
+## 1. Bắt đầu và quy trình hằng ngày
 
-## 1. GIAO DIỆN VÀ CHẾ ĐỘ SÁNG / TỐI (DARK MODE)
+- Đăng nhập bằng tài khoản được cấp và kiểm tra **chi nhánh** ở đầu trang trước khi thao tác. Dữ liệu được quản lý theo chi nhánh.
+- Trên máy tính, chọn chức năng ở menu bên trái. Trên điện thoại, dùng thanh điều hướng phía dưới; bấm **Thêm** để mở các chức năng còn lại.
+- Bấm biểu tượng **Mặt trăng / Mặt trời** cạnh tiêu đề Báo vắng để đổi giao diện sáng hoặc tối. App ghi nhớ lựa chọn trên trình duyệt đang dùng.
+- Bấm **Tải lại** khi cần lấy dữ liệu mới; mở menu tài khoản để **Đăng xuất** khi kết thúc sử dụng.
 
-Để giúp bảo vệ mắt và làm việc thoải mái hơn trong các điều kiện ánh sáng khác nhau, hệ thống hỗ trợ 2 chế độ hiển thị: **Sáng (mặc định)** và **Tối (Dark Mode)**.
+**Quy trình giáo viên:** chọn đúng lớp → điểm danh → xem cảnh báo trên học sinh → ghi nhận xử lý. Nếu sử dụng **Lên lớp**, chọn đúng ca và phần dạy, chốt điểm danh rồi nhập bài dạy, bài tập trước khi kết thúc ca.
 
-*   **Cách bật/tắt:** Nhìn lên góc phải phía trên cùng của màn hình, bạn sẽ thấy một nút biểu tượng **Trăng / Mặt trời** (hoặc thanh trượt).
-*   Chỉ cần click vào nút này, toàn bộ giao diện (từ trang Điểm danh đến trang Xếp lịch bù) sẽ tự động chuyển sang màu tối dịu mắt hoặc quay trở về màu sáng.
-*   Hệ thống sẽ tự động ghi nhớ lựa chọn của bạn cho những lần mở web sau.
+**Quy trình nhân viên trực:** mở **Hàng xử lý** → lọc và chọn học sinh cần liên hệ → gửi Zalo hoặc gọi điện → ghi nhận kết quả → kiểm tra **Lịch sử liên hệ** và xếp lịch bù nếu cần.
 
----
+**Thiết lập lần đầu:** quản trị viên tạo tài khoản và phân chi nhánh; nạp danh sách học sinh; kiểm tra mã lớp, tên, số điện thoại; cấu hình Zalo và mẫu tin nhắn trước khi gửi.
 
-## 2. TRA CỨU HỒ SƠ & LỊCH SỬ HỌC SINH
+## 2. Điểm danh
 
-Tính năng này giúp bạn tra cứu nhanh thông tin liên lạc và lịch sử đi học của học sinh.
+### Chọn lớp và tra cứu học sinh
 
-1.  **Nhập thông tin:** Tại màn hình chính, gõ **Mã lớp** và **Tên học sinh** vào ô tìm kiếm.
-2.  **Mở Hồ sơ (Profile):** Bấm trực tiếp vào **Tên học sinh** trên giao diện. Một bảng danh sách (Drawer) sẽ trượt ra từ lề phải màn hình.
-3.  **Xem thông tin:** Trong bảng Hồ sơ, bạn sẽ xem được:
-    *   **Thông tin chung:** Lớp, Số điện thoại liên hệ, và **Trường chính** của học sinh.
-    *   **Lịch sử gần đây:** Thống kê các ngày học sinh vắng học, đi trễ, về sớm. 
-    *   *Lưu ý:* Nếu học sinh không nghỉ buổi nào, hệ thống sẽ báo rõ dòng chữ: **"Học sinh đi học đầy đủ"**. (Các ghi nhận về "Học phí" sẽ không bị tính vào lịch sử vắng học).
-4.  **Đóng Hồ sơ:** Bấm dấu **[X]** ở góc trên bảng Hồ sơ, hoặc click chuột vào vùng mờ bên ngoài bảng để đóng lại.
+1. Chọn **Chọn thứ**, **Chọn buổi**, **Chọn khối**, rồi **Chọn lớp** để mở danh sách cần điểm danh.
+2. Kiểm tra tên, mã lớp và số điện thoại của học sinh trước khi đổi trạng thái.
+3. Dùng ô **Tra cứu học sinh & Báo phụ huynh nhanh** để tìm theo tên, mã học sinh, lớp hoặc số điện thoại. Kết quả tra cứu có thể thuộc lớp khác với bộ lọc đang chọn; kiểm tra mã lớp trên từng kết quả.
+4. Bấm tên học sinh để mở hồ sơ; bấm **X** để đóng.
 
----
+### Chọn đúng trạng thái
 
-## 3. HƯỚNG DẪN XẾP LỊCH HỌC BÙ (KETBU)
+| Trạng thái | Khi nào sử dụng |
+| --- | --- |
+| Đang học | Học sinh đang theo học và không có tình trạng đặc biệt cần ghi nhận. |
+| Vắng không phép | Học sinh nghỉ buổi học mà chưa xin phép. Được tính vào cảnh báo vắng không phép. |
+| Vắng có phép | Học sinh đã xin phép nghỉ buổi học. Không tính vào cảnh báo vắng không phép. |
+| Đi trễ / Về sớm | Ghi nhận học sinh đến muộn hoặc rời lớp sớm. |
+| Đã bù | Học sinh đã học bù trước buổi học chính; không tạo yêu cầu báo vắng cho buổi đó. |
+| Nghỉ học | Học sinh ngừng theo học. App yêu cầu nhập lý do và lưu vào lịch sử học sinh nghỉ học. |
+| Trễ học phí | Ghi nhận trường hợp cần nhắc học phí. Kiểm tra liên hệ ở Lịch sử học phí. |
+| Xóa khỏi danh sách lớp | Loại học sinh khỏi lớp đang chọn; có thông tin tại Đã xóa khỏi lớp. |
 
-Đây là tính năng quan trọng nhất giúp Văn phòng tự động tìm lớp học bù phù hợp cho học sinh bị kẹt lịch.
+**Vắng một buổi** dùng Vắng có phép hoặc Vắng không phép. **Nghỉ học** dùng khi học sinh ngừng theo học, không dùng thay cho báo vắng một buổi.
 
-### Bước 1: Khai báo thông tin kẹt lịch
-1.  Truy cập vào trang **Xếp lịch bù** (từ thanh công cụ hoặc menu ứng dụng).
-2.  Nhập **Mã lớp** và **Tên học sinh** (Bắt buộc phải nhập tên để hệ thống lưu lại lịch sử tra cứu).
-3.  Tại phần **Buổi học sinh bị kẹt**: Bấm xổ xuống và chọn chính xác buổi mà học sinh đã báo nghỉ / kẹt lịch.
+Khi chọn **Nghỉ học**, nhập lý do cụ thể vào hộp thoại rồi lưu. Ví dụ: “Đổi lịch học, không sắp xếp được thời gian”. Nếu hủy hoặc chưa nhập lý do, app chưa hoàn tất thay đổi. Sau khi lưu, vào **Lịch sử liên hệ → Học sinh nghỉ học** để kiểm tra ngày nghỉ, lớp và lý do.
 
-### Bước 2: Tìm kiếm lớp bù phù hợp
-1.  Tại phần **Chọn buổi muốn bù**: Hãy chọn **Thứ** và **Ca (Sáng/Chiều/Tối)** mà học sinh mong muốn đi học bù.
-2.  Bấm nút màu xanh **"Tìm lớp bù phù hợp"**.
-3.  Ngay lập tức, một **Cửa sổ nổi (Popup Modal)** sẽ hiện ra giữa màn hình, chứa danh sách tất cả các lớp có thể bù được.
+### Cảnh báo vắng ngay trên học sinh
 
-### Bước 3: Đọc hiểu và Chọn lớp bù
-Trong Cửa sổ nổi, hệ thống đã tính toán và sắp xếp các lớp từ trên xuống dưới dựa theo Mức độ phù hợp:
-*   **Màu Xanh lá (Phù hợp cao):** Cùng cấp độ, lớp chưa đầy. Rất khuyến khích xếp vào.
-*   **Màu Vàng (Phù hợp trung bình):** Cấp độ chênh lệch 1 bậc hoặc có cảnh báo nhỏ.
-*   **Màu Đỏ (Phù hợp thấp):** Chênh lệch trình độ nhiều, hoặc lớp đã đầy số lượng.
+- Khi học sinh có từ **2 buổi vắng không phép trong 30 ngày gần nhất**, app hiển thị nhãn nhấp nháy **Cần xử lý** trên dòng học sinh, theo từng môn. Hai buổi có cảnh báo màu cam; từ ba buổi có cảnh báo màu đỏ.
+- Bấm nhãn để xem các buổi nghỉ, ngày, buổi và lớp. Trao đổi với học sinh hoặc phụ huynh, nhập ghi chú nếu cần, rồi bấm **Đã xử lý**.
+- App lưu người xử lý và thời gian; nhãn chuyển sang **Đã xử lý**, ngừng nhấp nháy. Khi có thêm buổi vắng không phép được tính vào cảnh báo, học sinh sẽ cần xử lý lại.
+- Vắng có phép và Đã bù không tính vào ngưỡng này. Gửi lại tin nhắn hay gọi nhiều lần không làm tăng số buổi vắng.
 
-Ở mỗi dòng gợi ý, hệ thống hiển thị chi tiết: Thời gian, Phần học, Phòng học và **Số chỗ còn lại** của lớp đó.
+### Hồ sơ, quản lý lớp và điểm thi
 
-**Thao tác chốt lịch:**
-1.  Bấm nút **"Chọn lớp này"** ở lớp bạn thấy ưng ý nhất.
-2.  Nếu hệ thống kiểm tra thông tin hợp lệ (có tên học sinh, lớp chưa đầy quá mức quy định, không bị trùng lịch đã bù...), **cửa sổ tự động đóng lại** và hiển thị thông báo xếp lịch thành công.
-3.  Lịch bù vừa xếp sẽ được lưu vào hệ thống và hiển thị ở danh sách **Lịch đã xếp** bên ngoài để bạn tiện in phiếu hoặc quản lý.
+- Hồ sơ hiển thị thông tin liên hệ, trường chính và lịch sử của học sinh. Dùng **Sửa** để cập nhật thông tin; dùng **Chuyển lớp** để chọn lớp đích và xác nhận người thực hiện.
+- Dùng **Kẹt & Bù** trong hồ sơ để khai báo lịch kẹt và lịch bù. Chọn **Bù tạm (1 buổi)** hoặc **Học bù (Cố định)** theo nhu cầu, kiểm tra ngày và lớp trước khi lưu.
+- Muốn thêm học sinh, chọn một lớp cụ thể, bấm **Thêm học sinh**, nhập tên, trường chính và số điện thoại, rồi lưu.
+- Nút **Quản lý lớp** nằm cùng hàng chọn lớp. Có thể thêm lớp, sửa mã lớp hoặc xóa lớp. **Xóa lớp sẽ xóa học sinh thuộc lớp đó khỏi hệ thống**; kiểm tra lớp và số lượng trước khi xác nhận.
+- Với điểm thi, mở **Nhập điểm thi**, chọn hoặc nhập kỳ thi, nhập điểm rồi bấm **Lưu Bảng Điểm**. Dùng **Xuất Điểm** để lấy bảng điểm; kiểm tra nội dung trước khi **Gửi Zalo toàn lớp**.
 
----
+## 3. Hàng xử lý
 
-## 4. XỬ LÝ CÁC LỖI THƯỜNG GẶP KHI XẾP LỊCH
+Đây là nơi theo dõi các trường hợp báo vắng còn cần xử lý liên hệ.
 
-Trong lúc bấm **"Chọn lớp này"**, nếu cửa sổ vẫn KHÔNG đóng lại và xuất hiện dòng thông báo lỗi (chữ đỏ), hãy đọc và xử lý theo các trường hợp sau:
+1. Kiểm tra **Ngày**. Khi bật **Hôm nay**, app theo ngày hiện tại; bỏ chọn để tra ngày khác.
+2. Chọn **Buổi**, **Lớp**, **Trạng thái vắng**, **Zalo** hoặc nhập từ khóa, rồi bấm **Lọc**.
+3. Tích chọn những học sinh cần gửi. Bấm **Gửi Zalo hàng loạt (N)**; số N là số học sinh đang được chọn để gửi.
+4. Theo dõi trạng thái và thông báo kết quả. Trường hợp lỗi cần kiểm tra số điện thoại, Zalo và nội dung trước khi gửi lại hoặc gửi thủ công.
+5. Bấm **Xếp lịch bù** trên học sinh cần bố trí buổi bù, kiểm tra thông tin được điền sẵn rồi chọn lớp phù hợp.
 
-*   **"Vui lòng nhập tên học sinh...":** Do bạn mới chỉ nhập Mã lớp mà quên nhập tên. Hãy tắt bảng đi, nhập tên vào ô "Tên học sinh" rồi tìm lại.
-*   **"Không thể xếp. Lớp ... đã đủ chỗ":** Lớp bạn vừa chọn đã đạt tối đa giới hạn sức chứa. Hãy chọn một lớp gợi ý khác bên dưới.
-*   **"Học sinh này đã có lịch bù...":** Học sinh này đã được xếp 1 buổi bù cho đúng ngày bị kẹt đó rồi. Không được xếp trùng lần 2.
+Sau khi liên hệ được ghi nhận hoàn tất, bản ghi được đưa về lịch sử tương ứng. Các kết quả gọi **Đã báo**, **Không bắt máy**, **Không liên lạc được** đều được lưu vào lịch sử gọi điện và không còn là mục chờ trong hàng xử lý.
 
----
+## 4. Lịch sử liên hệ và xuất Excel
 
-## 5. MỘT SỐ CHÚ Ý KHÁC
-*   Sau khi thêm dữ liệu mới, hệ thống sẽ tự động đồng bộ (Auto Sync) ngầm để đảm bảo dữ liệu không bị mất. 
-*   Đừng quên làm mới trang (`Ctrl + F5`) nếu bạn cảm thấy ứng dụng đang giữ dữ liệu phiên bản cũ.
+### Chọn đúng loại lịch sử
+
+| Mục | Nội dung |
+| --- | --- |
+| Lịch sử vắng | Thông báo Zalo liên quan đến vắng, đi trễ, về sớm; xem kết quả gửi và xử lý lỗi. |
+| Lịch sử học phí | Thông báo nhắc học phí và kết quả gửi. |
+| Lịch sử gọi điện → Gọi vắng | Kết quả gọi về các trường hợp vắng học. |
+| Lịch sử gọi điện → Gọi học phí | Kết quả gọi nhắc học phí. |
+| Học sinh nghỉ học | Ngày ngừng theo học, học sinh, các lớp và lý do. |
+| Đã xóa khỏi lớp | Thông tin học sinh đã bị loại khỏi danh sách lớp. |
+
+### Lọc từ ngày đến ngày
+
+1. Bỏ chọn **Hôm nay** để sửa khoảng thời gian.
+2. Chọn **Từ ngày** và **Đến ngày**; app lấy cả hai ngày đầu và cuối. Ngày bắt đầu phải không muộn hơn ngày kết thúc.
+3. Nhập tên, lớp, số điện thoại hoặc từ khóa cần tìm, rồi bấm **Lọc lịch sử**.
+4. Để trống một mốc nếu chỉ cần giới hạn một phía; để trống cả hai mốc để xem tất cả ngày. Bật lại Hôm nay để quay về dữ liệu hôm nay.
+5. Mỗi trang có tối đa **15 dòng**. Dùng **Trước**, số trang và **Sau** để xem tiếp.
+
+**Ngày lọc và giờ gọi có thể khác nhau:** Gọi vắng được lọc theo ngày của buổi vắng; Gọi học phí theo ngày thông báo học phí gốc. Cột thời gian cuộc gọi hiển thị thời điểm xác nhận gọi. Nếu gọi hôm nay cho một buổi vắng cũ, hãy chọn khoảng ngày bao gồm ngày vắng đó.
+
+### Xử lý lỗi gửi và xác nhận đã gọi
+
+1. Ở dòng **Lỗi gửi**, chọn **Gửi lại** nếu cần thử gửi lại, hoặc **Xác nhận đã gửi** nếu đã kiểm tra tin thực sự được gửi trên Zalo.
+2. Nếu chuyển sang gọi điện, bấm **Xác nhận đã gọi** để mở danh sách kết quả.
+3. Chọn **Đã báo**, **Không bắt máy** hoặc **Không liên lạc được**. App lưu ngay kết quả về **Gọi vắng** hoặc **Gọi học phí**, theo loại thông báo gốc.
+
+**Đã báo** hiển thị nhãn **Đã gọi**; **Không bắt máy** hiển thị **Không nghe máy**. Trường hợp không nghe máy hoặc không liên lạc được vẫn có lịch sử. Dòng đã chuyển sang lịch sử gọi không tiếp tục hiển thị ở lịch sử Zalo chung hay hàng xử lý; trong lịch sử gọi không có khung chọn trạng thái thường trực.
+
+Nếu cùng một thông báo có nhiều lần gửi thất bại, app có thể gom thành **Lỗi gửi xN**; bấm để xem các lần gửi. Kiểm tra đúng học sinh và buổi vắng trước khi xác nhận.
+
+### Học sinh nghỉ học: lọc khối, môn và gom thông tin
+
+- Mở **Học sinh nghỉ học**, chọn **Khối** và **Môn**. Bộ lọc này kết hợp với khoảng ngày và từ khóa ở phía trên.
+- Cùng một học sinh học một môn ở nhiều mã lớp được gom thành một dòng khi thông tin nhận diện khớp. Ví dụ, Thái Song Quang có cùng số điện thoại ở hai lớp Toán **8T3M+** và **8NT7M** sẽ được hiển thị chung.
+- Dòng đã gom vẫn giữ các mã lớp và ngày nghỉ. Lý do khác nhau được hiển thị theo lần nghỉ; cùng một lý do không lặp lại nhiều lần.
+- Nếu chỉ chọn một khoảng ngày hoặc khối, dòng gom chỉ thể hiện các thông tin nằm trong bộ lọc đó. Những môn khác nhau được giữ riêng.
+- Dữ liệu nghỉ học cũ có thể chưa có lý do; app không tự suy đoán. Các lần chọn Nghỉ học mới yêu cầu nhập lý do trước khi lưu.
+
+### Xuất và xóa lịch sử
+
+Bấm **Xuất Excel**, chọn một trong sáu loại: **Lịch sử vắng**, **Lịch sử học phí**, **Gọi vắng**, **Gọi học phí**, **Học sinh nghỉ học**, **Đã xóa khỏi lớp**. File lấy toàn bộ kết quả phù hợp với khoảng ngày và từ khóa, không chỉ trang đang xem. Xuất học sinh nghỉ học còn áp dụng bộ lọc Khối, Môn và cách gom học sinh như trên màn hình.
+
+Nút xóa tác động đến loại lịch sử và phạm vi đang lọc. Kiểm tra khoảng ngày, từ khóa, Khối/Môn và xuất Excel trước nếu cần giữ bản lưu. Riêng **Xóa lịch sử** trong Học sinh nghỉ học xóa các hồ sơ nghỉ học phù hợp bộ lọc khỏi hệ thống; đây không phải thao tác chỉ ẩn dòng.
+
+## 5. Lịch học bù
+
+Mở **Lịch học bù** từ menu, hoặc bấm **Xếp lịch bù** tại Hàng xử lý để bắt đầu từ thông tin học sinh.
+
+1. Nhập hoặc kiểm tra **mã lớp** và **tên học sinh**.
+2. Chọn đúng **buổi bị kẹt**.
+3. Chọn **Thứ muốn bù** và **Ca muốn bù**, rồi bấm **Tìm lớp bù phù hợp**.
+4. Đọc các gợi ý: mã lớp, thời gian, phần học, phòng, số chỗ và mức độ phù hợp. Xem **Lớp không thể xếp** để biết lý do lớp bị loại.
+5. Bấm **Chọn lớp này** và kiểm tra thông báo xếp thành công.
+6. Kiểm tra tại **Danh sách học bù đã xác nhận**; dùng khoảng ngày để tra cứu và **Xuất Excel** khi cần.
+
+Nếu thiếu tên, đã có lịch bù cho buổi bị kẹt hoặc lớp hết chỗ khi bật kiểm tra sức chứa, app báo lỗi. Bổ sung thông tin hoặc chọn lớp khác; không xem việc mở bảng gợi ý là đã chốt lịch.
+
+Trong phần quản lý dữ liệu lịch bù, có thể thêm/sửa lớp, khai báo phần học, phòng và sức chứa hoặc nhập hàng loạt từ Excel. Kiểm tra thông báo lưu sau khi sửa. Danh sách học bù đã xác nhận có thao tác hủy lịch khi cần điều chỉnh.
+
+## 6. Lên lớp
+
+1. Mở **Lên lớp**, chọn **Ca dạy**, **Phần dạy** và nhập **Tên Giáo viên**.
+2. Lọc **Khối**, **Môn**, **Thứ**, **Buổi**, chọn **Lớp học**, rồi bấm **Bắt đầu vào lớp**.
+3. Kiểm tra danh sách, ghi nhận tình trạng của từng học sinh; bấm **Chốt Điểm Danh** sau khi kiểm tra. Chức năng này thực hiện bước báo vắng theo cấu hình gửi của app.
+4. Trong ca, ghi nhận đánh giá học sinh ở các phần tương ứng và thêm ghi chú khi cần. Bấm vào ô đánh giá để chọn kết quả phù hợp.
+5. Nhập đầy đủ **Bài dạy** và **Bài tập**, rồi bấm **Kết thúc ca dạy** và xác nhận. Nội dung được dùng trong Tiến độ phân phối.
+
+Nếu bắt đầu nhầm ca, dùng **Hủy ca dạy này** và đọc thông báo xác nhận. Không dùng hủy thay cho kết thúc một ca đã dạy.
+
+## 7. Tiến độ phân phối
+
+1. Chọn **Từ ngày**, **Đến ngày** và một **Lớp** cụ thể.
+2. Bấm **Xem tiến độ** để xem bài dạy, bài tập và giáo viên theo các phần học.
+3. Muốn đối chiếu các lớp, bấm **So sánh nhiều lớp**, tích các lớp cần xem rồi **So sánh ngay**. Bảng so sánh dùng cùng khoảng ngày đã chọn ở màn hình chính.
+
+Nếu thiếu nội dung, kiểm tra đúng lớp, khoảng ngày và việc giáo viên đã ghi Bài dạy/Bài tập ở Lên lớp.
+
+## 8. Nạp Excel
+
+1. Bấm **Tải Excel mẫu**, điền thông tin theo mẫu và dùng mã lớp đúng quy ước đang sử dụng.
+2. Kiểm tra họ tên đầy đủ, số điện thoại giữ số 0 đầu và các ký hiệu trong tên, chẳng hạn **Trương Bảo (C) Ngọc**.
+3. Chọn một hoặc nhiều file **.xlsx / .xls**, rồi bấm **Nạp và tách lớp**.
+4. Đọc kết quả số học sinh thêm/cập nhật; quay lại Điểm danh để kiểm tra danh sách lớp.
+
+Khi nạp bổ sung, để trống tùy chọn **Xóa sạch học sinh cũ (Chỉ giữ lại học sinh trong file này)**. Chỉ bật khi chủ động thay thế danh sách học sinh hiện có của chi nhánh. **Xóa file** chỉ bỏ file đang chọn và kết quả trên màn hình nhập, không xóa học sinh đã nạp.
+
+## 9. Zalo và tiện ích trình duyệt
+
+### Cấu hình mẫu và chế độ gửi
+
+1. Mở **Zalo**, nhập **Tên trường**, chọn **Zalo cá nhân** hoặc **Zalo OA**.
+2. Cài đặt thời gian chờ và các thông số của chế độ đang dùng. Với Zalo cá nhân, có thể đặt số học sinh mỗi chu kì và số phút nghỉ giữa chu kì.
+3. Sửa **Mẫu báo vắng/trễ**, **Mẫu nhắc học phí** hoặc **Mẫu thông báo định kì/khóa mới**. Giữ đúng các biến trong dấu ngoặc nhọn, ví dụ **{studentName}**, **{className}**, **{absenceStatus}**.
+4. Kiểm tra **Xem trước tin nhắn**; đây là dữ liệu mẫu, tin gửi thật lấy thông tin của từng học sinh. Với báo vắng, chọn thử cả Vắng có phép và Vắng không phép.
+5. Bấm **Lưu cấu hình** trước khi gửi.
+
+Mẫu thông báo định kì có vùng dán ảnh bằng **Ctrl+V** và ô nhập văn bản; kiểm tra ảnh/nội dung đã lưu trước khi sử dụng. Với OA, quản trị viên cấu hình endpoint, access token và **Bật gửi thật OA**; cần thông tin người nhận phù hợp với OA. Để trống access token nếu muốn giữ token hiện có.
+
+### Cài và dùng BaoVang - Auto Zalo Web
+
+1. Mở trang quản lý tiện ích của Chrome hoặc Edge, bật **Chế độ nhà phát triển**.
+2. Chọn **Tải tiện ích đã giải nén**, trỏ tới thư mục **zalo-extension** có file manifest.json.
+3. Mở app tại **https://baovang.vercel.app** và đăng nhập **https://chat.zalo.me** trong cùng trình duyệt đã cài tiện ích. Bản tiện ích hiện tại hỗ trợ địa chỉ app này; localhost chưa có trong danh sách địa chỉ được hỗ trợ.
+4. Từ Hàng xử lý hoặc chức năng gửi tương ứng, kiểm tra danh sách người nhận rồi bắt đầu gửi. Giữ Zalo Web đăng nhập và theo dõi thông báo kết quả.
+
+Tiện ích tìm bằng **số điện thoại** trước. Nếu Zalo báo số chưa đăng ký hoặc không cho phép tìm kiếm, tiện ích thử bằng **tên học sinh đầy đủ**, giữ cả ký hiệu như **(C)**. Nếu chưa xác định được đúng cuộc trò chuyện, tiện ích dừng/bỏ qua và báo lỗi để nhân viên kiểm tra.
+
+Tiện ích tự điền và gửi khi xác nhận được nội dung. Nếu báo chưa nhận đủ tin, chưa thấy nút gửi hoặc chưa xác nhận được kết quả, hãy mở cuộc trò chuyện để kiểm tra. Khi cần gửi thủ công, dùng **Copy tin nhắn**, dán vào đúng người nhận rồi gửi; chỉ **Xác nhận đã gửi** sau khi đã kiểm tra tin trên Zalo. Trạng thái chờ hoặc lỗi không có nghĩa phụ huynh đã nhận tin.
+
+### Cập nhật tiện ích
+
+Với bản cài bằng thư mục giải nén, tải bộ **zalo-extension** mới, thay các file trong thư mục đã cài, bấm **Tải lại** tiện ích ở trang quản lý tiện ích, rồi tải lại cả tab app và Zalo Web. Bản cài này không tự cập nhật online; cập nhật website không tự cập nhật tiện ích trong trình duyệt.
+
+## 10. Nhân sự và chi nhánh
+
+- **Nhân sự** chỉ hiển thị với quản trị viên. Nhập **Tên đăng nhập**, **Mật khẩu**, chọn **Quyền quản lý (Chi nhánh)** rồi bấm **Tạo tài khoản**.
+- Chọn một chi nhánh để cấp quyền làm việc ở chi nhánh đó; lựa chọn **Tất cả chi nhánh (Quản trị viên)** cấp quyền quản trị toàn hệ thống.
+- Quản trị viên dùng menu cạnh chọn chi nhánh để thêm, đổi tên hoặc xóa chi nhánh. Kiểm tra chi nhánh đang chọn trước khi nạp dữ liệu, điểm danh, gửi tin, xuất hoặc xóa lịch sử.
+- Tài khoản nhân viên chỉ sử dụng chi nhánh được phân quyền. Nếu không thấy Nhân sự hoặc không đổi được chi nhánh, kiểm tra quyền tài khoản với quản trị viên.
+
+## 11. Khi cần kiểm tra lại
+
+| Tình huống | Cách kiểm tra |
+| --- | --- |
+| Không thấy học sinh trong lớp | Kiểm tra chi nhánh, thứ, buổi, khối, lớp và từ khóa; thử tra cứu nhanh tên hoặc số điện thoại. |
+| Không thấy lịch sử cũ | Bỏ Hôm nay, chọn khoảng Từ ngày – Đến ngày bao gồm ngày cần tra; xóa từ khóa không còn phù hợp. |
+| Đã gọi nhưng không thấy lịch sử | Mở đúng Gọi vắng/Gọi học phí; khoảng lọc cần bao gồm ngày vắng hoặc ngày thông báo gốc. |
+| Chọn Không bắt máy rồi dòng biến mất | Dòng chuyển sang lịch sử gọi với nhãn Không nghe máy; không còn trong lịch sử Zalo và hàng xử lý. |
+| Lịch sử nghỉ học ít dòng hơn trước | Kiểm tra Khối/Môn; cùng học sinh và cùng môn có thể đã được gom, xem các mã lớp và ngày trên dòng đó. |
+| Lý do nghỉ học để trống | Có thể là dữ liệu cũ; lần ghi nhận Nghỉ học mới cần nhập lý do trong hộp thoại. |
+| Zalo báo lỗi hoặc chưa cập nhật kết quả | Kiểm tra cuộc trò chuyện trước khi gửi lại; xem tiện ích đã bật, Zalo đã đăng nhập và tên/số điện thoại đúng chưa. |
+| Tiện ích không phản hồi sau cập nhật | Tải lại tiện ích, tab app và Zalo Web; kiểm tra đang dùng địa chỉ app được hỗ trợ. |
+| Giao diện vẫn hiển thị bản cũ | Bấm Tải lại; nếu cần, dùng Ctrl+F5 trên máy tính để tải lại tài nguyên giao diện. |
+
+Nếu vẫn gặp lỗi, ghi lại tên học sinh, mã lớp, ngày/buổi, thao tác vừa thực hiện và thông báo lỗi để quản trị viên kiểm tra đúng trường hợp.
