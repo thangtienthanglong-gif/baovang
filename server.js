@@ -4108,6 +4108,24 @@ app.post('/api/absences/:id/zalo/manual-sent', async (req, res, next) => {
     }
 
     const absence = db.absences[index];
+    const requestedLogId = String(req.body?.logId || '');
+    const matchesAttempt = log => log.absenceId === absence.id && log.channel === 'Zalo cá nhân';
+    const existingLogIndex = requestedLogId
+      ? db.notificationLogs.findIndex(log => log.id === requestedLogId && matchesAttempt(log))
+      : db.notificationLogs.findLastIndex(matchesAttempt);
+    const existingLog = db.notificationLogs[existingLogIndex];
+    if ((requestedLogId && !existingLog) || (existingLog && (existingLog.callLogId
+        || !['Chờ gửi thủ công', 'Lỗi gửi', 'Đã gửi'].includes(existingLog.status)))) {
+      const err = new Error('Không tìm thấy lượt gửi Zalo cá nhân phù hợp để xác nhận.');
+      err.status = 409;
+      throw err;
+    }
+    // A repeated extension report or click acknowledges the same attempt;
+    // it must not create another log, consume another attempt, or change its time.
+    if (existingLog?.status === 'Đã gửi') {
+      return res.json({ absence: enrichAbsence(absence, studentByIdMap(db.students)), log: existingLog });
+    }
+
     const student = db.students.find(row => row.id === absence.studentId) || {};
     const time = nowISO();
     const settings = db.settings || defaultSettings();
@@ -4116,26 +4134,18 @@ app.post('/api/absences/:id/zalo/manual-sent', async (req, res, next) => {
     const sentResult = formattingWarning
       ? `Đã gửi qua Zalo cá nhân nhưng sai định dạng: ${formattingWarning}`
       : 'Đã gửi qua Zalo cá nhân, giáo viên đánh dấu thủ công.';
-
-    db.absences[index] = {
-      ...absence,
-      noticeStatus: 'Đã gửi',
-      noticeResult: sentResult,
-      noticeSentAt: time,
-      noticeDueAt: '',
-      autoNotice: false,
-      updatedAt: time
-    };
-
-    const requestedLogId = String(req.body?.logId || '');
-    let existingLogIndex = requestedLogId
-      ? db.notificationLogs.findIndex(l => l.id === requestedLogId && l.absenceId === absence.id && ['Chờ gửi thủ công', 'Lỗi gửi'].includes(l.status) && l.channel === 'Zalo cá nhân')
-      : -1;
-    if (existingLogIndex === -1) {
-      existingLogIndex = db.notificationLogs.findLastIndex(l => l.absenceId === absence.id && l.status === 'Chờ gửi thủ công');
-    }
-    if (existingLogIndex === -1) {
-      existingLogIndex = db.notificationLogs.findLastIndex(l => l.absenceId === absence.id && l.status === 'Lỗi gửi' && l.channel === 'Zalo cá nhân');
+    const newerAttemptExists = existingLogIndex !== -1 && db.notificationLogs
+      .slice(existingLogIndex + 1).some(log => log.absenceId === absence.id);
+    if (!newerAttemptExists) {
+      db.absences[index] = {
+        ...absence,
+        noticeStatus: 'Đã gửi',
+        noticeResult: sentResult,
+        noticeSentAt: time,
+        noticeDueAt: '',
+        autoNotice: false,
+        updatedAt: time
+      };
     }
     
     let log;
@@ -4153,7 +4163,7 @@ app.post('/api/absences/:id/zalo/manual-sent', async (req, res, next) => {
         studentId: student.id || '',
         studentCode: student.code || '',
         studentName: student.fullName || '',
-        className: student.className || '',
+        className: absence.attendanceClass || student.className || '',
         parentName: student.parentName || '',
         phone1: student.phone1 || '',
         zaloUserId: student.zaloUserId || '',

@@ -109,6 +109,7 @@ test('recorded message types survive an edited or removed attendance record', ()
 test('new sends and manual success or failure capture the tuition message type', async () => {
   for (const route of ['', '/api/absences/:id/zalo/manual-sent', '/api/absences/:id/zalo/manual-error']) {
     const app = setupServer();
+    if (route) app.db.notificationLogs.push({ id: 'new-pending', absenceId: 'a1', channel: 'Zalo cá nhân', status: 'Chờ gửi thủ công' });
     const log = route
       ? (await app.call('post', route)).log
       : await app.context.sendZaloNotice(app.db, 'a1');

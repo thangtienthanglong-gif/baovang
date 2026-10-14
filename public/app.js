@@ -1783,26 +1783,31 @@ async function loadRemovedClassStudents() {
 
 function groupFailedNoticeRows(rows) {
   const groupedRows = [];
-  const failures = new Map();
+  const attemptsBySession = new Map();
   const sortedRows = [...rows].sort((a, b) => String(b.time || '').localeCompare(String(a.time || '')));
   for (const row of sortedRows) {
-    if (row.status !== 'Lỗi gửi') {
+    if (!['Lỗi gửi', 'Đã gửi'].includes(row.status)) {
       groupedRows.push(row);
       continue;
     }
     const studentKey = row.studentId ? ['id', row.studentId] : row.studentCode ? ['code', row.studentCode] : null;
+    const sendDate = row.absenceStatus === 'Học phí' && row.time && Number.isFinite(Date.parse(row.time))
+      ? new Date(row.time).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }) : '';
     // An absence identifies one attendance session. Names alone are not unique.
     const key = studentKey && row.absenceId ? JSON.stringify([
       studentKey, row.absenceId, row.date || '', row.className || '', row.phone1 || '',
-      row.channel || '', row.absenceStatus || ''
+      row.channel || '', row.absenceStatus || '', row.status,
+      // Tuition uses the send day, unlike attendance's original absence day.
+      sendDate
     ]) : null;
-    const existing = key ? failures.get(key) : null;
+    const attemptsField = row.status === 'Lỗi gửi' ? 'failedAttempts' : 'sentAttempts';
+    const existing = key ? attemptsBySession.get(key) : null;
     if (existing) {
-      existing.failedAttempts.push(row);
+      existing[attemptsField].push(row);
     } else {
-      const group = { ...row, failedAttempts: [row] };
+      const group = { ...row, [attemptsField]: [row] };
       groupedRows.push(group);
-      if (key) failures.set(key, group);
+      if (key) attemptsBySession.set(key, group);
     }
   }
   return groupedRows;
@@ -1827,6 +1832,7 @@ function renderNoticeActions(row) {
 }
 
 function renderNoticeHistoryRow(row) {
+  const attempts = row.status === 'Đã gửi' ? row.sentAttempts : row.failedAttempts;
   return `
     <tr>
       <td>${escapeHtml(formatDateTime(row.time, 'Asia/Ho_Chi_Minh'))}</td>
@@ -1840,14 +1846,14 @@ function renderNoticeHistoryRow(row) {
       <td>
         <div class="notice-history-status">
           ${row.absenceStatus && row.absenceStatus !== 'Khác' ? `<span class="notice-history-reason">${escapeHtml(absenceStatusLabel(row.absenceStatus))}</span>` : ''}
-          ${row.failedAttempts?.length > 1 ? `
+          ${attempts?.length > 1 ? `
             <details>
-              <summary class="badge ${statusClass(row.status)}" style="cursor:pointer;" title="Bấm để xem từng lần gửi lỗi">Lỗi gửi x${row.failedAttempts.length} <i class="fa-solid fa-chevron-down" aria-hidden="true" style="font-size:9px; margin-left:4px;"></i></summary>
+              <summary class="badge ${statusClass(row.status)}" style="cursor:pointer;" title="Bấm để xem từng lần ghi nhận gửi">${escapeHtml(row.status)} x${attempts.length} <i class="fa-solid fa-chevron-down" aria-hidden="true" style="font-size:9px; margin-left:4px;"></i></summary>
               <div style="margin-top:8px; padding:8px 12px; border:1px solid #e2e8f0; border-radius:8px; font-size:12px;">
-                ${row.failedAttempts.map(attempt => `
+                ${attempts.map(attempt => `
                   <div style="padding:4px 0;">
                     <strong>${escapeHtml(formatDateTime(attempt.time))}</strong>
-                    <div class="muted">${escapeHtml(attempt.result || 'Gửi không thành công.')}</div>
+                    <div class="muted">${escapeHtml(attempt.result || attempt.status)}</div>
                   </div>
                 `).join('')}
               </div>
@@ -2429,8 +2435,9 @@ function startZaloExtensionAuto(items) {
         return;
       }
       if (data.type === 'BAOVANG_EXTENSION_RESULT') {
-        expectUpdateWithin(180000);
         const item = items.find(row => row.id === data.itemId);
+        if (!item || reportedItems.has(item.id)) return;
+        expectUpdateWithin(180000);
         if (item?.absenceId) {
           reportedItems.add(item.id);
           updateChain = updateChain.then(() =>

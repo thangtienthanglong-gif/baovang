@@ -123,3 +123,17 @@ test('timeout failure reports identify each unreported pending log', async () =>
   await completed;
   assert.deepEqual(app.requests.map(request => request.body.logId), ['log-timeout']);
 });
+
+test('duplicate and contradictory extension result events persist a completed item only once', async () => {
+  const app = extensionBridge();
+  const completed = app.context.startZaloExtensionAuto([{ id: 'log-success', absenceId: 'a1' }]);
+  app.event({ type: 'BAOVANG_EXTENSION_RESULT', itemId: 'log-success', ok: true });
+  app.event({ type: 'BAOVANG_EXTENSION_RESULT', itemId: 'log-success', ok: true });
+  app.event({ type: 'BAOVANG_EXTENSION_RESULT', itemId: 'log-success', ok: false, error: 'Duplicate error' });
+  app.event({ type: 'BAOVANG_EXTENSION_RESULT', itemId: 'unknown', ok: true });
+  app.event({ type: 'BAOVANG_EXTENSION_STATUS', status: 'completed' });
+  await completed;
+  assert.equal(app.requests.length, 1);
+  assert.equal(app.requests[0].body.logId, 'log-success');
+  assert.match(app.requests[0].url, /manual-sent$/);
+});

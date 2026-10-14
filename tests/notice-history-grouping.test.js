@@ -106,3 +106,47 @@ test('an uncertain partial send in any failed attempt retains the existing warni
   assert.match(container.innerHTML, /Kiểm tra tin trong Zalo trước khi thao tác tiếp/);
   assert.doesNotMatch(container.innerHTML, /retry-zalo-btn/);
 });
+
+test('three sent entries for one attendance session appear once, preserving every recorded attempt and latest time', async () => {
+  const rows = [
+    failure({ id: 'sent1', status: 'Đã gửi', time: '2026-10-10T01:35:00Z' }),
+    failure({ id: 'sent2', status: 'Đã gửi', time: '2026-10-10T01:36:00Z' }),
+    failure({ id: 'sent3', status: 'Đã gửi', time: '2026-10-10T01:37:00Z', result: '<img onerror=unsafe>' })
+  ];
+  const original = structuredClone(rows);
+  const { context, container } = setup(rows);
+  const grouped = context.groupFailedNoticeRows(rows);
+  assert.equal(grouped.length, 1);
+  assert.equal(grouped[0].id, 'sent3');
+  assert.deepEqual(Array.from(grouped[0].sentAttempts, row => row.id), ['sent3', 'sent2', 'sent1']);
+  await context.loadNotices();
+  assert.equal((container.innerHTML.match(/<tr>/g) || []).length, 1);
+  assert.match(container.innerHTML, /Đã gửi x3/);
+  for (const minute of ['35', '36', '37']) assert.match(container.innerHTML, new RegExp(`01:${minute}:00Z`));
+  assert.match(container.innerHTML, /&lt;img onerror=unsafe&gt;/);
+  assert.doesNotMatch(container.innerHTML, /retry-zalo-btn|confirm-zalo-sent-btn/);
+  assert.deepEqual(rows, original);
+});
+
+test('successful sends never merge other students, attendance sessions, dates, classes or channels', () => {
+  for (const overrides of [
+    { studentId: 's2' }, { absenceId: 'a2' }, { date: '2026-10-09' },
+    { className: '8OTHER' }, { phone1: '0900000000' }, { channel: 'Zalo OA' },
+    { absenceStatus: 'Có phép' }, { studentId: '', studentCode: '' }, { absenceId: '' }
+  ]) {
+    const rows = [failure({ status: 'Đã gửi' }), failure({ id: 'other', status: 'Đã gửi', ...overrides })];
+    assert.equal(setup(rows).context.groupFailedNoticeRows(rows).length, 2);
+  }
+});
+
+test('tuition confirmations on different Vietnam send days stay separate, with same-day attempts grouped', () => {
+  const rows = [
+    failure({ status: 'Đã gửi', absenceStatus: 'Học phí', id: 'yesterday', time: '2026-10-09T16:59:00Z' }),
+    failure({ status: 'Đã gửi', absenceStatus: 'Học phí', id: 'midnight', time: '2026-10-09T17:00:00Z' }),
+    failure({ status: 'Đã gửi', absenceStatus: 'Học phí', id: 'later', time: '2026-10-10T01:37:00Z' })
+  ];
+  const grouped = setup(rows).context.groupFailedNoticeRows(rows);
+  assert.equal(grouped.length, 2);
+  assert.equal(grouped[0].sentAttempts.length, 2);
+  assert.equal(grouped[1].id, 'yesterday');
+});
