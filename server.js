@@ -2139,7 +2139,7 @@ async function sendZaloNotice(db, absenceId, reason = 'auto') {
         ...records[index],
         noticeStatus: status,
         noticeResult: result,
-        noticeSentAt: ['Đã gửi', 'Chạy thử'].includes(status) ? time : records[index].noticeSentAt,
+        noticeSentAt: ['Đã gửi', 'Chạy thử'].includes(status) ? time : (records[index].noticeSentAt ?? ''),
         noticeDueAt: '',
         autoNotice: false,
         updatedAt: time

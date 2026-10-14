@@ -11,6 +11,12 @@ function slice(start, end) {
   assert.ok(from >= 0 && to > from);
   return server.slice(from, to);
 }
+function assertFirebaseValues(value, field = 'branches.main') {
+  if (value === undefined) throw new Error(`Firebase cannot save undefined at ${field}`);
+  if (value && typeof value === 'object') {
+    for (const [key, child] of Object.entries(value)) assertFirebaseValues(child, `${field}.${key}`);
+  }
+}
 function setup() {
   const db = {
     settings: { schoolName: 'Trường học', zaloMode: 'personal-real',
@@ -26,7 +32,10 @@ function setup() {
   let saves = 0, counter = 0;
   const context = {
     app: Object.fromEntries(['get', 'post'].map(method => [method, (route, handler) => routes.set(`${method} ${route}`, handler)])),
-    getBranchDb: async req => branches[req.branch], saveBranchDb: async () => { saves++; },
+    getBranchDb: async req => branches[req.branch], saveBranchDb: async (req, branchDb) => {
+      assertFirebaseValues(branchDb);
+      saves++;
+    },
     cleanText: value => String(value ?? '').trim(), normalizePhone: value => value,
     normalizeInitialReason: value => value, absenceStatusForMessage: value => value,
     studentByIdMap: students => Object.fromEntries(students.map(row => [row.id, row])),
@@ -47,6 +56,7 @@ function setup() {
     ['function buildMessage(', 'function normalizeCozeBaseUrl('],
     ['async function sendZaloNotice(', 'let noticeSchedulerRunning'],
     ['function selectBulkZaloCandidates(', "app.post('/api/absences/zalo/bulk'"],
+    ["app.post('/api/absences/zalo/bulk'", "app.post('/api/absences/:id/zalo/manual-sent'"],
     ["app.post('/api/absences/:id/zalo/manual-sent'", "app.post('/api/absences/:id/zalo'"]
   ]) vm.runInContext(slice(start, end), context);
   registerStudentNotificationRoutes(context.app, context);
@@ -76,6 +86,7 @@ for (const type of NOTICE_TYPES) {
     const response = await app.create(type);
     assert.equal(response.request.notificationOnly, true);
     assert.equal(response.request.noticeStatus, 'Chưa gửi');
+    assert.equal(response.request.noticeSentAt, '');
     assert.equal(response.noticeLog, null);
     assert.deepEqual(app.db.absences, before);
     assert.deepEqual(buildAttendanceAlerts(app.db, { endDate: '2026-10-14' }), warnings);
@@ -165,4 +176,40 @@ test('bulk sending only selected notification IDs leaves attendance and other no
   assert.equal(result.logs[0].absenceId, exam.request.id);
   assert.equal(app.db.contactRequests.find(row => row.id === enrollment.request.id).noticeStatus, 'Chưa gửi');
   assert.deepEqual(app.db.absences, before);
+});
+
+test('bulk API saves pending exam and enrollment notices without undefined values rejected by Firebase', async () => {
+  const app = setup();
+  const exam = await app.create(NOTICE_TYPES[0]);
+  const enrollment = await app.create(NOTICE_TYPES[1]);
+  const before = structuredClone(app.db.absences);
+  // Requests created before the fix do not have this field yet.
+  for (const request of app.db.contactRequests) delete request.noticeSentAt;
+  const result = await app.call('post', '/api/absences/zalo/bulk', { body: {
+    filters: { date: '2026-10-14', includeNotifications: true },
+    ids: [exam.request.id, enrollment.request.id]
+  } });
+  assert.equal(result.processed, 2);
+  assert.equal(result.summary.manual, 2);
+  assert.equal(app.saves(), 3);
+  assert.ok(app.db.contactRequests.every(row => row.noticeStatus === 'Chờ gửi thủ công' && row.noticeSentAt === ''));
+  assertFirebaseValues(app.db);
+  assert.deepEqual(app.db.absences, before);
+});
+
+test('failed and blocked notices are Firebase-safe and retries preserve an existing send time', async () => {
+  for (const scenario of ['missing-user', 'missing-token', 'existing-time']) {
+    const app = setup();
+    const { request } = await app.create(NOTICE_TYPES[0]);
+    delete request.noticeSentAt;
+    if (scenario === 'existing-time') request.noticeSentAt = '2026-10-13T09:00:00Z';
+    if (scenario === 'missing-token') app.db.students[0].zaloUserId = 'uid-1';
+    if (scenario !== 'existing-time') app.context.getZaloRuntimeConfig = () => ({ mode: 'oa', enabled: true });
+    const result = await app.call('post', '/api/absences/zalo/bulk', { body: {
+      filters: { date: '2026-10-14', includeNotifications: true }, ids: [request.id]
+    } });
+    assert.equal(result.logs[0].status, scenario === 'missing-user' ? 'Không gửi' : scenario === 'missing-token' ? 'Lỗi gửi' : 'Chờ gửi thủ công');
+    assert.equal(app.db.contactRequests[0].noticeSentAt, scenario === 'existing-time' ? '2026-10-13T09:00:00Z' : '');
+    assertFirebaseValues(app.db);
+  }
 });
