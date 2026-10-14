@@ -50,6 +50,14 @@ Khi chọn **Nghỉ học**, nhập lý do cụ thể vào hộp thoại rồi l
 - App lưu người xử lý và thời gian; nhãn chuyển sang **Đã xử lý**, ngừng nhấp nháy. Khi có thêm buổi vắng không phép được tính vào cảnh báo, học sinh sẽ cần xử lý lại.
 - Vắng có phép và Đã bù không tính vào ngưỡng này. Gửi lại tin nhắn hay gọi nhiều lần không làm tăng số buổi vắng.
 
+### Nhắc học phí chung giữa các môn
+
+- Mẫu nhắc học phí dùng chung cho các môn, không yêu cầu nhập số tiền. Cùng học sinh được nhận diện theo mã hồ sơ chung nếu có, hoặc họ tên và số điện thoại; cần giữ thông tin nhất quán giữa các lớp. Hai anh/chị/em dùng chung số phụ huynh vẫn được theo dõi riêng theo tên.
+- Sau khi Zalo **Đã gửi** hoặc gọi **Đã báo** thành công, app hiển thị nhãn **Đã nhắc học phí** ở học sinh trong mọi lớp, kèm thời gian và lớp gửi. Bấm nhãn để xem lịch sử nhắc chung các môn.
+- Nhãn tự ẩn sau **7 ngày kể từ lần liên hệ thành công gần nhất**. Nhắc lại thành công sẽ tính lại 7 ngày. Gửi lỗi, chạy thử, chờ gửi, không bắt máy và không liên lạc được không tính là đã nhắc thành công.
+- Trong **Hàng xử lý**, trường hợp đã được nhắc trong 7 ngày được **bỏ tích mặc định** và không tự gửi lại. Nhân viên vẫn có thể tích lại để nhắc tiếp. Mỗi lượt gửi hàng loạt chỉ lấy một bản ghi học phí của cùng học sinh giữa các lớp.
+- Khi nhãn hết hạn, lịch sử gửi và gọi vẫn được giữ ở **Lịch sử học phí** và **Gọi học phí**. Việc ẩn nhãn chỉ đánh dấu hết thời gian tránh nhắc trùng, không xác nhận học sinh đã đóng học phí.
+
 ### Gửi thông báo kiểm tra định kì hoặc đăng ký mới
 
 1. Vào **Zalo**, điền **Mẫu thông báo kiểm tra định kì** hoặc **Mẫu thông báo đăng ký mới** rồi **Lưu cấu hình**. Thay các phần `[Nhập ...]` bằng lịch kiểm tra, nội dung ôn tập hoặc tên khóa học, thời hạn và cách đăng ký thực tế.

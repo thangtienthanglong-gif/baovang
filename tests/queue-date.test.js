@@ -27,6 +27,7 @@ function setup(instant = '2026-10-08T16:59:00Z') {
     queryString: params => new URLSearchParams(params).toString(),
     renderFilters: () => { filterRenders++; }, renderSummary() {}, renderAbsences() {},
     renderClassDropdown() {}, renderRoster() {},
+    loadTuitionReminders: async () => {},
     loadAttendanceAbsences: async () => { attendanceLoads++; }
   };
   vm.createContext(context);

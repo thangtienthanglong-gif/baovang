@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <link rel="stylesheet" href="/style.css?v=20261014-notifications-1">
+  <link rel="stylesheet" href="/style.css?v=20261014-tuition-3">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     /* Inner Tabs for History - INLINED TO PREVENT CACHE */
@@ -403,7 +403,7 @@
           <div class="field span-4">
             <label for="tuitionTemplate">Mẫu nhắc học phí</label>
             <textarea id="tuitionTemplate" rows="3"></textarea>
-            <span class="muted">Biến: {schoolName}, {date}, {studentName}, {className}, {tuitionDebt}</span>
+            <span class="muted">Nhắc học phí chung cho các môn, không cần số tiền. Biến: {schoolName}, {date}, {studentName}, {className}</span>
           </div>
           <div class="field span-4">
             <label for="examNoticeTemplate">Mẫu thông báo kiểm tra định kì</label>
@@ -767,6 +767,14 @@
 </tbody></table></div>
 <p><strong>Vắng một buổi</strong> dùng Vắng có phép hoặc Vắng không phép. <strong>Nghỉ học</strong> dùng khi học sinh ngừng theo học, không dùng thay cho báo vắng một buổi.</p>
 <p>Khi chọn <strong>Nghỉ học</strong>, nhập lý do cụ thể vào hộp thoại rồi lưu. Ví dụ: “Đổi lịch học, không sắp xếp được thời gian”. Nếu hủy hoặc chưa nhập lý do, app chưa hoàn tất thay đổi. Sau khi lưu, vào <strong>Lịch sử liên hệ → Học sinh nghỉ học</strong> để kiểm tra ngày nghỉ, lớp và lý do.</p>
+<h4>Nhắc học phí chung giữa các môn</h4>
+<ul>
+<li>Mẫu nhắc học phí dùng chung cho các môn, không cần nhập số tiền. Giữ họ tên và số điện thoại nhất quán giữa các lớp, hoặc dùng mã hồ sơ chung. Các anh/chị/em dùng cùng số phụ huynh được theo dõi riêng theo tên.</li>
+<li>Sau khi Zalo <strong>Đã gửi</strong> hoặc gọi <strong>Đã báo</strong> thành công, nhãn <strong>Đã nhắc học phí</strong> xuất hiện trong mọi lớp của học sinh, kèm thời gian và lớp gửi. Bấm nhãn để xem lịch sử nhắc chung các môn.</li>
+<li>Nhãn tự ẩn sau <strong>7 ngày kể từ lần liên hệ thành công gần nhất</strong>; nhắc lại thành công tính lại 7 ngày. Gửi lỗi, chạy thử, chờ gửi, không bắt máy và không liên lạc được không tính là đã nhắc thành công.</li>
+<li>Trong <strong>Hàng xử lý</strong>, học sinh đã được nhắc trong 7 ngày được bỏ tích mặc định và không tự gửi lại. Nhân viên có thể tích lại để nhắc tiếp. Mỗi lượt hàng loạt chỉ nhắc học phí một lần cho cùng học sinh giữa các lớp.</li>
+<li>Khi nhãn hết hạn, lịch sử vẫn được giữ ở <strong>Lịch sử học phí</strong> và <strong>Gọi học phí</strong>. Hết hạn nhãn không có nghĩa học sinh đã đóng học phí.</li>
+</ul>
 <h4>Cảnh báo vắng ngay trên học sinh</h4>
 <ul>
 <li>Khi học sinh có từ <strong>2 buổi vắng không phép trong 30 ngày gần nhất</strong>, app hiển thị nhãn nhấp nháy <strong>Cần xử lý</strong> trên dòng học sinh, theo từng môn. Hai buổi có cảnh báo màu cam; từ ba buổi có cảnh báo màu đỏ.</li>
@@ -1069,6 +1077,14 @@
       </div>
     </div>
   </div>
+  <dialog id="tuitionReminderDialog" class="withdrawal-reason-dialog tuition-reminder-dialog" aria-labelledby="tuitionReminderTitle">
+    <h2 id="tuitionReminderTitle">Lịch sử nhắc học phí chung các môn</h2>
+    <p id="tuitionReminderStudent" class="muted"></p>
+    <p class="muted">Nhãn Đã nhắc học phí hiển thị 7 ngày từ lần liên hệ thành công gần nhất. Lịch sử vẫn được giữ khi nhãn hết hạn.</p>
+    <div class="table-wrap"><table><thead><tr><th>Thời gian</th><th>Lớp</th><th>Liên hệ</th><th>Kết quả</th></tr></thead><tbody id="tuitionReminderRows"></tbody></table></div>
+    <div id="tuitionReminderPagination" class="pagination"></div>
+    <div class="withdrawal-reason-actions"><button class="btn secondary" id="tuitionReminderClose" type="button">Đóng</button></div>
+  </dialog>
   <dialog id="studentNotificationDialog" class="withdrawal-reason-dialog student-notification-dialog" aria-labelledby="studentNotificationTitle" aria-describedby="studentNotificationStudent">
     <form id="studentNotificationForm">
       <h2 id="studentNotificationTitle">Thông báo</h2>
@@ -1097,7 +1113,8 @@
     </form>
   </dialog>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="/app.js?v=20261014-26"></script>
+  <script src="/tuition-reminders.js?v=20261014-2"></script>
+  <script src="/app.js?v=20261014-28"></script>
   <script src="/attendance-alerts.js?v=20261014-2"></script>
   <script src="/exams.js?v=20261009-2"></script>
   <nav class="bottom-nav">

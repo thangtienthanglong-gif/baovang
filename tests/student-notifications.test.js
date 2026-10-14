@@ -46,6 +46,7 @@ function setup() {
     nowISO: () => '2026-10-14T09:00:00Z', id: prefix => `${prefix}-${++counter}`
   };
   Object.assign(context, require('../lib/history-date-range'));
+  Object.assign(context, require('../lib/tuition-reminders'));
   vm.createContext(context);
   vm.runInContext(server.match(/^const ABSENCE_STATUSES = .*;$/m)[0], context);
   for (const [start, end] of [

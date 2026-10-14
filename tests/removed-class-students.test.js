@@ -146,6 +146,7 @@ function setupFrontend(confirmed, api) {
   const student = { id: 's1', fullName: 'Nguyễn An', className: '7C26M' };
   const select = { value: 'REMOVE_FROM_CLASS', dataset: { studentId: 's1', attendanceClass: '7C26M', absenceId: 'a1' } };
   const context = {
+    renderTuitionReminderBadge: () => '', tuitionQueueChecked: () => true,
     state: { students: [student], classes: ['7C26M'], absences: [{ id: 'a1', studentId: 's1' }] },
     normalizeAbsenceStatus: value => value, absenceForStudent: () => ({ absenceStatus: 'Vắng' }),
     confirm: () => confirmed, getActiveBranch: () => 'main', api,
@@ -199,6 +200,7 @@ test('removed names are excluded from active students and quick-search rosters',
 
 test('the removal choice appears in regular student statuses and stays out of makeup attendance', () => {
   const context = {
+    renderTuitionReminderBadge: () => '', tuitionQueueChecked: () => true,
     state: { scheduleExceptions: [] }, absenceForStudent: () => null,
     normalizeAbsenceStatus: value => value, absenceStatusLabel: value => value,
     selectedDate: () => '2026-10-09', selectedDay: () => 'ALL', escapeHtml: value => value

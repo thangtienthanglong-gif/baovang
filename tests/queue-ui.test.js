@@ -16,6 +16,7 @@ function setup() {
   let boxes = [];
   const context = {
     URLSearchParams,
+    renderTuitionReminderBadge: () => '', tuitionQueueChecked: () => true,
     state: { absences: [] },
     $: selector => els[selector.slice(1)] || null,
     document: {

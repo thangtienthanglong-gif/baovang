@@ -16,6 +16,8 @@ const { buildAttendanceAlerts, subjectForClass, registerAttendanceAlertRoutes } 
 const { historyDateRange, matchesHistoryDate, historyExportSuffix } = require('./lib/history-date-range');
 const { groupQuitStudents } = require('./lib/quit-history');
 const { registerStudentNotificationRoutes } = require('./lib/student-notifications');
+const { DEFAULT_TUITION_TEMPLATE, resolveTuitionTemplate, buildTuitionReminders,
+  selectTuitionContacts, registerTuitionReminderRoutes } = require('./lib/tuition-reminders');
 
 const app = express();
 const sessionLocks = new Set();
@@ -356,7 +358,7 @@ function defaultSettings() {
     cozeAccessToken: '',
     cozeUserId: 'bao-vang-teacher',
     messageTemplate: DEFAULT_ABSENCE_MESSAGE_TEMPLATE,
-    tuitionTemplate: 'Kính gửi Quý phụ huynh, {schoolName} thông báo học phí/tiền nợ của em {studentName}, lớp {className} hiện tại là: {tuitionDebt}.\nVui lòng hoàn thành sớm. Trân trọng!',
+    tuitionTemplate: DEFAULT_TUITION_TEMPLATE,
     periodicTemplate: 'Kính gửi Quý phụ huynh, {schoolName} gửi thông báo định kì/khóa mới cho em {studentName}, lớp {className}.',
     examNoticeTemplate: 'Kính gửi Quý phụ huynh, {schoolName} thông báo kiểm tra định kì cho em {studentName}, lớp {className}.\nLịch kiểm tra: [Nhập ngày, giờ].\nNội dung ôn tập: [Nhập nội dung].\nTrân trọng!',
     enrollmentNoticeTemplate: 'Kính gửi Quý phụ huynh, {schoolName} thông báo đăng ký khóa học mới cho em {studentName}, lớp {className}.\nKhóa học: [Nhập tên khóa học].\nThời hạn và cách đăng ký: [Nhập hướng dẫn].\nTrân trọng!',
@@ -398,7 +400,7 @@ function publicSettings(settings) {
     cozeUserId: cozeConfig.userId,
     hasCozeAccessToken: Boolean(cozeConfig.accessToken),
     messageTemplate: resolveAbsenceMessageTemplate(settings.messageTemplate),
-    tuitionTemplate: settings.tuitionTemplate || defaultSettings().tuitionTemplate,
+    tuitionTemplate: resolveTuitionTemplate(settings.tuitionTemplate),
     periodicTemplate: settings.periodicTemplate || defaultSettings().periodicTemplate,
     examNoticeTemplate: settings.examNoticeTemplate || defaultSettings().examNoticeTemplate,
     enrollmentNoticeTemplate: settings.enrollmentNoticeTemplate || defaultSettings().enrollmentNoticeTemplate,
@@ -826,7 +828,7 @@ function buildMessage(settings, absence, student) {
   const status = normalizeAbsenceStatus(absence.absenceStatus);
   let template = resolveAbsenceMessageTemplate(settings.messageTemplate);
   if (status === 'Học phí' || status === 'Trễ học phí') {
-    template = settings.tuitionTemplate || 'Kính gửi Quý phụ huynh, {schoolName} thông báo học phí/tiền nợ của em {studentName}, lớp {className} hiện tại là: {tuitionDebt}.\nVui lòng hoàn thành sớm. Trân trọng!';
+    template = resolveTuitionTemplate(settings.tuitionTemplate);
   } else if (status === 'Kiểm tra định kì') {
     template = settings.examNoticeTemplate || defaultSettings().examNoticeTemplate;
   } else if (status === 'Đăng ký mới') {
@@ -2265,6 +2267,14 @@ async function processDueNotices() {
       if (!dueAbsences.length) continue;
 
       for (const absence of dueAbsences) {
+        if (normalizeAbsenceStatus(absence.absenceStatus) === 'Học phí'
+            && buildTuitionReminders(db).reminders[absence.studentId]) {
+          absence.autoNotice = false;
+          absence.noticeDueAt = '';
+          absence.noticeStatus = 'Không gửi';
+          absence.noticeResult = 'Đã nhắc học phí trong 7 ngày; chờ nhân viên chọn nếu cần nhắc lại.';
+          continue;
+        }
         await sendZaloNotice(db, absence.id, 'scheduled_delay');
       }
       changed = true;
@@ -3173,6 +3183,7 @@ async function saveHandledAttendanceAlert(req, action) {
 }
 
 registerAttendanceAlertRoutes(app, { getBranchDb, saveHandledAlert: saveHandledAttendanceAlert, id, nowISO });
+registerTuitionReminderRoutes(app, { getBranchDb });
 
 app.get('/api/students', async (req, res, next) => {
   try {
@@ -3949,7 +3960,8 @@ app.post('/api/absences', async (req, res, next) => {
     }
 
     const absenceStatus = normalizeAbsenceStatus(req.body.absenceStatus);
-    const shouldAutoSend = req.body.sendZalo !== false && !isWithdrawnAbsence({ absenceStatus }, student) && absenceStatus !== 'Đã bù' && absenceStatus !== 'Đi trễ' && absenceStatus !== 'Có phép' && absenceStatus !== 'Vắng có phép';
+    const recentlyReminded = absenceStatus === 'Học phí' && buildTuitionReminders(db, { now: nowISO() }).reminders[student.id];
+    const shouldAutoSend = !recentlyReminded && req.body.sendZalo !== false && !isWithdrawnAbsence({ absenceStatus }, student) && absenceStatus !== 'Đã bù' && absenceStatus !== 'Đi trễ' && absenceStatus !== 'Có phép' && absenceStatus !== 'Vắng có phép';
     const noticeDelayMinutes = shouldAutoSend ? delayMinutesFromSettings(db.settings || defaultSettings()) : 0;
     const absence = {
       id: id('abs'),
@@ -4016,7 +4028,8 @@ app.put('/api/absences/:id/status', async (req, res, next) => {
       error.status = 400;
       throw error;
     }
-    const shouldAutoSend = req.body.sendZalo !== false && !isWithdrawnAbsence({ absenceStatus }, student) && absenceStatus !== 'Đã bù' && absenceStatus !== 'Đi trễ';
+    const recentlyReminded = absenceStatus === 'Học phí' && buildTuitionReminders(db, { now: nowISO() }).reminders[currentAbsence.studentId];
+    const shouldAutoSend = !recentlyReminded && req.body.sendZalo !== false && !isWithdrawnAbsence({ absenceStatus }, student) && absenceStatus !== 'Đã bù' && absenceStatus !== 'Đi trễ';
     const noticeDelayMinutes = shouldAutoSend ? delayMinutesFromSettings(db.settings || defaultSettings()) : 0;
     db.absences[index] = {
       ...db.absences[index],
@@ -4024,7 +4037,7 @@ app.put('/api/absences/:id/status', async (req, res, next) => {
       initialReason: normalizeInitialReason(req.body.initialReason || db.absences[index].initialReason, absenceStatus),
       note: req.body.note !== undefined ? cleanText(req.body.note) : db.absences[index].note,
       noticeStatus: shouldAutoSend ? (noticeDelayMinutes > 0 ? 'Chờ gửi' : db.absences[index].noticeStatus) : (['Chờ gửi', 'Chưa gửi'].includes(db.absences[index].noticeStatus) ? 'Không gửi' : db.absences[index].noticeStatus),
-      noticeDueAt: shouldAutoSend && noticeDelayMinutes > 0 ? addMinutesISO(noticeDelayMinutes) : db.absences[index].noticeDueAt,
+      noticeDueAt: recentlyReminded ? '' : shouldAutoSend && noticeDelayMinutes > 0 ? addMinutesISO(noticeDelayMinutes) : db.absences[index].noticeDueAt,
       noticeDelayMinutes,
       autoNotice: shouldAutoSend && noticeDelayMinutes > 0,
       updatedAt: nowISO()
@@ -4072,6 +4085,8 @@ async function runBulkZaloAction(db, filters, reason = 'bulk_send', ids = null) 
     selection.allCandidates = selection.allCandidates.filter(row => idSet.has(row.id));
     selection.alreadySent = selection.rows.length - selection.allCandidates.length;
   }
+  const tuitionSelection = selectTuitionContacts(db, selection.candidates, { allowRecent: ids !== null });
+  selection.candidates = tuitionSelection.candidates;
   const logs = [];
   
   const settings = db.settings || defaultSettings();
@@ -4096,7 +4111,10 @@ async function runBulkZaloAction(db, filters, reason = 'bulk_send', ids = null) 
   return {
     total: selection.rows.length,
     processed: logs.length,
-    skipped: selection.alreadySent,
+    skipped: selection.alreadySent + tuitionSelection.reminded + tuitionSelection.duplicates,
+    alreadySent: selection.alreadySent,
+    tuitionAlreadyReminded: tuitionSelection.reminded,
+    tuitionDuplicates: tuitionSelection.duplicates,
     limited: selection.limited,
     limit: selection.limit,
     mode: selection.mode,

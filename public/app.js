@@ -413,6 +413,7 @@ async function loadAbsences() {
   const data = await api('/api/absences?' + queryString(getFilters()));
   state.absences = data.absences;
   state.summary = data.summary;
+  await loadTuitionReminders();
   renderSummary();
   renderAbsences();
   renderClassDropdown();
@@ -432,6 +433,7 @@ async function loadAttendanceAbsences() {
 async function loadStudents(q = '') {
   const rows = await api('/api/students?' + queryString({ q }));
   state.students = rows;
+  await loadTuitionReminders();
   rebuildQuickSearchIndex();
   renderStudentSelect();
   renderClassDropdown();
@@ -655,7 +657,7 @@ function renderMessagePreview() {
     reason: 'Không có lý do',
     parentName: 'Phụ huynh HS',
     phone: '0901234567',
-    tuitionDebt: '1.500.000 VNĐ',
+    tuitionDebt: '',
     birthday: '15/05/2012'
   };
 
@@ -1269,9 +1271,12 @@ function renderRosterStudent(student) {
   return `
     <article class="student-card ${attendanceAlert ? 'has-attendance-alert' : ''} ${absence && currentStatus !== 'Đã bù' ? 'is-absent' : ''} ${student.isMakeupAttendance ? 'is-makeup' : ''} ${hasStuckNote ? 'is-stuck' : ''}">
       <div class="student-main">
-        <div>
-          <div class="person-main clickable-name" onclick="openStudentProfile('${escapeHtml(student.id)}')">
-            ${escapeHtml(student.fullName)}
+        <div class="student-name-details">
+          <div class="student-heading">
+            <div class="person-main clickable-name" onclick="openStudentProfile('${escapeHtml(student.id)}')">
+              ${escapeHtml(student.fullName)}
+            </div>
+            ${renderTuitionReminderBadge(student.id)}
           </div>
           <div class="student-phone">${escapeHtml(phone)}</div>
           ${(state.contactRequests || []).filter(row => row.studentId === student.id && row.date === rosterDate && row.className === student.className).map(row => `<div class="muted">${escapeHtml(row.absenceStatus)} · ${escapeHtml(row.noticeStatus)}</div>`).join('')}
@@ -1382,12 +1387,13 @@ function renderAbsences() {
     return `
     <article class="absence-item" data-id="${row.id}">
       <div class="absence-check">
-        <input type="checkbox" class="bulk-select" data-id="${row.id}" checked aria-label="Chọn ${escapeHtml(row.studentName)} để gửi Zalo hàng loạt">
+        <input type="checkbox" class="bulk-select" data-id="${row.id}" ${tuitionQueueChecked(row) ? 'checked' : ''} aria-label="Chọn ${escapeHtml(row.studentName)} để gửi Zalo hàng loạt">
       </div>
       <div class="absence-student">
         <div class="student-heading">
           <div class="person-main clickable-name" onclick="openStudentProfile('${escapeHtml(row.studentId)}')">${escapeHtml(row.studentName)}</div>
           ${row.className ? `<span class="mini-chip">${escapeHtml(row.className)}</span>` : ''}
+          ${['Học phí', 'Trễ học phí'].includes(row.absenceStatus) ? renderTuitionReminderBadge(row.studentId) : ''}
         </div>
         <div class="student-phone">${phoneHtml}</div>
       </div>
@@ -2194,7 +2200,9 @@ function bulkZaloMessage(result) {
     summary.manual ? `${summary.manual} chờ gửi thủ công` : '',
     summary.failed ? `${summary.failed} lỗi` : '',
     summary.notSent ? `${summary.notSent} chưa gửi được` : '',
-    result.skipped ? `${result.skipped} đã gửi trước đó` : '',
+    (result.alreadySent ?? result.skipped) ? `${result.alreadySent ?? result.skipped} đã gửi trước đó` : '',
+    result.tuitionAlreadyReminded ? `${result.tuitionAlreadyReminded} đã nhắc học phí trong 7 ngày` : '',
+    result.tuitionDuplicates ? `${result.tuitionDuplicates} bản ghi cùng học sinh được bỏ qua` : '',
     result.limited ? `${result.limited} ngoài giới hạn chạy thử` : ''
   ].filter(Boolean);
   return `Đã xử lý Zalo hàng loạt: ${parts.join(', ')}.`;
@@ -3306,7 +3314,10 @@ function initEvents() {
   });
 
   $('#absenceRows')?.addEventListener('change', event => {
-    if (event.target.classList.contains('bulk-select')) updateBulkSendCount();
+    if (event.target.classList.contains('bulk-select')) {
+      rememberTuitionQueueChoice(event.target);
+      updateBulkSendCount();
+    }
   });
 
   $('#noticePagination')?.addEventListener('click', event => {

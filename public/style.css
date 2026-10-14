@@ -2553,3 +2553,32 @@ body.dark-mode .badge.no-answer {
     font-size: 30px;
   }
 }
+
+.student-card .student-main { min-width: 0; }
+.student-name-details { min-width: 0; width: 100%; }
+
+.tuition-reminder-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.tuition-reminder-badge {
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 4px 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tuition-reminder-badge:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.tuition-reminder-dialog { width: min(860px, calc(100vw - 32px)); max-width: 860px; }
+.tuition-reminder-dialog table { min-width: 540px; }
+.tuition-reminder-dialog td { white-space: normal; }
+body.dark-mode .tuition-reminder-badge { background: #7f1d1d; border-color: #f87171; color: #fecaca; }

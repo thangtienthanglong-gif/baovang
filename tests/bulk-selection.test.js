@@ -39,6 +39,7 @@ function setupServer() {
       return { id, status: 'Chờ gửi thủ công' };
     }
   };
+  Object.assign(context, require('../lib/tuition-reminders'));
   vm.createContext(context);
   vm.runInContext(slice(server, 'function selectBulkZaloCandidates(', "app.post('/api/absences/:id/zalo/manual-sent'"), context);
   async function call(body, branch = 'main') {
@@ -46,8 +47,26 @@ function setupServer() {
     await handler({ body, branch, query: {} }, { json(value) { result = value; } }, error => { throw error; });
     return result;
   }
-  return { call, sent, saves };
+  return { call, sent, saves, branches };
 }
+
+test('bulk default skips cross-class tuition reminders while explicit choices allow one repeat per person', async () => {
+  for (const explicit of [false, true]) {
+    const app = setupServer();
+    const db = app.branches.main;
+    db.students = [{ id: 'van', fullName: 'Nguyễn An', phone1: '0901234567' },
+      { id: 'toan', fullName: 'Nguyễn An', phone1: '0901234567' }];
+    db.notificationLogs = [{ id: 'old', studentId: 'van', time: new Date(Date.now() - 86400000).toISOString(), absenceStatus: 'Học phí', status: 'Đã gửi' }];
+    db.rows = [{ id: 'v', studentId: 'van', absenceStatus: 'Học phí' },
+      { id: 't', studentId: 'toan', absenceStatus: 'Học phí' }];
+    const result = await app.call(explicit ? { ids: ['v', 't'] } : {});
+    assert.equal(result.processed, explicit ? 1 : 0);
+    assert.equal(result.tuitionAlreadyReminded, explicit ? 0 : 2);
+    assert.equal(result.tuitionDuplicates, explicit ? 1 : 0);
+    assert.equal(result.skipped, explicit ? 1 : 2);
+    assert.deepEqual(app.sent.map(row => row.id), explicit ? ['v'] : []);
+  }
+});
 
 test('bulk selection only sends checked IDs that match the selected class and keeps sent or inactive students out', async () => {
   const app = setupServer();

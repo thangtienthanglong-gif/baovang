@@ -14,6 +14,7 @@ function slice(start, end) {
 
 function rosterContext({ madeUp = false, stuck = false } = {}) {
   const context = {
+    renderTuitionReminderBadge: () => '', tuitionQueueChecked: () => true,
     state: { scheduleExceptions: stuck ? [{}] : [] },
     absenceForStudent: () => madeUp ? { id: 'a1', absenceStatus: 'Đã bù' } : null,
     normalizeAbsenceStatus: value => value, absenceStatusLabel: value => value,
@@ -46,7 +47,8 @@ for (const absenceId of ['', 'existing']) {
   test(`saving made-up status uses the chosen attendance date and explicitly disables sending (${absenceId || 'new'})`, async () => {
     const requests = [];
     const context = {
-      state: { students: [student] }, normalizeAbsenceStatus: value => value,
+      renderTuitionReminderBadge: () => '', tuitionQueueChecked: () => true,
+    state: { students: [student] }, normalizeAbsenceStatus: value => value,
       selectedDate: () => '2026-10-10', selectedDay: () => 'ALL',
       getClassScheduleInfo: () => ({ sessionName: 'Tối' }),
       api: async (url, options) => { requests.push({ url, options }); return {}; },
@@ -66,6 +68,7 @@ for (const absenceId of ['', 'existing']) {
 test('made-up attendance stays out of the queue even if a stale record is still marked pending', () => {
   const container = {};
   const context = {
+    renderTuitionReminderBadge: () => '', tuitionQueueChecked: () => true,
     state: { absences: [{ absenceStatus: 'Đã bù', noticeStatus: 'Chờ gửi', studentName: 'Đã học bù' }] },
     $: () => container, normalizeAbsenceStatus: value => value, updateBulkSendCount() {}
   };

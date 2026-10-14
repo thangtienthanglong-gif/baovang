@@ -36,6 +36,7 @@ function setup(db) {
   Object.assign(context, require('../lib/history-date-range'));
   context.subjectForClass = require('../lib/attendance-alerts').subjectForClass;
   context.groupQuitStudents = require('../lib/quit-history').groupQuitStudents;
+  Object.assign(context, require('../lib/tuition-reminders'));
   vm.createContext(context);
   for (const [start, end] of [
     ['function sanitizeStudent(', 'function getSummary('],
@@ -57,6 +58,28 @@ function setup(db) {
 }
 
 const withdrawal = { date: '2026-10-06', studentId: 's1', session: 'Tối', absenceStatus: 'Nghỉ học', sendZalo: true };
+
+for (const mode of ['new', 'update']) {
+  test(`recent cross-class tuition contacts disable automatic sending and scheduling (${mode})`, async () => {
+    const db = fixture();
+    db.students.push({ ...db.students[0], id: 's2', code: 'AUTO-T', className: '8T4' });
+    db.notificationLogs.push({ id: 'sent', studentId: 's1', absenceStatus: 'Học phí', status: 'Đã gửi', time: '2026-10-05T10:00:00Z' });
+    db.settings.delay = 5;
+    const app = setup(db);
+    let response;
+    if (mode === 'new') {
+      response = await app.call('post', '/api/absences', { body: { ...withdrawal, studentId: 's2', absenceStatus: 'Học phí' } });
+    } else {
+      db.absences.push({ id: 'pending', studentId: 's2', date: withdrawal.date, session: 'Tối', absenceStatus: 'Vắng',
+        noticeStatus: 'Chờ gửi', autoNotice: true, noticeDueAt: '2026-10-06T11:00:00Z' });
+      response = await app.call('put', '/api/absences/:id/status', { id: 'pending', body: { absenceStatus: 'Học phí', sendZalo: true } });
+    }
+    assert.equal(response.data.absence.autoNotice, false);
+    assert.equal(response.data.absence.noticeDueAt, '');
+    assert.equal(response.data.noticeLog, null);
+    assert.equal(db.notificationLogs.length, 1);
+  });
+}
 
 for (const mode of ['new', 'duplicate', 'update']) {
   test(`a withdrawal reason is saved in attendance, student history and Excel (${mode})`, async () => {

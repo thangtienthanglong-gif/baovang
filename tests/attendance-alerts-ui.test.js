@@ -33,6 +33,7 @@ function setup(initial = fixture()) {
     };
   }
   const context = {
+    renderTuitionReminderBadge: () => '', tuitionQueueChecked: () => true,
     state: { students: [{ id: 's1', fullName: 'Nguyễn An', className: '8T3M+' }], scheduleExceptions: [] },
     document: { addEventListener: (type, handler) => { init = handler; } },
     $: selector => fields[selector.slice(1)], clientTodayISO: () => '2026-10-14',
