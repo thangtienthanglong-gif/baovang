@@ -10,7 +10,7 @@ function setup() {
   let now = new Date('2026-10-08T16:59:00Z');
   const fields = Object.fromEntries([
     'filterDate', 'filterDateAuto', 'historyDate', 'historyDateEnd', 'historyDateAuto', 'historyKeyword',
-    'historyRows', 'callHistoryRows', 'noticeRows', 'noticePagination', 'quitRows', 'removedClassRows', 'historyExportMenu'
+    'historyRows', 'callHistoryRows', 'noticeRows', 'noticePagination', 'quitRows', 'quitHistoryGrade', 'quitHistorySubject', 'removedClassRows', 'historyExportMenu'
   ].map(id => [id, {
     value: '', listeners: {}, style: { display: 'block' },
     setCustomValidity(message) { this.validationMessage = message; },
@@ -24,6 +24,7 @@ function setup() {
       constructor(...args) { super(...(args.length ? args : [now.getTime()])); }
     },
     state: {}, $: selector => fields[selector.slice(1)], escapeHtml: value => String(value ?? ''),
+    getClassGrade: value => String(value || '').match(/^\d+/)?.[0] || '',
     activeTabId: () => 'historyTab', getActiveBranch: () => 'main', renderFilters() {},
     api: async url => { requests.push(url); return []; },
     queryString: params => new URLSearchParams(params).toString(),
@@ -39,7 +40,7 @@ function setup() {
   vm.runInContext('let queueDateAuto = true; let historyDateAuto = true;', context);
   load('function clientTodayISO(', 'async function loadBootstrap(');
   load('async function loadHistory(', 'async function updateCallResult(');
-  load('async function loadQuitStudents(', 'async function markUnfriended(');
+  load('function quitHistoryParams(', 'async function markUnfriended(');
   load('function exportHistory(', 'async function clearQuitHistory(');
   load("  $('#historyExportMenu')", "  $('#historyKeyword').addEventListener");
   context.syncAutomaticDate();
@@ -163,4 +164,38 @@ test('reversed dates block loading and exporting; clearing either endpoint permi
   app.manualHistory('2026-10-01', '');
   assert.equal(app.context.historyDateParams().dateEnd, '');
   assert.equal(app.fields.historyDateEnd.validationMessage, '');
+});
+
+test('withdrawal grade and subject filters apply to the list and its Excel export only', async () => {
+  const app = setup();
+  app.manualHistory('2026-10-01', '2026-10-14');
+  app.fields.quitHistoryGrade.value = '8';
+  app.fields.quitHistorySubject.value = 'K';
+  app.fields.historyKeyword.value = 'Nhân';
+  await app.context.loadQuitStudents();
+  const query = new URL(app.requests[0], 'https://example.test').searchParams;
+  assert.equal(query.get('grade'), '8');
+  assert.equal(query.get('subject'), 'K');
+  assert.equal(query.get('q'), 'Nhân');
+  app.exportType('quit');
+  assert.equal(app.exports[0].params.grade, '8');
+  assert.equal(app.exports[0].params.subject, 'K');
+  assert.equal(app.exports[0].params.dateStart, '2026-10-01');
+  app.exportType('absence');
+  assert.equal(app.exports[1].params.grade, undefined);
+  assert.equal(app.exports[1].params.subject, undefined);
+});
+
+test('a response for an earlier withdrawal filter cannot overwrite the newer selection', async () => {
+  const app = setup();
+  let first;
+  app.context.api = async () => new Promise(resolve => { first = resolve; });
+  const pending = app.context.loadQuitStudents();
+  app.fields.quitHistoryGrade.value = '8';
+  app.context.api = async () => [{ fullName: 'Khối 8', className: '8KS4M', quitDate: '2026-10-14' }];
+  await app.context.loadQuitStudents();
+  first([{ fullName: 'Khối 7', className: '7KS4M', quitDate: '2026-10-14' }]);
+  await pending;
+  assert.match(app.fields.quitRows.innerHTML, /Khối 8/);
+  assert.doesNotMatch(app.fields.quitRows.innerHTML, /Khối 7/);
 });

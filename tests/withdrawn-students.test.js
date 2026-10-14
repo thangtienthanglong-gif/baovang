@@ -34,6 +34,7 @@ function setup(db) {
     XLSX, Date
   };
   Object.assign(context, require('../lib/history-date-range'));
+  context.subjectForClass = require('../lib/attendance-alerts').subjectForClass;
   vm.createContext(context);
   for (const [start, end] of [
     ['function sanitizeStudent(', 'function getSummary('],

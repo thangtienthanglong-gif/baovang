@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <link rel="stylesheet" href="/style.css?v=20261014-history-range-1">
+  <link rel="stylesheet" href="/style.css?v=20261014-quit-filters-1">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     /* Inner Tabs for History - INLINED TO PREVENT CACHE */
@@ -625,6 +625,10 @@
               <button class="btn danger" id="clearQuitHistoryBtn" type="button">Xóa lịch sử</button>
             </div>
           </div>
+          <div class="quit-history-filters">
+            <div class="field"><label for="quitHistoryGrade">Khối</label><select id="quitHistoryGrade"><option value="ALL">Tất cả khối</option></select></div>
+            <div class="field"><label for="quitHistorySubject">Môn</label><select id="quitHistorySubject"><option value="ALL">Tất cả môn</option><option value="TOAN">Toán</option><option value="A">Anh</option><option value="V">Văn</option><option value="K">KHTN</option><option value="OTHER">Môn khác</option></select></div>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -880,7 +884,7 @@
     </form>
   </dialog>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="/app.js?v=20261014-21"></script>
+  <script src="/app.js?v=20261014-22"></script>
   <script src="/attendance-alerts.js?v=20261014-2"></script>
   <script src="/exams.js?v=20261009-2"></script>
   <nav class="bottom-nav">

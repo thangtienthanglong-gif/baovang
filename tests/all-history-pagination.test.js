@@ -41,7 +41,7 @@ function setup() {
   vm.createContext(context);
   for (const [start, end] of [
     ['async function loadHistory(', 'async function updateCallResult('],
-    ['async function loadQuitStudents(', 'async function markUnfriended(']
+    ['function quitHistoryParams(', 'async function markUnfriended(']
   ]) {
     const offset = source.indexOf(start);
     vm.runInContext(source.slice(offset, source.indexOf(end, offset)), context);

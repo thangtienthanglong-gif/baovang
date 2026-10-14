@@ -1714,11 +1714,35 @@ async function updateCallResult(id, result, select = null) {
   }
 }
 
-async function loadQuitStudents() {
-  const rows = await api('/api/quit-students?' + queryString({
+function quitHistoryParams() {
+  return {
     ...historyDateParams(),
-    q: $('#historyKeyword').value.trim()
-  }));
+    q: $('#historyKeyword')?.value.trim() || '',
+    grade: $('#quitHistoryGrade')?.value || 'ALL',
+    subject: $('#quitHistorySubject')?.value || 'ALL'
+  };
+}
+
+function renderQuitHistoryFilters() {
+  const select = $('#quitHistoryGrade');
+  if (!select) return;
+  const selected = select.value;
+  const grades = [...new Set(['6', '7', '8', '9', '10', '11', '12',
+    ...(state.students || []).map(student => getClassGrade(student.className)).filter(Boolean)
+      .map(grade => String(Number(grade)))])].sort((a, b) => Number(a) - Number(b));
+  select.innerHTML = '<option value="ALL">Tất cả khối</option>'
+    + grades.map(grade => `<option value="${grade}">Khối ${grade}</option>`).join('');
+  select.value = grades.includes(selected) ? selected : 'ALL';
+}
+
+let quitHistoryLoadId = 0;
+
+async function loadQuitStudents() {
+  renderQuitHistoryFilters();
+  const branch = getActiveBranch();
+  const request = ++quitHistoryLoadId;
+  const rows = await api('/api/quit-students?' + queryString(quitHistoryParams()));
+  if (request !== quitHistoryLoadId || branch !== getActiveBranch()) return;
 
   const tbody = $('#quitRows');
   if (!tbody) return;
@@ -2476,17 +2500,14 @@ function exportHistory(type) {
     case 'call-tuition':
       return downloadUrl('/api/call-logs/export', { ...params, absenceStatus: 'Học phí' });
     case 'quit':
-      return downloadUrl('/api/quit-students/export', params);
+      return downloadUrl('/api/quit-students/export', quitHistoryParams());
     case 'removed':
       return downloadUrl('/api/removed-class-students/export', params);
   }
 }
 
 async function clearQuitHistory() {
-  const params = {
-    ...historyDateParams(),
-    q: $('#historyKeyword')?.value || ''
-  };
+  const params = quitHistoryParams();
   await api('/api/quit-students/clear?' + queryString(params), { method: 'DELETE' });
   await loadQuitStudents();
   toast('Đã xóa danh sách học sinh nghỉ học');
@@ -3459,6 +3480,9 @@ function initEvents() {
   });
   $('#historyDate')?.addEventListener('change', reloadHistoryFromFilters);
   $('#historyDateEnd')?.addEventListener('change', reloadHistoryFromFilters);
+  ['#quitHistoryGrade', '#quitHistorySubject'].forEach(selector => {
+    $(selector)?.addEventListener('change', () => loadQuitStudents().catch(error => toast(error.message, 'error')));
+  });
   
   $('#logFilterBtn')?.addEventListener('click', () => {
     loadTeachingLog();

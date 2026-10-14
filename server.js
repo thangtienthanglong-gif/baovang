@@ -3082,9 +3082,14 @@ app.options('/api/local-zalo/open-paste', (req, res) => {
 function filterQuitStudents(db, query) {
   const q = normalizeSearchText(query.q || '');
   const range = historyDateRange(query);
+  const grade = query.grade && query.grade !== 'ALL' ? String(Number(query.grade)) : '';
+  const subject = query.subject && query.subject !== 'ALL' ? String(query.subject) : '';
   return (db.students || []).filter(student => student.status === 'Nghỉ học')
     .map(student => ({ ...student, ...quitStudentDetails(db, student) }))
     .filter(student => matchesHistoryDate(student.quitDate, range)
+      && (!grade || Number(String(student.className || '').trim().match(/^\d+/)?.[0]) === Number(grade))
+      && (!subject || (subject === 'OTHER' ? subjectForClass(student.className).key.startsWith('OTHER:')
+        : subjectForClass(student.className).key === subject))
       && (!q || normalizeSearchText(`${student.code} ${student.fullName} ${student.className} ${student.parentName} ${student.phone1} ${student.phone2}`).includes(q)))
     .sort((a, b) => b.quitDate.localeCompare(a.quitDate));
 }

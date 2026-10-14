@@ -23,6 +23,7 @@ function setup() {
     getBranchDb: async req => branches[req.branch], saveBranchDb: async () => { saves++; },
     app: Object.fromEntries(['get', 'delete'].map(method => [method, (route, handler) => routes.set(`${method} ${route}`, handler)]))
   };
+  context.subjectForClass = require('../lib/attendance-alerts').subjectForClass;
   vm.createContext(context);
   for (const [start, end] of [
     ['function quitStudentDetails(', 'function markStudentWithdrawn('],
@@ -96,4 +97,20 @@ test('invalid intervals reject destructive requests before saving anything', asy
   }
   assert.equal(app.saves(), 0);
   assert.deepEqual(app.branches, before);
+});
+
+test('withdrawals can be filtered by grade alone, subject alone or both, including advanced math', async () => {
+  const app = setup();
+  app.branches.main.students = ['8KS4M', '7KS4M', '8VT2', '8T3M+', '8NS3', '8AT2', 'CUSTOM']
+    .map((className, i) => ({ id: `s${i}`, fullName: 'An', className, status: 'Nghỉ học', quitDate: '2026-10-14' }));
+  assert.equal(app.context.filterQuitStudents(app.branches.main, { grade: '8' }).length, 5);
+  assert.equal(app.context.filterQuitStudents(app.branches.main, { subject: 'K' }).length, 2);
+  assert.deepEqual(Array.from(app.context.filterQuitStudents(app.branches.main, { grade: '8', subject: 'TOAN' }), row => row.className).sort(), ['8NS3', '8T3M+']);
+  assert.equal(app.context.filterQuitStudents(app.branches.main, { subject: 'OTHER' })[0].className, 'CUSTOM');
+  const before = structuredClone(app.branches.other);
+  await app.remove('/api/quit-students/clear', { grade: '8', subject: 'K' });
+  assert.equal(app.branches.main.students.length, 6);
+  assert.ok(app.branches.main.students.some(student => student.className === '7KS4M'));
+  assert.ok(app.branches.main.students.some(student => student.className === '8VT2'));
+  assert.deepEqual(app.branches.other, before);
 });

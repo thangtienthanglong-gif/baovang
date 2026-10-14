@@ -22,6 +22,7 @@ function setup(db) {
     cleanText: value => String(value ?? '').replace(/\s+/g, ' ').trim()
   };
   Object.assign(context, require('../lib/history-date-range'));
+  context.subjectForClass = require('../lib/attendance-alerts').subjectForClass;
   vm.createContext(context);
   vm.runInContext(source.match(/^const ABSENCE_STATUSES = .*;$/m)[0], context);
   for (const [start, end] of [
@@ -172,4 +173,19 @@ test('all history Excel exports include both interval boundaries and exclude out
     assert.equal(file.rows.length, 3, route);
     assert.match(file.filename, /2026-10-10_den_2026-10-12\.xlsx/);
   }
+});
+
+test('withdrawal Excel combines grade, subject, date and keyword and preserves reasons and phones', async () => {
+  const exportFile = setup({ students: [
+    { id: 'target', status: 'Nghỉ học', fullName: 'An', className: '8KS4M', quitDate: '2026-10-14', quitReason: 'Học mệt', phone1: '0901234567' },
+    { id: 'other-grade', status: 'Nghỉ học', fullName: 'An', className: '7KS4M', quitDate: '2026-10-14' },
+    { id: 'other-subject', status: 'Nghỉ học', fullName: 'An', className: '8VT2', quitDate: '2026-10-14' },
+    { id: 'old', status: 'Nghỉ học', fullName: 'An', className: '8KS4M', quitDate: '2026-09-14' },
+    { id: 'other-name', status: 'Nghỉ học', fullName: 'Bình', className: '8KS4M', quitDate: '2026-10-14' }
+  ] });
+  const file = await exportFile('/api/quit-students/export', { grade: '8', subject: 'K', q: 'an', dateStart: '2026-10-01', dateEnd: '2026-10-14' });
+  assert.equal(file.rows.length, 1);
+  assert.equal(file.rows[0]['Lớp'], '8KS4M');
+  assert.equal(file.rows[0]['Lý do'], 'Học mệt');
+  assert.equal(file.rows[0]['SĐT'], '0901234567');
 });
