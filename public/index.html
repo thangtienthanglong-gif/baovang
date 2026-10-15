@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <link rel="stylesheet" href="/style.css?v=20261014-tuition-3">
+  <link rel="stylesheet" href="/style.css?v=20261015-class-notices-2">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     /* Inner Tabs for History - INLINED TO PREVENT CACHE */
@@ -235,8 +235,9 @@
                 <p id="rosterMeta">Chọn lớp ở cây bên trái để thao tác nhanh.</p>
               </div>
               <div class="section-actions">
-                <button class="btn primary" id="addStudentBtn" type="button"><i class="fa-solid fa-user-plus"></i> Thêm học sinh</button>
-                <button class="btn primary btn-exam" id="openExamSelectBtn" type="button"><i class="fa-solid fa-star"></i> Nhập điểm thi</button>
+                <button class="btn primary roster-tool-btn" id="openClassNotificationBtn" type="button"><i class="fa-solid fa-bullhorn"></i> Gửi thông báo theo lớp</button>
+                <button class="btn primary roster-tool-btn roster-add-btn" id="addStudentBtn" type="button"><i class="fa-solid fa-user-plus"></i> Thêm học sinh</button>
+                <button class="btn primary btn-exam roster-tool-btn roster-exam-btn" id="openExamSelectBtn" type="button"><i class="fa-solid fa-star"></i> Nhập điểm thi</button>
                 <button class="btn secondary" id="exportExamBtn" type="button" style="background: #e2e8f0; color: #475569; border: none; padding: 6px 12px; border-radius: 4px;"><i class="fa-solid fa-file-excel"></i> Xuất Điểm</button>
               </div>
               
@@ -714,7 +715,7 @@
     <section id="guideTab" class="tab-panel">
       <article class="card app-guide" aria-labelledby="userGuideTitle">
         <div class="section-title guide-header">
-          <div><h2 id="userGuideTitle">Hướng dẫn sử dụng BaoVang</h2><p>Cập nhật ngày 14/10/2026. Dành cho giáo viên, nhân viên trực và quản trị viên; trình bày theo thứ tự menu hiện tại của app.</p></div>
+          <div><h2 id="userGuideTitle">Hướng dẫn sử dụng BaoVang</h2><p>Cập nhật ngày 15/10/2026. Dành cho giáo viên, nhân viên trực và quản trị viên; trình bày theo thứ tự menu hiện tại của app.</p></div>
           <a class="btn ghost" href="/huong-dan-su-dung.md" download="Huong-dan-su-dung-BaoVang.md">Tải hướng dẫn</a>
         </div>
         <nav id="guideContents" class="guide-toc" aria-labelledby="guideContentsTitle">
@@ -782,7 +783,15 @@
 <li>App lưu người xử lý và thời gian; nhãn chuyển sang <strong>Đã xử lý</strong>, ngừng nhấp nháy. Khi có thêm buổi vắng không phép được tính vào cảnh báo, học sinh sẽ cần xử lý lại.</li>
 <li>Vắng có phép và Đã bù không tính vào ngưỡng này. Gửi lại tin nhắn hay gọi nhiều lần không làm tăng số buổi vắng.</li>
 </ul>
-<h4>Gửi thông báo kiểm tra định kì hoặc đăng ký mới</h4>
+<h4>Gửi thông báo theo lớp</h4>
+<ol>
+<li>Trong <strong>Điểm danh</strong>, chọn lớp rồi bấm <strong>Gửi thông báo theo lớp</strong> ở đầu Danh sách học sinh. Có thể đổi lớp ngay trong hộp thoại.</li>
+<li>Chọn <strong>Kiểm tra định kì</strong> hoặc <strong>Đăng ký mới</strong>, kiểm tra <strong>Ngày ghi nhận</strong>. Lịch kiểm tra, nội dung ôn tập hoặc thông tin đăng ký lấy từ mẫu đã lưu; bấm <strong>Mở mẫu Zalo</strong> để chỉnh mẫu.</li>
+<li>App tích sẵn học sinh có thể gửi. Bỏ tích người không cần nhận hoặc dùng <strong>Chọn tất cả</strong>. Học sinh nghỉ học/đã xóa khỏi lớp không nằm trong danh sách; người thiếu số điện thoại hoặc đã gửi cùng nội dung, loại và ngày được bỏ qua.</li>
+<li>Chọn <strong>Xem nội dung của học sinh</strong> để kiểm tra tên và lớp, rồi bấm <strong>Gửi hàng loạt (N)</strong>. Zalo cá nhân dùng luồng extension hiện có. Đóng hộp thoại trước khi gửi không tạo thông báo.</li>
+<li>Xem kết quả tại <strong>Lịch sử liên hệ → Thông báo</strong>; xử lý tin lỗi ở <strong>Hàng xử lý</strong>. Điểm danh được giữ nguyên và lượt đang chờ được dùng lại khi gửi lại cùng nội dung.</li>
+</ol>
+<h4>Gửi thông báo cho từng học sinh</h4>
 <ol>
 <li>Vào <strong>Zalo</strong>, điền <strong>Mẫu thông báo kiểm tra định kì</strong> hoặc <strong>Mẫu thông báo đăng ký mới</strong> rồi <strong>Lưu cấu hình</strong>. Thay các phần [Nhập ...] bằng lịch kiểm tra, nội dung ôn tập hoặc tên khóa học, thời hạn và cách đăng ký thực tế.</li>
 <li>Trong danh sách lớp, ở <strong>Trạng thái</strong> của học sinh, chọn <strong>Kiểm tra định kì</strong> hoặc <strong>Đăng ký mới</strong>.</li>
@@ -1077,6 +1086,32 @@
       </div>
     </div>
   </div>
+  <dialog id="classNotificationDialog" class="withdrawal-reason-dialog class-notification-dialog" aria-labelledby="classNotificationTitle" aria-describedby="classNotificationHelp">
+    <form id="classNotificationForm">
+      <h2 id="classNotificationTitle">Gửi thông báo theo lớp</h2>
+      <p id="classNotificationHelp" class="muted">Chọn lớp và loại thông báo, kiểm tra nội dung rồi tích người nhận. Lịch kiểm tra và thông tin đăng ký lấy từ mẫu đã lưu trong Zalo.</p>
+      <fieldset id="classNotificationFields" aria-label="Thông tin và người nhận thông báo">
+        <div class="class-notification-filters">
+          <div class="field"><label for="classNotificationClass">Lớp nhận thông báo</label><select id="classNotificationClass" required></select></div>
+          <div class="field"><label for="classNotificationType">Loại thông báo</label><select id="classNotificationType" required><option value="">Chọn loại thông báo</option><option>Kiểm tra định kì</option><option>Đăng ký mới</option></select></div>
+          <div class="field"><label for="classNotificationDate">Ngày ghi nhận</label><input id="classNotificationDate" type="date" required></div>
+        </div>
+        <div class="class-notification-tools"><button id="classNotificationTemplates" class="btn ghost btn-sm" type="button">Mở mẫu Zalo</button><button id="classNotificationReload" class="btn ghost btn-sm" type="button">Tải lại danh sách</button></div>
+        <div class="class-notification-content">
+          <section aria-label="Chọn người nhận">
+            <div class="class-notification-selection"><label><input id="classNotificationSelectAll" type="checkbox" disabled> Chọn tất cả</label><span id="classNotificationCount" class="muted"></span></div>
+            <div id="classNotificationRecipients" class="class-notification-recipients"></div>
+          </section>
+          <section aria-label="Xem trước nội dung">
+            <div class="field"><label for="classNotificationPreviewStudent">Xem nội dung của học sinh</label><select id="classNotificationPreviewStudent"></select></div>
+            <div id="classNotificationMessage" class="preview-box class-notification-message"></div>
+          </section>
+        </div>
+      </fieldset>
+      <p id="classNotificationError" class="class-notification-error" role="alert" hidden></p>
+      <div class="withdrawal-reason-actions"><button class="btn secondary" id="classNotificationCancel" type="button">Đóng</button><button class="btn primary" id="classNotificationSend" type="submit" disabled>Gửi hàng loạt (0)</button></div>
+    </form>
+  </dialog>
   <dialog id="tuitionReminderDialog" class="withdrawal-reason-dialog tuition-reminder-dialog" aria-labelledby="tuitionReminderTitle">
     <h2 id="tuitionReminderTitle">Lịch sử nhắc học phí chung các môn</h2>
     <p id="tuitionReminderStudent" class="muted"></p>
@@ -1114,6 +1149,7 @@
   </dialog>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="/tuition-reminders.js?v=20261014-2"></script>
+  <script src="/class-notifications.js?v=20261015-1"></script>
   <script src="/app.js?v=20261014-28"></script>
   <script src="/attendance-alerts.js?v=20261014-2"></script>
   <script src="/exams.js?v=20261009-2"></script>

@@ -2582,3 +2582,45 @@ body.dark-mode .badge.no-answer {
 .tuition-reminder-dialog table { min-width: 540px; }
 .tuition-reminder-dialog td { white-space: normal; }
 body.dark-mode .tuition-reminder-badge { background: #7f1d1d; border-color: #f87171; color: #fecaca; }
+
+.class-notification-dialog { width: min(1000px, calc(100vw - 32px)); max-width: 1000px; }
+.class-notification-dialog fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.class-notification-filters { display: grid; grid-template-columns: 1fr 1fr 170px; gap: 12px; }
+.class-notification-tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 18px; }
+.class-notification-content { display: grid; grid-template-columns: 1fr 1.1fr; gap: 20px; }
+.class-notification-content > section { min-width: 0; }
+.class-notification-selection { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 10px; }
+.class-notification-selection label { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+.class-notification-dialog input[type="checkbox"] { width: 17px; height: 17px; flex-shrink: 0; margin: 0; accent-color: var(--primary); }
+.class-notification-recipients { max-height: 350px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; }
+.class-notification-recipients:empty { border: 0; }
+.class-notice-person { display: flex; align-items: center; gap: 10px; padding: 12px; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 13px; }
+.class-notice-person:last-child { border-bottom: 0; }
+.class-notice-person > span:first-of-type { min-width: 0; flex: 1; }
+.class-notice-person strong, .class-notice-person .muted { display: block; overflow-wrap: anywhere; }
+.class-notice-person .muted, .class-notice-reason { font-size: 12px; }
+.class-notice-person.unavailable { color: var(--muted); cursor: default; }
+.class-notice-reason { color: var(--muted); }
+.class-notification-message { margin-top: 10px; max-height: 310px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+.class-notification-error { color: var(--danger); }
+
+.btn.roster-tool-btn {
+  min-height: 32px;
+  padding: 6px 10px;
+  gap: 6px;
+  border-radius: 7px;
+  font-size: 13px;
+  line-height: 1.25;
+  white-space: nowrap;
+  box-shadow: none;
+}
+.btn.roster-add-btn:not(:disabled) { background: linear-gradient(135deg, #15803d, #166534); }
+.btn.roster-exam-btn:not(:disabled) { background: linear-gradient(135deg, #c2410c, #9a3412); }
+.btn.roster-tool-btn:not(:disabled):hover { transform: translateY(-1px); box-shadow: none; }
+
+@media (max-width: 700px) {
+  .class-notification-dialog { padding: 18px; }
+  .class-notification-filters, .class-notification-content { grid-template-columns: 1fr; }
+  .class-notification-recipients { max-height: 230px; }
+  .class-notification-dialog .withdrawal-reason-actions { flex-wrap: wrap; }
+}

@@ -3897,7 +3897,7 @@ app.get('/api/absences/export-failed-zalo', async (req, res, next) => {
   }
 });
 
-registerStudentNotificationRoutes(app, { getBranchDb, saveBranchDb, buildMessage, sendZaloNotice, id, nowISO });
+registerStudentNotificationRoutes(app, { getBranchDb, saveBranchDb, buildMessage, sendZaloNotice, runBulkZaloAction, id, nowISO });
 
 app.post('/api/absences', async (req, res, next) => {
   try {

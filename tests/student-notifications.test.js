@@ -132,6 +132,111 @@ test('repeated queue choices reuse a notice, while two types on the same day rem
   assert.equal(app.db.contactRequests.length, 2);
 });
 
+function classFixture() {
+  const app = setup();
+  app.db.students.push(
+    { ...app.db.students[0], id: 's2', fullName: 'Nguyễn An <img>', phone1: '', phone2: '0901234567' },
+    { ...app.db.students[0], id: 'outside', className: '9VT4' },
+    { ...app.db.students[0], id: 'withdrawn', status: 'Nghỉ học' },
+    { ...app.db.students[0], id: 'removed', removedFromClass: true },
+    { ...app.db.students[0], id: 'no-phone', phone1: '' });
+  const input = { ...app.input(NOTICE_TYPES[0]), className: '8T3M+' };
+  const preview = (extra = {}) => app.call('get', '/api/class-notifications/preview', { query: { ...input, ...extra } });
+  const send = (recipients, extra = {}) => app.call('post', '/api/class-notifications', { body: { ...input, recipients, ...extra } });
+  return { ...app, classInput: input, classPreview: preview, classSend: send };
+}
+
+test('class preview lists active main-class students with personalized messages and makes no writes', async () => {
+  const app = classFixture(), before = structuredClone(app.db);
+  const result = await app.classPreview();
+  assert.deepEqual(result.recipients.map(row => row.studentId), ['s1', 's2', 'no-phone']);
+  assert.match(result.recipients[1].message, /Nguyễn An <img>/);
+  assert.equal(result.recipients[1].phone, '0901234567');
+  assert.equal(result.recipients[2].selectable, false);
+  assert.equal(result.recipients[2].reason, 'Chưa có SĐT');
+  assert.deepEqual(app.db, before);
+  assert.equal(app.saves(), 0);
+});
+
+for (const type of NOTICE_TYPES) {
+  test(`${type}: class send targets only selected students and uses notification history without changing attendance`, async () => {
+    const app = classFixture(), before = structuredClone(app.db.absences);
+    const preview = await app.classPreview({ type });
+    const selected = preview.recipients.filter(row => row.studentId === 's2');
+    const result = await app.classSend(selected, { type });
+    assert.equal(result.total, 1);
+    assert.equal(result.logs.length, 1);
+    assert.equal(result.logs[0].studentId, 's2');
+    assert.equal(result.logs[0].absenceStatus, type);
+    assert.equal(result.logs[0].message, selected[0].message);
+    assert.equal(result.logs[0].responsePayload.phone, '0901234567');
+    assert.equal(result.logs[0].status, 'Chờ gửi thủ công');
+    assert.equal(app.db.contactRequests.length, 1);
+    assert.equal(app.saves(), 1);
+    assert.deepEqual(app.db.absences, before);
+    assert.equal(app.context.filterNotificationLogs(app.db, { notificationType: 'general', dateBasis: 'time', date: '2026-10-14' }).length, 1);
+    assert.equal(app.context.filterNotificationLogs(app.db, { excludeGeneralNotifications: true }).length, 0);
+  });
+}
+
+test('repeated class submissions reuse pending requests and their exact log IDs', async () => {
+  const app = classFixture(), preview = await app.classPreview();
+  const selected = preview.recipients.filter(row => row.selectable);
+  const first = await app.classSend(selected);
+  const second = await app.classSend(selected);
+  assert.deepEqual(second.logs.map(row => row.id), first.logs.map(row => row.id));
+  assert.equal(app.db.contactRequests.length, 2);
+  assert.equal(app.db.notificationLogs.length, 2);
+  assert.equal(second.summary.manual, 2);
+  assert.equal(second.processed, 2);
+});
+
+test('already successful or dry-run class notices are skipped even if submitted from an old preview', async () => {
+  for (const status of ['Đã gửi', 'Chạy thử']) {
+    const app = classFixture(), preview = await app.classPreview();
+    const selected = preview.recipients.filter(row => row.studentId === 's1');
+    await app.classSend(selected);
+    app.db.contactRequests[0].noticeStatus = status;
+    app.db.notificationLogs[0].status = status;
+    const second = await app.classSend(selected);
+    assert.equal(second.processed, 0);
+    assert.equal(second.skipped, 1);
+    assert.equal(app.db.notificationLogs.length, 1);
+    assert.equal((await app.classPreview()).recipients[0].selectable, false);
+  }
+});
+
+test('duplicate student IDs within a class submission send a single personalized notice', async () => {
+  const app = classFixture(), preview = await app.classPreview();
+  const row = preview.recipients[0];
+  const result = await app.classSend([row, row]);
+  assert.equal(result.total, 1);
+  assert.equal(app.db.notificationLogs.length, 1);
+});
+
+test('all class recipients and reviewed fields are checked before any mutation or send', async () => {
+  for (const variant of ['outside', 'withdrawn', 'removed', 'no-phone', 'missing', 'message', 'phone', 'empty', 'invalid-shape', 'branch', 'template', 'date', 'type', 'class']) {
+    const app = classFixture(), preview = await app.classPreview();
+    let recipients = [preview.recipients[0], { ...preview.recipients[1] }];
+    const extra = {};
+    if (['outside', 'withdrawn', 'removed', 'no-phone', 'missing'].includes(variant)) recipients[1].studentId = variant;
+    if (variant === 'message') recipients[1].message = 'Unreviewed text';
+    if (variant === 'phone') app.db.students[1].phone2 = '0909999999';
+    if (variant === 'empty') recipients = [];
+    if (variant === 'invalid-shape') recipients = 's1';
+    if (variant === 'template') app.db.settings.examNoticeTemplate = 'Lịch mới cho {studentName}';
+    if (variant === 'date') extra.date = '2026-02-30';
+    if (variant === 'type') extra.type = 'Học phí';
+    if (variant === 'class') extra.className = 'ALL';
+    const before = structuredClone(app.db);
+    await assert.rejects(variant === 'branch'
+      ? app.call('post', '/api/class-notifications', { branch: 'other', body: { ...app.classInput, recipients } })
+      : app.classSend(recipients, extra), error => [400, 404, 409].includes(error.status), variant);
+    assert.deepEqual(app.db, before, variant);
+    assert.equal(app.saves(), 0, variant);
+  }
+});
+
 test('a changed template requires another review before creating or sending anything', async () => {
   const app = setup();
   const preview = await app.preview(NOTICE_TYPES[0]);

@@ -1,6 +1,6 @@
 # Hướng dẫn sử dụng BaoVang
 
-Cập nhật ngày 14/10/2026. Dành cho giáo viên, nhân viên trực và quản trị viên; trình bày theo thứ tự menu hiện tại của app.
+Cập nhật ngày 15/10/2026. Dành cho giáo viên, nhân viên trực và quản trị viên; trình bày theo thứ tự menu hiện tại của app.
 
 ## 1. Bắt đầu và quy trình hằng ngày
 
@@ -58,7 +58,15 @@ Khi chọn **Nghỉ học**, nhập lý do cụ thể vào hộp thoại rồi l
 - Trong **Hàng xử lý**, trường hợp đã được nhắc trong 7 ngày được **bỏ tích mặc định** và không tự gửi lại. Nhân viên vẫn có thể tích lại để nhắc tiếp. Mỗi lượt gửi hàng loạt chỉ lấy một bản ghi học phí của cùng học sinh giữa các lớp.
 - Khi nhãn hết hạn, lịch sử gửi và gọi vẫn được giữ ở **Lịch sử học phí** và **Gọi học phí**. Việc ẩn nhãn chỉ đánh dấu hết thời gian tránh nhắc trùng, không xác nhận học sinh đã đóng học phí.
 
-### Gửi thông báo kiểm tra định kì hoặc đăng ký mới
+### Gửi thông báo theo lớp
+
+1. Trong **Điểm danh**, chọn lớp rồi bấm **Gửi thông báo theo lớp** ở đầu Danh sách học sinh. Có thể đổi sang lớp khác ngay trong hộp thoại.
+2. Chọn **Kiểm tra định kì** hoặc **Đăng ký mới** và kiểm tra **Ngày ghi nhận**. Lịch kiểm tra, nội dung ôn tập hoặc thông tin đăng ký dùng mẫu đã lưu trong **Zalo**; nút **Mở mẫu Zalo** đưa đến nơi chỉnh mẫu.
+3. App tích sẵn học sinh có thể gửi. Bỏ tích người không cần nhận, hoặc dùng **Chọn tất cả**. Học sinh nghỉ học/đã xóa khỏi lớp không nằm trong danh sách; người thiếu số điện thoại hoặc đã gửi cùng nội dung, loại và ngày được bỏ qua.
+4. Dùng **Xem nội dung của học sinh** để kiểm tra tin đã điền đúng tên và lớp, rồi bấm **Gửi hàng loạt (N)**. Với Zalo cá nhân, app dùng luồng extension gửi hàng loạt hiện có. Đóng hộp thoại trước khi gửi không tạo thông báo.
+5. Xem kết quả trong **Lịch sử liên hệ → Thông báo**. Tin gửi lỗi có thể xử lý tiếp ở **Hàng xử lý**. Luồng này giữ nguyên điểm danh của học sinh và dùng lại lượt đang chờ gửi khi gửi lại cùng nội dung.
+
+### Gửi thông báo cho từng học sinh
 
 1. Vào **Zalo**, điền **Mẫu thông báo kiểm tra định kì** hoặc **Mẫu thông báo đăng ký mới** rồi **Lưu cấu hình**. Thay các phần `[Nhập ...]` bằng lịch kiểm tra, nội dung ôn tập hoặc tên khóa học, thời hạn và cách đăng ký thực tế.
 2. Trong danh sách lớp, ở **Trạng thái** của học sinh, chọn **Kiểm tra định kì** hoặc **Đăng ký mới**.
