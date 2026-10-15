@@ -35,8 +35,6 @@ Cập nhật ngày 15/10/2026. Dành cho giáo viên, nhân viên trực và qu�
 | Đã bù | Học sinh đã học bù trước buổi học chính; không tạo yêu cầu báo vắng cho buổi đó. |
 | Nghỉ học | Học sinh ngừng theo học. App yêu cầu nhập lý do và lưu vào lịch sử học sinh nghỉ học. |
 | Trễ học phí | Ghi nhận trường hợp cần nhắc học phí. Kiểm tra liên hệ ở Lịch sử học phí. |
-| Kiểm tra định kì | Tự đưa thông báo vào Hàng xử lý, không mở hộp thoại và không gửi ngay. Giữ nguyên trạng thái điểm danh. |
-| Đăng ký mới | Mở bản xem trước thông báo, chọn gửi ngay hoặc thêm vào hàng xử lý. Giữ nguyên trạng thái điểm danh. |
 | Xóa khỏi danh sách lớp | Loại học sinh khỏi lớp đang chọn; có thông tin tại Đã xóa khỏi lớp. |
 
 **Vắng một buổi** dùng Vắng có phép hoặc Vắng không phép. **Nghỉ học** dùng khi học sinh ngừng theo học, không dùng thay cho báo vắng một buổi.
@@ -66,15 +64,7 @@ Khi chọn **Nghỉ học**, nhập lý do cụ thể vào hộp thoại rồi l
 4. Dùng **Xem nội dung của học sinh** để kiểm tra tin đã điền đúng tên và lớp, rồi bấm **Gửi hàng loạt (N)**. Với Zalo cá nhân, app dùng luồng extension gửi hàng loạt hiện có. Đóng hộp thoại trước khi gửi không tạo thông báo.
 5. Xem kết quả trong **Lịch sử liên hệ → Thông báo**. Tin gửi lỗi có thể xử lý tiếp ở **Hàng xử lý**. Luồng này giữ nguyên điểm danh của học sinh và dùng lại lượt đang chờ gửi khi gửi lại cùng nội dung.
 
-### Gửi thông báo cho từng học sinh
-
-1. Vào **Zalo**, điền **Mẫu thông báo kiểm tra định kì** hoặc **Mẫu thông báo đăng ký mới** rồi **Lưu cấu hình**. Thay các phần `[Nhập ...]` bằng lịch kiểm tra, nội dung ôn tập hoặc tên khóa học, thời hạn và cách đăng ký thực tế.
-2. Trong danh sách lớp, ở **Trạng thái** của học sinh, chọn **Kiểm tra định kì** hoặc **Đăng ký mới**.
-3. Với **Kiểm tra định kì**, app tự thêm thông báo vào **Hàng xử lý**, không mở hộp thoại và chưa gửi Zalo. Với **Đăng ký mới**, kiểm tra người nhận và nội dung trong hộp thoại; chọn **Gửi ngay** hoặc **Thêm vào hàng xử lý**. **Hủy** không tạo thông báo đăng ký.
-4. Để gửi hàng loạt, mở Hàng xử lý, chọn đúng Ngày/Buổi, lọc **Nội dung liên hệ** theo loại thông báo, tích người nhận rồi bấm **Gửi Zalo hàng loạt**.
-5. Xem kết quả tại **Lịch sử liên hệ → Thông báo**. Ngày lọc của lịch sử thông báo là ngày ghi nhận lượt gửi; có thể xuất Excel theo khoảng ngày.
-
-Thông báo được lưu riêng, giữ nguyên buổi vắng hoặc trạng thái đang học. Nội dung đã duyệt được giữ trong hàng xử lý; sửa mẫu sau đó không thay nội dung của thông báo đã xếp. Chọn lại cùng loại, cùng nội dung và ngày sẽ dùng lại thông báo đã tạo.
+Kiểm tra định kì và đăng ký mới được tạo từ **Gửi thông báo theo lớp**, không còn là trạng thái điểm danh. Nếu chỉ gửi cho một số học sinh, bỏ chọn những em không nhận thông báo trong danh sách người nhận. Nội dung thông báo được lưu riêng, giữ nguyên điểm danh; gửi lại cùng loại, nội dung và ngày sẽ dùng lại lượt đã tạo.
 
 ### Hồ sơ, quản lý lớp và điểm thi
 

@@ -1260,9 +1260,10 @@ function renderRosterStudent(student) {
   ];
   if (!student.isMakeupAttendance) {
     statusOptions.splice(3, 0, ['Đã bù', 'Đã bù']);
-    statusOptions.push(['Nghỉ học', 'Nghỉ học'], ['Học phí', 'Trễ học phí'], ['Kiểm tra định kì', 'Kiểm tra định kì'], ['Đăng ký mới', 'Đăng ký mới'], ['REMOVE_FROM_CLASS', 'Xóa khỏi danh sách lớp']);
+    statusOptions.push(['Nghỉ học', 'Nghỉ học'], ['Học phí', 'Trễ học phí'], ['REMOVE_FROM_CLASS', 'Xóa khỏi danh sách lớp']);
   }
-  if (!statusOptions.some(([value]) => value === currentStatus)) {
+  if (!['Kiểm tra định kì', 'Đăng ký mới'].includes(currentStatus)
+      && !statusOptions.some(([value]) => value === currentStatus)) {
     statusOptions.push([currentStatus, currentStatus]);
   }
 
@@ -1289,7 +1290,7 @@ function renderRosterStudent(student) {
       <div class="student-status-control">
         <label for="status-${escapeHtml(student.id)}-${escapeHtml(student.className)}">Trạng thái</label>
         <select id="status-${escapeHtml(student.id)}-${escapeHtml(student.className)}" class="roster-status-select" data-student-id="${escapeHtml(student.id)}" data-attendance-class="${escapeHtml(student.className)}" data-absence-id="${escapeHtml(absence?.id || '')}" title="${isLocked ? 'Học sinh bị kẹt lịch. Chọn Đã bù nếu đã học bù trước buổi này.' : ''}">
-          ${statusOptions.map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === currentStatus ? 'selected' : ''} ${isLocked && !['Kiểm tra định kì', 'Đăng ký mới'].includes(value) && value !== currentStatus && value !== 'Đã bù' && !(currentStatus === 'Đã bù' && value === 'Đang học') ? 'disabled' : ''}>${escapeHtml(label)}</option>`).join('')}
+          ${statusOptions.map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === currentStatus ? 'selected' : ''} ${isLocked && value !== currentStatus && value !== 'Đã bù' && !(currentStatus === 'Đã bù' && value === 'Đang học') ? 'disabled' : ''}>${escapeHtml(label)}</option>`).join('')}
         </select>
       </div>
     </article>

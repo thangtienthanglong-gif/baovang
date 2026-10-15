@@ -46,7 +46,9 @@ function showZaloStatus(message, isError = false) {
     });
     document.body.appendChild(banner);
   }
-  banner.textContent = message;
+  let version = '';
+  try { version = chrome.runtime.getManifest?.().version || ''; } catch (_) {}
+  banner.textContent = version ? message.replace(/^BaoVang:/, `BaoVang v${version}:`) : message;
   banner.style.background = isError ? '#fff1f2' : '#eff6ff';
   banner.style.color = isError ? '#9f1239' : '#1e3a8a';
   banner.style.border = isError ? '1px solid #fda4af' : '1px solid #93c5fd';
@@ -339,23 +341,89 @@ function matchingMessageCount(message, requireLines = true) {
   return matches.filter(el => !matches.some(child => child !== el && el.contains(child))).length;
 }
 
+function searchResultRow(el) {
+  const known = el?.closest?.('[role="option"], [data-type="contact"], .conv-item, .contact-item, .search-result-item, .search-item');
+  if (known) return known;
+  const searchRect = findSearchBox()?.getBoundingClientRect?.();
+  if (!searchRect || !el?.getBoundingClientRect) return el;
+  // Highlighted search names can sit in rows whose CSS class names change.
+  // Use the first sidebar row containing an avatar, rather than a whole list.
+  for (let node = el, depth = 0; node && depth < 5; node = node.parentElement, depth++) {
+    const rect = node.getBoundingClientRect();
+    if (rect.left >= searchRect.right || rect.top < searchRect.bottom) break;
+    if (rect.height >= 36 && rect.height <= 150 && rect.width >= searchRect.width * 0.7
+        && rect.right <= searchRect.right + Math.max(160, searchRect.width * 0.6)
+        && node.querySelector?.('img, [class*="avatar"], [class*="Avatar"]')) return node;
+  }
+  return el;
+}
+
 function searchResultCandidates() {
-  return [...new Set(allVisible([
+  const ordinary = allVisible([
     '[role="option"]',
     '[role="listbox"] li',
     '[class*="search"] [class*="item"]',
     '[class*="search"] [role="button"]',
     '[class*="search"] li',
+    '[class*="Search"] [class*="item"]',
+    '[class*="search"] [class*="name"]',
     '[class*="friend"]',
     '[class*="contact"]',
     '[class*="user-item"]'
-  ]))].filter(el => textOf(el).length > 0);
+  ]);
+  const search = findSearchBox();
+  const query = search && searchText(search);
+  const searchRect = search?.getBoundingClientRect?.();
+  const sections = searchRect && query && !/^\+?\d[\d\s.-]*$/.test(query) ? searchSectionHeadings() : [];
+  const fallback = sections.length ? allVisible(['[title]', '[data-name]', '[class*="name"]', '[class*="Name"]', 'span', 'mark'])
+    .filter(el => {
+      const rect = el.getBoundingClientRect();
+      const section = sections.find(heading => heading.bottom <= rect.top + 2);
+      if (!section || section.kind !== 'contact' || rect.left >= searchRect.right || rect.top < searchRect.bottom) return false;
+      return [textOf(el), el.getAttribute('title'), el.getAttribute('data-name')]
+        .some(label => comparableContactName(label).includes(comparableContactName(query)));
+    }) : [];
+  return [...new Set([...ordinary, ...fallback].map(searchResultRow))].filter(el => textOf(el).length > 0);
+}
+
+function searchSectionHeadings() {
+  const searchRect = findSearchBox()?.getBoundingClientRect?.();
+  if (!searchRect) return [];
+  return allVisible(['div', 'span', 'h2', 'h3', 'h4', '[role="heading"]']).flatMap(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.left >= searchRect.right || rect.top < searchRect.bottom
+        || rect.height > Math.max(64, searchRect.height * 2)) return [];
+    const label = textOf(el);
+    const heading = label.match(/^(liên hệ|bạn bè|contacts?|tin nhắn|messages?|file|files|nhóm(?: chat)?|groups?)(?:\s*\(\d+\))?$/iu);
+    // Search tabs also say "Liên hệ" and "Tin nhắn"; only section captions count.
+    if (!heading || (!/\(\d+\)/.test(label) && !el.matches('h2, h3, h4, [role="heading"]'))) return [];
+    const kind = /^(liên hệ|bạn bè|contacts?)$/iu.test(heading[1]) ? 'contact' : 'other';
+    return [{ bottom: rect.bottom, kind }];
+  }).sort((a, b) => b.bottom - a.bottom);
+}
+
+function isContactSearchResult(el, sections) {
+  if (['message', 'file', 'group'].includes(String(el.getAttribute?.('data-type') || '').toLowerCase())) return false;
+  if (el.closest?.('[data-type="message"], [data-type="file"], [data-type="group"], [class*="search-message"], [class*="message-search"], [class*="search-file"], [class*="file-search"], [class*="group-item"], [class*="group-chat"]')) return false;
+  const rect = el.getBoundingClientRect?.();
+  const section = rect && sections.find(heading => heading.bottom <= rect.top + 2);
+  return !section || section.kind === 'contact';
+}
+
+function inActiveSearchResults(el, sections) {
+  if (el.matches?.('[role="option"]') || el.closest?.('[role="listbox"], [class*="search"], [class*="Search"]')) return true;
+  const searchRect = findSearchBox()?.getBoundingClientRect?.();
+  const rect = el.getBoundingClientRect?.();
+  const section = rect && sections.find(heading => heading.bottom <= rect.top + 2);
+  return Boolean(searchRect && rect && rect.left < searchRect.right && rect.top >= searchRect.bottom && section?.kind === 'contact');
 }
 
 function findSearchResult(phone, previousResults) {
   const normalizedPhone = phoneForSearch(phone);
+  const sections = searchSectionHeadings();
   const candidates = searchResultCandidates().filter(el =>
-    !/không tìm thấy|không có kết quả|chưa đăng ký tài khoản|không cho phép tìm kiếm|no results|tìm tất cả/i.test(textOf(el)));
+    isContactSearchResult(el, sections)
+    && !/không tìm thấy|không có kết quả|chưa đăng ký tài khoản|không cho phép tìm kiếm|no results|tìm tất cả/i.test(textOf(el)));
   const exact = candidates.filter(el => {
     const digits = textOf(el).replace(/\D/g, '');
     return normalizedPhone && digits.includes(normalizedPhone.slice(-8));
@@ -365,7 +433,7 @@ function findSearchResult(phone, previousResults) {
   // Search results may show only the account name. Accept a single newly
   // rendered result, never an unchanged chat from the left-hand history.
   const fresh = candidates.filter(el => previousResults.get(el) !== textOf(el))
-    .filter(el => el.matches?.('[role="option"]') || el.closest?.('[role="listbox"], [class*="search"], [class*="Search"]'));
+    .filter(el => inActiveSearchResults(el, sections));
   const leaves = fresh.filter(el => !fresh.some(other => other !== el && el.contains(other)));
   return leaves.length === 1 ? leaves[0] : null;
 }
@@ -377,10 +445,67 @@ function skippedError(message) {
 }
 
 const studentSearchName = value => String(value || '').normalize('NFC')
+  .replace(/[\u200b-\u200d\ufeff]/g, '')
   .replace(/\s+/g, ' ').trim();
 const comparableContactName = value => studentSearchName(value).normalize('NFD')
   .replace(/\p{M}/gu, '').replace(/[đĐ]/g, 'd').toLocaleLowerCase('vi')
   .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+const contactClassKey = value => studentSearchName(value).toLocaleUpperCase('vi');
+const isContactClassCode = value => /^\d{1,2}[a-z][a-z0-9]*\+?$/i.test(value);
+
+function studentContactLabel(value, item) {
+  const lines = String(value || '').normalize('NFC').split(/\r?\n/).map(studentSearchName).filter(Boolean);
+  let firstLine = lines[0] || '';
+  if (isContactClassCode(firstLine) && lines[1]) firstLine += ` ${lines[1]}`;
+  let [main, ...details] = firstLine.split(/\s*[,|·]\s*/u);
+  const expectedClass = studentSearchName(item.className);
+  if (expectedClass && contactClassKey(main).startsWith(contactClassKey(expectedClass))) {
+    const remainder = main.slice(expectedClass.length).trim();
+    if (/^\p{L}/u.test(remainder)
+        && comparableContactName(remainder) === comparableContactName(item.studentName)) main = `${expectedClass} ${remainder}`;
+  }
+  const words = main.split(/\s+/);
+  const classes = [];
+  if (isContactClassCode(words[0])) classes.push(words.shift());
+  if (isContactClassCode(words[words.length - 1])) classes.push(words.pop());
+  for (const detail of details) {
+    const code = detail.replace(/^Lớp\s*:?\s*/iu, '');
+    if (isContactClassCode(code)) classes.push(code);
+  }
+  const classConflict = classes.some(code => !item.className || contactClassKey(code) !== contactClassKey(item.className));
+  // Keep student markers meaningful even if a contact puts one after a comma.
+  const extraMarker = details.some(detail => /^\(\s*[a-z0-9]{1,3}\s*\)$/iu.test(detail));
+  return {
+    matches: !classConflict && !extraMarker
+      && comparableContactName(words.join(' ')) === comparableContactName(item.studentName),
+    classMatched: classes.length > 0 && !classConflict,
+    classConflict
+  };
+}
+
+function contactTitleInfo(el, item) {
+  const visible = textOf(el);
+  const primary = studentContactLabel(visible, item);
+  if (primary.matches || primary.classConflict) return primary;
+  const nameElement = el.querySelector?.('[class*="name"], [class*="Name"], [data-name]');
+  const firstLine = visible.split(/\r?\n/)[0];
+  // A highlight containing the queried name is not proof that a longer name
+  // (e.g. "Lâm Thanh Trúc Anh") is the same student.
+  if (!/\.{3}|…/u.test(firstLine) && comparableContactName(firstLine).includes(comparableContactName(item.studentName))) return primary;
+  const fields = [...new Set([el, nameElement, ...Array.from(el.querySelectorAll?.('[title], [data-name]') || [])].filter(Boolean))];
+  for (const field of fields) {
+    const shortened = /\.{3}|…/u.test(textOf(field)) || /\.{3}|…/u.test(firstLine) || !visible;
+    const labels = field === nameElement ? [textOf(field), String(field.textContent || '')] : [];
+    if (shortened) labels.push(field.getAttribute?.('title'), field.getAttribute?.('data-name'));
+    for (const label of labels.filter(Boolean)) {
+      const info = studentContactLabel(String(label).replace(/\r?\n/g, ' '), item);
+      if (info.classConflict) return info;
+      if (info.matches) return info;
+    }
+  }
+  return primary;
+}
 
 function phoneSearchUnavailable() {
   return allVisible(['div', 'span', 'p', '[role="status"]']).some(el => {
@@ -391,7 +516,7 @@ function phoneSearchUnavailable() {
 }
 
 function contactResultPhones(el) {
-  return [el.getAttribute?.('data-phone'), ...textOf(el).split(/\r?\n/)]
+  return [el.getAttribute?.('data-phone'), ...textOf(el).split(/\r?\n|[,|·]/u)]
     .filter(Boolean).map(line => String(line).replace(/^(?:SĐT|Điện thoại|Phone)\s*:\s*/i, '').trim())
     .filter(line => /^\+?\d[\d .()-]{8,}\d$/.test(line)).map(phoneForSearch);
 }
@@ -401,20 +526,20 @@ function nameSearchCandidates(item, previousResults) {
   if (!name) return [];
   const className = comparableContactName(item.className);
   const phone = phoneForSearch(item.phone);
+  const sections = searchSectionHeadings();
   const candidates = searchResultCandidates().filter(el => {
     const text = textOf(el);
-    if (/không tìm thấy|không có kết quả|chưa đăng ký tài khoản|không cho phép tìm kiếm|no results|tìm tất cả/i.test(text)
+    if (!isContactSearchResult(el, sections)
+        || /không tìm thấy|không có kết quả|chưa đăng ký tài khoản|không cho phép tìm kiếm|no results|tìm tất cả/i.test(text)
         || previousResults.get(el) === text) return false;
-    if (!el.matches?.('[role="option"]') && !el.closest?.('[role="listbox"], [class*="search"], [class*="Search"]')) return false;
+    if (!inActiveSearchResults(el, sections)) return false;
     if (String(el.getAttribute?.('data-type') || '').toLowerCase() === 'group'
         || el.matches?.('[class*="group-item"], [class*="group-chat"]')
         || el.querySelector?.('[class*="group-avatar"], [class*="group-icon"]')
         || /\d+\s+(?:thành viên|members)/i.test(text)) return false;
-    const nameElement = el.querySelector?.('[class*="name"], [class*="Name"], [data-name]');
-    const title = comparableContactName(textOf(nameElement || el).split(/\r?\n/)[0]);
-    if (title !== name && (!className || title !== `${name} ${className}`)) return false;
+    if (!contactTitleInfo(el, item).matches) return false;
     const listedClass = text.split(/\r?\n/).slice(1).map(line => line.match(/^Lớp\s*:?\s*(.+)$/i)).find(Boolean);
-    if (className && listedClass && comparableContactName(listedClass[1]) !== className) return false;
+    if (className && listedClass && contactClassKey(listedClass[1]) !== contactClassKey(item.className)) return false;
     const phoneLines = contactResultPhones(el);
     return !phoneLines.length || phoneLines.includes(phone);
   });
@@ -422,8 +547,8 @@ function nameSearchCandidates(item, previousResults) {
   const phoneMatches = matches.filter(el => contactResultPhones(el).includes(phone));
   if (phoneMatches.length) matches = phoneMatches;
   if (matches.length > 1 && className) {
-    const classMatches = matches.filter(el => comparableContactName(textOf(el).split(/\r?\n/)[0]) === `${name} ${className}`
-      || textOf(el).split(/\r?\n/).slice(1).some(line => comparableContactName(line.replace(/^Lớp\s*:?\s*/i, '')) === className));
+    const classMatches = matches.filter(el => contactTitleInfo(el, item).classMatched
+      || textOf(el).split(/\r?\n/).slice(1).some(line => contactClassKey(line.replace(/^Lớp\s*:?\s*/i, '')) === contactClassKey(item.className)));
     if (classMatches.length) return classMatches;
   }
   return matches;
@@ -445,27 +570,50 @@ async function findStudentByName(item) {
     return matches.length === 1 ? { result: matches[0] } : matches.length > 1 ? { ambiguous: true } : null;
   }, 7000);
   if (outcome?.ambiguous) throw skippedError(`Có nhiều kết quả trùng tên ${query}; cần chọn người nhận thủ công, chưa gửi tin.`);
-  if (!outcome?.result) throw skippedError(`Không tìm thấy liên hệ khớp tên ${query} cho số ${item.phone}; chưa gửi tin.`);
+  if (!outcome?.result) throw skippedError(`Không tìm thấy liên hệ khớp tên ${query}${item.className ? `, lớp ${item.className}` : ''} cho số ${item.phone}; chưa gửi tin.`);
   return outcome.result;
 }
 
 function conversationMatchesStudent(item, composer) {
-  const name = comparableContactName(item.studentName);
-  const className = comparableContactName(item.className);
   const rect = composer.getBoundingClientRect();
-  const root = composer.closest?.('#chatView, #conversation, [class*="chat-panel"], [class*="conversation-view"]');
-  return allVisible([
+  const searchRect = findSearchBox()?.getBoundingClientRect?.();
+  const leftEdge = Math.max(searchRect?.right || 0, rect.left - 80);
+  const topEdge = Math.max(0, (searchRect?.top || 0) - 60);
+  const bottomEdge = Math.max(260, (searchRect?.bottom || 0) + 120);
+  const inHeaderArea = el => {
+    const bounds = el.getBoundingClientRect();
+    return bounds.left >= leftEdge && bounds.top >= topEdge && bounds.top <= bottomEdge
+      && (bounds.bottom == null || bounds.bottom <= bottomEdge);
+  };
+  const named = allVisible([
     '[class*="header"] [class*="name"]', '[class*="header"] [class*="title"]',
     '[class*="Header"] [class*="Name"]', '[class*="chat-info"] [class*="name"]',
-    '.title-container', '[data-testid="conversation-title"]'
-  ]).some(el => {
-    if (root && !root.contains(el)) return false;
-    const header = el.getBoundingClientRect();
-    if (header.left < rect.left - 48 || header.top > Math.min(260, window.innerHeight * 0.3)) return false;
+    '.title-container', '[data-testid="conversation-title"]',
+    '[class*="header-name"]', '[class*="header-title"]',
+    '[class*="conversation-name"]', '[class*="conversation-title"]'
+  ]);
+  if (named.some(el => {
+    if (!inHeaderArea(el)) return false;
     const text = textOf(el);
     if (/\d+\s+(?:thành viên|members)/i.test(text)) return false;
-    const title = comparableContactName(text.split(/\r?\n/)[0]);
-    return title === name || Boolean(className && title === `${name} ${className}`);
+    return contactTitleInfo(el, item).matches;
+  })) return true;
+
+  // Some Zalo layouts give the chat title no predictable class. Only inspect
+  // a short title next to an avatar in the top strip of the chat pane.
+  return allVisible(['div, span, h1, h2, h3, strong, [title]']).some(el => {
+    if (!inHeaderArea(el) || el.isContentEditable
+        || el.closest?.('#baovang-zalo-status, [class*="message"], [class*="bubble"], [role="listitem"]')) return false;
+    const label = textOf(el);
+    if (!label || label.length > 150 || /\d+\s+(?:thành viên|members)/i.test(label)) return false;
+    const info = contactTitleInfo(el, item);
+    if (!info.matches || (item.className && !info.classMatched)) return false;
+    for (let row = el, depth = 0; row && depth < 4; row = row.parentElement, depth++) {
+      const bounds = row.getBoundingClientRect?.();
+      if (!bounds || bounds.height > 140 || !inHeaderArea(row)) break;
+      if (row.querySelector?.('img, [class*="avatar"], [class*="Avatar"]')) return true;
+    }
+    return false;
   });
 }
 
@@ -482,7 +630,7 @@ async function openConversation(item, search) {
     ? { unavailable: true } : findSearchResult(item.phone, previousResults), 7000);
   const result = outcome?.unavailable ? await findStudentByName(item) : outcome;
   if (!result) throw skippedError(`Không tìm thấy kết quả tìm kiếm rõ ràng cho số ${item.phone}; chưa gửi tin.`);
-  clickLike(result);
+  clickLike(searchResultRow(result));
   // The previous chat's composer may still be mounted while Zalo switches chats.
   await wait(1200);
   let composer = await waitFor(findComposer, 3500);

@@ -19,6 +19,7 @@ function candidate(text, attributes = {}) {
     innerText: text, textContent: text,
     matches: selector => selector === '[role="option"]',
     contains: () => false, focus() {}, dispatchEvent() {}, offsetWidth: 1, offsetHeight: 1,
+    getBoundingClientRect: () => ({ left: 100, right: 420, top: 280, bottom: 340, width: 320, height: 60 }),
     getClientRects: () => [{}], getAttribute: key => attributes[key] || null,
     click() { this.clicked = true; }
   };
@@ -27,7 +28,8 @@ function candidate(text, attributes = {}) {
 function searchHarness({ editable = false, remount = false, pasteAllowed = true,
   pastedPhone, resetAllowed = true, clipboardAllowed = true,
   phoneUnavailable = false, phoneResults, nameResults = [], pastedName, namePasteAllowed = true,
-  staleHeader = false, openedHeader } = {}) {
+  staleHeader = false, openedHeader, sections = [], searchBounds = false,
+  genericHeader = false, headerAvatar = true, headerLeft = 500 } = {}) {
   const commands = [];
   const clipboardWrites = [];
   const queries = [];
@@ -41,14 +43,25 @@ function searchHarness({ editable = false, remount = false, pasteAllowed = true,
   }
   const header = candidate('');
   Object.defineProperty(header, 'innerText', { get: () => activeName });
-  header.getBoundingClientRect = () => ({ left: 500, top: 60 });
+  header.getBoundingClientRect = () => ({ left: headerLeft, right: headerLeft + 300, top: 60, bottom: 92, width: 300, height: 32 });
+  if (genericHeader) {
+    header.parentElement = {
+      getBoundingClientRect: () => ({ left: 440, right: 820, top: 45, bottom: 112, width: 380, height: 67 }),
+      querySelector: () => headerAvatar ? {} : null,
+      parentElement: null
+    };
+  }
   let results = [];
   let clipboard;
   let current;
   let clock = 0;
   const document = {
-    querySelectorAll: selector => /header|Header|title-container|conversation-title|chat-info/.test(selector)
-      ? [header] : phoneUnavailable && /^\d+$/.test(current.draft) ? [unavailable] : [],
+    querySelectorAll: selector => {
+      if (/header|Header|title-container|conversation-title|conversation-name|chat-info/.test(selector)) return genericHeader ? [] : [header];
+      if (selector === 'div, span, h1, h2, h3, strong, [title]') return genericHeader ? [header] : [];
+      const unavailableRows = phoneUnavailable && /^\d+$/.test(current.draft) ? [unavailable] : [];
+      return [...unavailableRows, ...sections];
+    },
     createRange: () => ({ selectNodeContents() {} }),
     execCommand(command) {
       commands.push(command);
@@ -77,7 +90,8 @@ function searchHarness({ editable = false, remount = false, pasteAllowed = true,
       get textContent() { return this.draft; },
       focus() { document.activeElement = this; },
       select() {},
-      getAttribute: () => editable ? 'true' : null
+      getAttribute: () => editable ? 'true' : null,
+      ...(searchBounds ? { getBoundingClientRect: () => ({ left: 70, right: 390, top: 30, bottom: 66, width: 320, height: 36 }) } : {})
     };
   }
   current = field('0906905915');
@@ -181,6 +195,166 @@ test('name search preserves parenthesized markers and normalizes whitespace only
   await app.api.openConversation({ phone: '0909630582', studentName: '  Nguyễn Đặng  Thiên (A) Kim  '.normalize('NFD') }, app.original);
   assert.deepEqual(app.clipboardWrites, ['0909630582', 'Nguyễn Đặng Thiên (A) Kim']);
   assert.equal(contact.clicked, true);
+});
+
+test('class-prefixed saved contacts with a school suffix open the matching conversation', async () => {
+  const contact = candidate('9T46A Trần Ngọc Uyên Thy, VVT');
+  const app = searchHarness({ phoneUnavailable: true, nameResults: [contact] });
+  await app.api.openConversation({ phone: '0901234567', studentName: 'Trần Ngọc Uyên Thy', className: '9T46A' }, app.original);
+  assert.equal(contact.clicked, true);
+});
+
+test('the two Lam Thanh Truc contacts select the requested class despite parentheses in the school name', async () => {
+  const correct = candidate('9T26A Lâm Thanh Trúc, NTT(P)');
+  const other = candidate('9T26D Lâm Thanh Trúc');
+  const app = searchHarness({ phoneUnavailable: true, nameResults: [correct, other] });
+  await app.api.openConversation({ phone: '0942752299', studentName: 'Lâm Thanh Trúc', className: '9T26A' }, app.original);
+  assert.equal(correct.clicked, true);
+  assert.equal(other.clicked, undefined);
+});
+
+test('a Zalo chat title beside the avatar is verified even without header CSS classes', async () => {
+  const correct = candidate('9T26A Lâm Thanh Trúc, NTT(P)');
+  const other = candidate('9T26D Lâm Thanh Trúc');
+  const app = searchHarness({ phoneUnavailable: true, nameResults: [correct, other],
+    genericHeader: true, openedHeader: '9T26A Lâm Thanh Trúc, NTT(PN)' });
+  await app.api.openConversation({ phone: '0942752299', studentName: 'Lâm Thanh Trúc', className: '9T26A' }, app.original);
+  assert.equal(correct.clicked, true);
+  assert.equal(other.clicked, undefined);
+});
+
+test('generic chat-title fallback still rejects a different class, missing avatar or sidebar label', async () => {
+  for (const options of [
+    { openedHeader: '9T26D Lâm Thanh Trúc, NTT(PN)' },
+    { openedHeader: '9T26A Lâm Thanh Trúc, NTT(PN)', headerAvatar: false },
+    { openedHeader: '9T26A Lâm Thanh Trúc, NTT(PN)', headerLeft: 100 }
+  ]) {
+    const contact = candidate('9T26A Lâm Thanh Trúc, NTT(P)');
+    const app = searchHarness({ phoneUnavailable: true, nameResults: [contact], genericHeader: true, ...options });
+    await assert.rejects(app.api.openConversation({ phone: '0942752299', studentName: 'Lâm Thanh Trúc', className: '9T26A' }, app.original), error => error.skipped);
+    assert.equal(contact.clicked, true);
+  }
+});
+
+test('a shortened visible title uses the full title attribute before opening the matching chat', async () => {
+  const fullName = '9T46A Chu Nguyễn Hoàng Phúc';
+  const contact = candidate('9T46A Chu Nguyễn Hoàng Ph...', { title: fullName });
+  const app = searchHarness({ phoneUnavailable: true, nameResults: [contact], openedHeader: fullName });
+  await app.api.openConversation({ phone: '0937236758', studentName: 'Chu Nguyễn Hoàng Phúc', className: '9T46A' }, app.original);
+  assert.equal(contact.clicked, true);
+});
+
+test('a name query reads the whole result row when a nested name element holds only the class code', async () => {
+  const contact = candidate('9T26A Lâm Thanh Trúc, NTT');
+  contact.querySelector = selector => selector.includes('name') ? candidate('9T26A') : null;
+  const app = searchHarness({ phoneUnavailable: true, nameResults: [contact] });
+  await app.api.openConversation({ phone: '0942752299', studentName: 'Lâm Thanh Trúc', className: '9T26A' }, app.original);
+  assert.equal(contact.clicked, true);
+});
+
+test('a class code joined to the highlighted name still identifies the requested class', async () => {
+  const contact = candidate('9T26ALâm Thanh Trúc, NTT(P)');
+  const app = searchHarness({ phoneUnavailable: true, nameResults: [contact] });
+  await app.api.openConversation({ phone: '0942752299', studentName: 'Lâm Thanh Trúc', className: '9T26A' }, app.original);
+  assert.equal(contact.clicked, true);
+});
+
+test('a matching highlight or tooltip cannot replace a longer visible name or conflicting class', async () => {
+  for (const text of ['9T26A Lâm Thanh Trúc Anh', '9T26D Lâm Thanh Tr...', '9T26A+ Lâm Thanh Tr...']) {
+    const contact = candidate(text, { title: '9T26A Lâm Thanh Trúc' });
+    contact.querySelector = selector => selector.includes('name') ? candidate('Lâm Thanh Trúc') : null;
+    const app = searchHarness({ phoneUnavailable: true, nameResults: [contact] });
+    await assert.rejects(app.api.openConversation({ phone: '0942752299', studentName: 'Lâm Thanh Trúc', className: '9T26A' }, app.original), error => error.skipped);
+    assert.equal(contact.clicked, undefined, text);
+  }
+});
+
+test('a shortened contact with a conflicting full title is never selected', async () => {
+  const contact = candidate('Chu Nguyễn Hoàng Ph...', { title: '9VT4 Chu Nguyễn Hoàng Phúc' });
+  const app = searchHarness({ phoneUnavailable: true, nameResults: [contact] });
+  await assert.rejects(app.api.openConversation({ phone: '0937236758', studentName: 'Chu Nguyễn Hoàng Phúc', className: '9T46A' }, app.original), error => error.skipped);
+  assert.equal(contact.clicked, undefined);
+});
+
+test('the visible contact section is selected while an identical message search hit is ignored', async () => {
+  const contact = candidate('9T46A Trần Ngọc Uyên Thy, VVT');
+  const message = candidate('9T46A Trần Ngọc Uyên Thy, VVT\nBạn: Nội dung thông báo cũ');
+  message.getBoundingClientRect = () => ({ left: 100, top: 500, bottom: 580, right: 420, height: 80, width: 320 });
+  const sections = [['Liên hệ (1)', 200], ['Tin nhắn (1)', 420]].map(([text, top]) => {
+    const heading = candidate(text);
+    heading.getBoundingClientRect = () => ({ left: 70, right: 220, top, bottom: top + 24, height: 24, width: 150 });
+    return heading;
+  });
+  const app = searchHarness({ phoneUnavailable: true, nameResults: [message, contact], sections, searchBounds: true });
+  await app.api.openConversation({ phone: '0901234567', studentName: 'Trần Ngọc Uyên Thy', className: '9T46A' }, app.original);
+  assert.equal(contact.clicked, true);
+  assert.equal(message.clicked, undefined);
+});
+
+test('message and file results never substitute for a contact, including phone search hits', async () => {
+  for (const type of ['message', 'file']) {
+    const hit = candidate('9T46A Trần Ngọc Uyên Thy, VVT\n0901234567', { 'data-type': type });
+    const app = searchHarness({ phoneUnavailable: true, nameResults: [hit] });
+    await assert.rejects(app.api.openConversation({ phone: '0901234567', studentName: 'Trần Ngọc Uyên Thy', className: '9T46A' }, app.original), error => error.skipped);
+    app.setResults([hit]);
+    assert.equal(app.api.findSearchResult('0901234567', new Map()), null);
+    assert.equal(hit.clicked, undefined);
+  }
+});
+
+test('search tabs without section counts do not masquerade as result headings', async () => {
+  const contact = candidate('9T46A Trần Ngọc Uyên Thy, VVT');
+  const tabs = ['Liên hệ', 'Tin nhắn', 'File'].map(text => {
+    const tab = candidate(text);
+    tab.getBoundingClientRect = () => ({ left: 70, right: 220, top: 100, bottom: 124, height: 24, width: 150 });
+    return tab;
+  });
+  const app = searchHarness({ phoneUnavailable: true, nameResults: [contact], sections: tabs, searchBounds: true });
+  await app.api.openConversation({ phone: '0901234567', studentName: 'Trần Ngọc Uyên Thy', className: '9T46A' }, app.original);
+  assert.equal(contact.clicked, true);
+});
+
+test('class prefix and school suffix support preserves full-name, class, phone and marker checks', async () => {
+  for (const text of [
+    '9VT4 Trần Ngọc Uyên Thy, VVT',
+    '9T46A Trần Ngọc Uyên Thy Anh, VVT',
+    '9T46A Trần Ngọc Uyên Thy (A), VVT',
+    '9T46A Trần Ngọc Uyên Thy, (C), VVT',
+    '9T46A Trần Ngọc Uyên Thy, 0900000000',
+    '9T46A Trần Ngọc Uyên Thy, VVT\n5 thành viên'
+  ]) {
+    const contact = candidate(text);
+    const app = searchHarness({ phoneUnavailable: true, nameResults: [contact] });
+    await assert.rejects(app.api.openConversation({ phone: '0901234567', studentName: 'Trần Ngọc Uyên Thy', className: '9T46A' }, app.original), error => error.skipped, text);
+    assert.equal(contact.clicked, undefined, text);
+  }
+});
+
+test('class prefixes and suffixes disambiguate a matching contact without accepting another class', async () => {
+  const correct = candidate('9T46A Trần Ngọc Uyên Thy, VVT');
+  const other = candidate('9VT4 Trần Ngọc Uyên Thy, VVT');
+  const unknown = candidate('Trần Ngọc Uyên Thy, VVT');
+  const app = searchHarness({ phoneUnavailable: true, nameResults: [other, unknown, correct] });
+  await app.api.openConversation({ phone: '0901234567', studentName: 'Trần Ngọc Uyên Thy', className: '9T46A' }, app.original);
+  assert.equal(correct.clicked, true);
+  assert.equal(unknown.clicked, undefined);
+  assert.equal(other.clicked, undefined);
+});
+
+test('two saved contacts with the same class and full name remain ambiguous', async () => {
+  const contacts = [candidate('9T46A Trần Ngọc Uyên Thy, VVT'), candidate('9T46A Trần Ngọc Uyên Thy, ABC')];
+  const app = searchHarness({ phoneUnavailable: true, nameResults: contacts });
+  await assert.rejects(app.api.openConversation({ phone: '0901234567', studentName: 'Trần Ngọc Uyên Thy', className: '9T46A' }, app.original), error => error.skipped);
+  assert.ok(contacts.every(contact => !contact.clicked));
+});
+
+test('a class suffix plus sign stays significant and an incompatible class in the opened header blocks pasting', async () => {
+  for (const openedHeader of ['9T46A+ Trần Ngọc Uyên Thy, VVT', '9VT4 Trần Ngọc Uyên Thy, VVT']) {
+    const contact = candidate('9T46A Trần Ngọc Uyên Thy, VVT');
+    const app = searchHarness({ phoneUnavailable: true, nameResults: [contact], openedHeader });
+    await assert.rejects(app.api.openConversation({ phone: '0901234567', studentName: 'Trần Ngọc Uyên Thy', className: '9T46A' }, app.original), error => error.skipped && /cuộc trò chuyện khớp tên/.test(error.message));
+    assert.equal(contact.clicked, true);
+  }
 });
 
 test('a name with a missing or different marker never qualifies as the same student', async () => {
