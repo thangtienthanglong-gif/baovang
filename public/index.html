@@ -235,7 +235,6 @@
                 <p id="rosterMeta">Chọn lớp ở cây bên trái để thao tác nhanh.</p>
               </div>
               <div class="section-actions">
-                <button class="btn secondary roster-tool-btn" id="exportRepeatedAbsencesBtn" type="button" title="Xuất toàn bộ học sinh vắng không phép từ 2 buổi theo từng môn trong tháng hiện tại, tại cơ sở đang chọn"><i class="fa-solid fa-file-excel"></i> Xuất vắng ≥2 buổi (tháng này)</button>
                 <button class="btn primary roster-tool-btn" id="openClassNotificationBtn" type="button"><i class="fa-solid fa-bullhorn"></i> Gửi thông báo theo lớp</button>
                 <button class="btn primary roster-tool-btn roster-add-btn" id="addStudentBtn" type="button"><i class="fa-solid fa-user-plus"></i> Thêm học sinh</button>
                 <button class="btn primary btn-exam roster-tool-btn roster-exam-btn" id="openExamSelectBtn" type="button"><i class="fa-solid fa-star"></i> Nhập điểm thi</button>
@@ -525,6 +524,7 @@
           <input id="historyKeyword" type="search" placeholder="Tên, lớp, phụ huynh, SĐT, trạng thái...">
         </div>
         <button class="btn" id="historyFilterBtn" type="button" style="margin-bottom: 0;">Lọc lịch sử</button>
+        <button class="btn secondary" id="exportRepeatedAbsencesBtn" type="button" title="Chọn lớp, môn và số buổi vắng không phép tối thiểu trong tháng hiện tại"><i class="fa-solid fa-file-excel"></i> Xuất học sinh vắng (tháng này)</button>
         <div class="dropdown-wrapper" style="position: relative; display: inline-block;">
           <button class="btn blue" type="button" style="margin-bottom: 0;" onclick="const m = this.nextElementSibling; const isVis = m.style.display==='block'; document.querySelectorAll('.dropdown-menu').forEach(x=>x.style.display='none'); if(!isVis) m.style.display='block'; event.stopPropagation();">
             Xuất Excel <i class="fa-solid fa-chevron-down" style="margin-left: 6px;"></i>
@@ -540,6 +540,17 @@
           </div>
         </div>
       </section>
+
+      <dialog id="attendanceExportDialog" class="attendance-alert-dialog" aria-labelledby="attendanceExportTitle" aria-describedby="attendanceExportDescription">
+        <form id="attendanceExportForm">
+          <h2 id="attendanceExportTitle">Xuất học sinh vắng trong tháng</h2>
+          <p id="attendanceExportDescription" class="muted">Chỉ tính vắng không phép từ đầu tháng đến hôm nay, theo từng môn tại cơ sở đang chọn. Chọn 3 để xuất học sinh vắng từ 3 buổi trở lên.</p>
+          <div class="field"><label for="attendanceExportSubject">Môn</label><select id="attendanceExportSubject"><option value="ALL">Tất cả môn</option><option value="TOAN">Toán</option><option value="A">Anh</option><option value="V">Văn</option><option value="K">KHTN</option><option value="OTHER">Môn khác</option></select></div>
+          <div class="field"><label for="attendanceExportClass">Lớp</label><select id="attendanceExportClass"><option value="ALL">Tất cả lớp</option></select></div>
+          <div class="field"><label for="attendanceExportMinSessions">Số buổi vắng tối thiểu</label><input id="attendanceExportMinSessions" type="number" min="2" step="1" value="2" list="attendanceExportSessionChoices" required><datalist id="attendanceExportSessionChoices"><option value="2"></option><option value="3"></option><option value="4"></option><option value="5"></option><option value="6"></option><option value="7"></option><option value="8"></option><option value="9"></option><option value="10"></option></datalist></div>
+          <div class="attendance-alert-actions"><button class="btn ghost" id="attendanceExportCancel" type="button">Đóng</button><button class="btn primary" id="attendanceExportSubmit" type="submit"><i class="fa-solid fa-file-excel"></i> Xuất Excel</button></div>
+        </form>
+      </dialog>
 
       <div class="inner-tabs" style="margin-bottom: 16px; display: flex; gap: 8px; overflow-x: auto;">
         <button class="inner-tab active" data-subtab="zaloHistoryPanel" type="button">Lịch sử vắng</button>
@@ -781,7 +792,7 @@
 <li>Bấm nhãn để xem các buổi nghỉ, ngày, buổi và lớp. Trao đổi với học sinh hoặc phụ huynh, nhập ghi chú nếu cần, rồi bấm <strong>Đã xử lý</strong>.</li>
 <li>App lưu người xử lý và thời gian; nhãn chuyển sang <strong>Đã xử lý</strong>, ngừng nhấp nháy. Khi có thêm buổi vắng không phép được tính vào cảnh báo, học sinh sẽ cần xử lý lại.</li>
 <li>Vắng có phép và Đã bù không tính vào ngưỡng này. Gửi lại tin nhắn hay gọi nhiều lần không làm tăng số buổi vắng.</li>
-<li>Bấm <strong>Xuất vắng ≥2 buổi (tháng này)</strong> ở Danh sách học sinh để tải Excel học sinh vắng không phép từ 2 buổi trở lên, theo từng môn, từ đầu tháng đến hôm nay. File lấy toàn bộ cơ sở đang chọn, gồm cả cảnh báo đã xử lý; không giới hạn ở lớp đang mở. Mỗi dòng ghi tên, lớp, số điện thoại, số buổi và chi tiết ngày/buổi vắng.</li>
+<li>Vào <strong>Lịch sử liên hệ</strong>, bấm <strong>Xuất học sinh vắng (tháng này)</strong>, chọn Môn, Lớp và Số buổi vắng tối thiểu (2, 3, 4…), rồi bấm <strong>Xuất Excel</strong>. File tính vắng không phép theo từng môn, từ đầu tháng đến hôm nay tại cơ sở đang chọn, gồm cả cảnh báo đã xử lý. Chọn “Tất cả lớp” hoặc “Tất cả môn” nếu không muốn giới hạn. Mỗi dòng ghi tên, lớp, số điện thoại, số buổi và chi tiết ngày/buổi vắng.</li>
 </ul>
 <h4>Gửi thông báo theo lớp</h4>
 <ol>
@@ -1143,7 +1154,7 @@
   <script src="/tuition-reminders.js?v=20261014-2"></script>
   <script src="/class-notifications.js?v=20261015-1"></script>
   <script src="/app.js?v=20261014-28"></script>
-  <script src="/attendance-alerts.js?v=20261017-1"></script>
+  <script src="/attendance-alerts.js?v=20261017-2"></script>
   <script src="/exams.js?v=20261009-2"></script>
   <nav class="bottom-nav">
     <button class="bottom-tab active" data-tab="absenceTab" type="button"><i class="fa-solid fa-clipboard-user"></i><span>Điểm danh</span></button>

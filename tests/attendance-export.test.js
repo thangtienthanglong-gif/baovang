@@ -47,11 +47,11 @@ function fixture() {
   ] };
 }
 
-async function readFile(response) {
+async function readFile(response, minSessions = 2) {
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('content-type'), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   const workbook = XLSX.read(Buffer.from(await response.arrayBuffer()), { type: 'buffer' });
-  assert.deepEqual(workbook.SheetNames, ['Vang tu 2 buoi']);
+  assert.deepEqual(workbook.SheetNames, [`Vang tu ${minSessions} buoi`]);
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   return { sheet, rows: XLSX.utils.sheet_to_json(sheet) };
 }
@@ -107,4 +107,35 @@ test('default export uses the current Vietnam month and empty branches retain Ex
   assert.equal(empty.sheet.G1.v, 'Số buổi vắng không phép');
   assert.equal((await request({ endDate: '2026-02-30' })).status, 400);
   assert.equal((await request({}, 'unknown')).status, 404);
+});
+
+test('class, subject and minimum sessions combine in the exported workbook and its filename', async t => {
+  const db = fixture();
+  db.students.push({ id: 's3', fullName: 'Trần Dũng', className: '8AT2', phone1: '0901234568' });
+  db.absences.push(...Array.from({ length: 4 }, (_, index) => ({
+    id: `english-${index}`, studentId: 's3', date: `2026-10-0${index + 1}`, session: 'Tối', absenceStatus: 'Vắng'
+  })));
+  const request = await setup(t, db);
+  const base = { period: 'month', endDate: '2026-10-17' };
+  const response = await request({ ...base, subject: 'A', className: '8AT2', minSessions: '3' });
+  assert.match(response.headers.get('content-disposition'), /hoc-sinh-vang-tu-3-buoi/);
+  const { rows } = await readFile(response, 3);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]['Họ tên học sinh'], 'Trần Dũng');
+  assert.equal(rows[0]['Số buổi vắng không phép'], 4);
+  assert.equal(rows[0]['Môn'], 'Anh');
+  assert.equal((await readFile(await request({ ...base, subject: 'A', minSessions: '4' }), 4)).rows.length, 1);
+  for (const filters of [{ subject: 'TOAN', minSessions: '3' }, { subject: 'A', className: '8T3M+' }, { minSessions: '5' }]) {
+    const result = await readFile(await request({ ...base, ...filters }), Number(filters.minSessions || 2));
+    assert.equal(result.rows.length, 0);
+  }
+});
+
+test('invalid minimum-session parameters return a useful 400 response', async t => {
+  const request = await setup(t, fixture());
+  for (const minSessions of ['0', '1', '2.5', '-2', 'NaN', '', '9007199254740992']) {
+    const response = await request({ minSessions });
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error, /Số buổi vắng tối thiểu/);
+  }
 });

@@ -1,6 +1,77 @@
 let attendanceAlertRequest = 0;
 let attendanceAlertOpenRequest = 0;
 let attendanceAlertAction = null;
+let attendanceExportBranch = null;
+let attendanceExportClasses = [];
+
+function updateAttendanceExportClasses() {
+  const subject = $('#attendanceExportSubject').value;
+  const select = $('#attendanceExportClass');
+  const previous = select.value;
+  const classes = attendanceExportClasses.filter(className => {
+    const key = getClassSubjectKey(className);
+    const group = ['TOAN', 'A', 'V', 'K'].includes(key) ? key : 'OTHER';
+    return subject === 'ALL' || group === subject;
+  });
+  select.innerHTML = '<option value="ALL">Tất cả lớp</option>' + classes.map(className =>
+    `<option value="${escapeHtml(className)}">${escapeHtml(className)}</option>`).join('');
+  select.value = classes.includes(previous) ? previous : 'ALL';
+}
+
+async function openAttendanceExportDialog() {
+  const button = $('#exportRepeatedAbsencesBtn');
+  const dialog = $('#attendanceExportDialog');
+  if (button.disabled || dialog.open) return;
+  const branch = getActiveBranch();
+  button.disabled = true;
+  try {
+    const endDate = clientTodayISO();
+    const [bootstrap, result] = await Promise.all([
+      api('/api/bootstrap'),
+      api('/api/attendance-alerts?' + queryString({ period: 'month', endDate }))
+    ]);
+    if (branch !== getActiveBranch()) return;
+    attendanceExportBranch = branch;
+    attendanceExportClasses = [...new Set([
+      ...(bootstrap.classes || []),
+      ...result.alerts.flatMap(alert => [...alert.classes, alert.currentClass])
+    ].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi'));
+    $('#attendanceExportSubject').value = 'ALL';
+    $('#attendanceExportClass').value = 'ALL';
+    $('#attendanceExportMinSessions').value = '2';
+    updateAttendanceExportClasses();
+    dialog.showModal();
+  } catch (error) {
+    if (branch === getActiveBranch()) toast(error.message, 'error');
+  } finally { button.disabled = false; }
+}
+
+async function exportSelectedAttendance(event) {
+  event.preventDefault();
+  const dialog = $('#attendanceExportDialog');
+  const button = $('#attendanceExportSubmit');
+  if (button.disabled) return;
+  if (attendanceExportBranch !== getActiveBranch()) {
+    dialog.close();
+    toast('Cơ sở đã thay đổi. Vui lòng mở lại hộp xuất danh sách.', 'error');
+    return;
+  }
+  const rawMinSessions = $('#attendanceExportMinSessions').value;
+  const minSessions = Number(rawMinSessions);
+  if (!/^\d+$/.test(rawMinSessions) || !Number.isSafeInteger(minSessions) || minSessions < 2) {
+    toast('Số buổi vắng tối thiểu phải là số nguyên từ 2 trở lên.', 'error');
+    return;
+  }
+  button.disabled = true;
+  try {
+    await downloadUrl('/api/attendance-alerts/export', {
+      period: 'month', endDate: clientTodayISO(),
+      className: $('#attendanceExportClass').value,
+      subject: $('#attendanceExportSubject').value,
+      minSessions
+    });
+  } finally { button.disabled = false; }
+}
 
 function syncRosterAttendanceAlerts(result) {
   let changed = false;
@@ -105,14 +176,11 @@ async function saveAttendanceAlertAction(event) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  $('#exportRepeatedAbsencesBtn').addEventListener('click', async () => {
-    const button = $('#exportRepeatedAbsencesBtn');
-    if (button.disabled) return;
-    button.disabled = true;
-    try {
-      await downloadUrl('/api/attendance-alerts/export', { period: 'month', endDate: clientTodayISO() });
-    } finally { button.disabled = false; }
-  });
+  $('#exportRepeatedAbsencesBtn').addEventListener('click', openAttendanceExportDialog);
+  $('#attendanceExportSubject').addEventListener('change', updateAttendanceExportClasses);
+  $('#attendanceExportForm').addEventListener('submit', exportSelectedAttendance);
+  $('#attendanceExportCancel').addEventListener('click', () => $('#attendanceExportDialog').close());
+  $('#attendanceExportDialog').addEventListener('close', () => { attendanceExportBranch = null; });
   $('#studentRoster').addEventListener('click', event => {
     const button = event.target.closest('[data-attendance-alert-id]');
     if (button) openRosterAttendanceAlert(button);

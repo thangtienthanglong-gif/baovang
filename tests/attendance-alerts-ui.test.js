@@ -72,24 +72,91 @@ test('the roster warning sits between student details and the attendance selecto
   assert.doesNotMatch(page, /attendanceAlertsTab|attendanceAlertFilters|attendanceAlertRows/);
 });
 
-test('monthly absence export uses the current Vietnam date, includes all branch classes and prevents duplicate clicks', async () => {
+test('history export opens filters before downloading and prevents duplicate submissions', async () => {
   const app = setup();
+  const page = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
+  const historyStart = page.indexOf('<section id="historyTab"');
+  const buttonPosition = page.indexOf('id="exportRepeatedAbsencesBtn"');
+  assert.ok(buttonPosition > historyStart);
+  assert.equal(page.match(/id="exportRepeatedAbsencesBtn"/g).length, 1);
   const downloads = [];
   let finish;
   app.context.downloadUrl = (url, params) => {
     downloads.push({ url, params });
     return new Promise(resolve => { finish = resolve; });
   };
-  const button = app.fields.exportRepeatedAbsencesBtn;
-  const pending = button.listeners.click();
+  await app.fields.exportRepeatedAbsencesBtn.listeners.click();
+  assert.equal(downloads.length, 0);
+  assert.equal(app.fields.attendanceExportDialog.open, true);
+  assert.equal(app.fields.attendanceExportMinSessions.value, '2');
+  const button = app.fields.attendanceExportSubmit;
+  const event = { preventDefault() {} };
+  const pending = app.fields.attendanceExportForm.listeners.submit(event);
   assert.equal(button.disabled, true);
-  await button.listeners.click();
+  await app.fields.attendanceExportForm.listeners.submit(event);
   assert.equal(downloads.length, 1);
   assert.equal(downloads[0].url, '/api/attendance-alerts/export');
-  assert.deepEqual(JSON.parse(JSON.stringify(downloads[0].params)), { period: 'month', endDate: '2026-10-14' });
+  assert.deepEqual(JSON.parse(JSON.stringify(downloads[0].params)), {
+    period: 'month', endDate: '2026-10-14', className: 'ALL', subject: 'ALL', minSessions: 2
+  });
   finish();
   await pending;
   assert.equal(button.disabled, false);
+});
+
+test('export class options follow the subject and the chosen class, subject and threshold reach the download', async () => {
+  const app = setup();
+  app.handler(async url => url === '/api/bootstrap'
+    ? { classes: ['8T3M+', '8AT2', '9KCCB', 'CUSTOM', '8VT2'] } : fixture());
+  await app.fields.exportRepeatedAbsencesBtn.listeners.click();
+  app.fields.attendanceExportSubject.value = 'A';
+  app.fields.attendanceExportClass.value = '8T3M+';
+  app.fields.attendanceExportSubject.listeners.change();
+  assert.match(app.fields.attendanceExportClass.innerHTML, /8AT2/);
+  assert.doesNotMatch(app.fields.attendanceExportClass.innerHTML, /8T3M\+|8VT2|9KCCB|CUSTOM/);
+  assert.equal(app.fields.attendanceExportClass.value, 'ALL');
+  app.fields.attendanceExportClass.value = '8AT2';
+  app.fields.attendanceExportMinSessions.value = '4';
+  let params;
+  app.context.downloadUrl = async (_url, filters) => { params = filters; };
+  await app.fields.attendanceExportForm.listeners.submit({ preventDefault() {} });
+  assert.equal(params.subject, 'A');
+  assert.equal(params.className, '8AT2');
+  assert.equal(params.minSessions, 4);
+  app.fields.attendanceExportSubject.value = 'OTHER';
+  app.fields.attendanceExportSubject.listeners.change();
+  assert.match(app.fields.attendanceExportClass.innerHTML, /CUSTOM/);
+  assert.doesNotMatch(app.fields.attendanceExportClass.innerHTML, /8AT2|8T3M\+/);
+});
+
+test('invalid thresholds and branch changes cannot submit an export for a stale branch', async () => {
+  const app = setup();
+  let downloads = 0;
+  app.context.downloadUrl = async () => { downloads++; };
+  await app.fields.exportRepeatedAbsencesBtn.listeners.click();
+  for (const value of ['1', '2.5', '', 'invalid']) {
+    app.fields.attendanceExportMinSessions.value = value;
+    await app.fields.attendanceExportForm.listeners.submit({ preventDefault() {} });
+  }
+  assert.equal(downloads, 0);
+  app.fields.attendanceExportMinSessions.value = '3';
+  app.branch('other');
+  await app.fields.attendanceExportForm.listeners.submit({ preventDefault() {} });
+  assert.equal(downloads, 0);
+  assert.equal(app.fields.attendanceExportDialog.open, false);
+  assert.match(app.messages.at(-1).message, /Cơ sở đã thay đổi/);
+});
+
+test('changing branches while export options load prevents stale filters from opening', async () => {
+  const app = setup();
+  let finish;
+  app.handler(url => url === '/api/bootstrap' ? { classes: ['8AT2'] } : new Promise(resolve => { finish = resolve; }));
+  const opening = app.fields.exportRepeatedAbsencesBtn.listeners.click();
+  app.branch('other');
+  finish(fixture());
+  await opening;
+  assert.notEqual(app.fields.attendanceExportDialog.open, true);
+  assert.equal(app.fields.exportRepeatedAbsencesBtn.disabled, false);
 });
 
 test('the badge shows only its class subject, and handled warnings stop blinking', async () => {
