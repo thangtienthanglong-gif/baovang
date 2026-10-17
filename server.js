@@ -753,11 +753,11 @@ function filterNotificationLogs(db, query) {
 function sendWorkbook(res, filename, sheets) {
   const workbook = XLSX.utils.book_new();
   sheets.forEach(sheet => {
-    const worksheet = XLSX.utils.json_to_sheet(sheet.rows);
+    const worksheet = XLSX.utils.json_to_sheet(sheet.rows, sheet.headers ? { header: sheet.headers } : undefined);
     
     // Auto-fit columns width
-    if (sheet.rows && sheet.rows.length > 0) {
-      const keys = Object.keys(sheet.rows[0]);
+    if (sheet.rows && (sheet.rows.length > 0 || sheet.headers?.length)) {
+      const keys = sheet.headers || Object.keys(sheet.rows[0]);
       const wscols = keys.map(key => {
         let max = key.length;
         sheet.rows.forEach(row => {
@@ -3182,7 +3182,7 @@ async function saveHandledAttendanceAlert(req, action) {
   });
 }
 
-registerAttendanceAlertRoutes(app, { getBranchDb, saveHandledAlert: saveHandledAttendanceAlert, id, nowISO });
+registerAttendanceAlertRoutes(app, { getBranchDb, saveHandledAlert: saveHandledAttendanceAlert, sendWorkbook, id, nowISO });
 registerTuitionReminderRoutes(app, { getBranchDb });
 
 app.get('/api/students', async (req, res, next) => {

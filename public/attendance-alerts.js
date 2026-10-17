@@ -105,6 +105,14 @@ async function saveAttendanceAlertAction(event) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  $('#exportRepeatedAbsencesBtn').addEventListener('click', async () => {
+    const button = $('#exportRepeatedAbsencesBtn');
+    if (button.disabled) return;
+    button.disabled = true;
+    try {
+      await downloadUrl('/api/attendance-alerts/export', { period: 'month', endDate: clientTodayISO() });
+    } finally { button.disabled = false; }
+  });
   $('#studentRoster').addEventListener('click', event => {
     const button = event.target.closest('[data-attendance-alert-id]');
     if (button) openRosterAttendanceAlert(button);

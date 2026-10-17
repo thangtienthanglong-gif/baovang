@@ -72,6 +72,26 @@ test('the roster warning sits between student details and the attendance selecto
   assert.doesNotMatch(page, /attendanceAlertsTab|attendanceAlertFilters|attendanceAlertRows/);
 });
 
+test('monthly absence export uses the current Vietnam date, includes all branch classes and prevents duplicate clicks', async () => {
+  const app = setup();
+  const downloads = [];
+  let finish;
+  app.context.downloadUrl = (url, params) => {
+    downloads.push({ url, params });
+    return new Promise(resolve => { finish = resolve; });
+  };
+  const button = app.fields.exportRepeatedAbsencesBtn;
+  const pending = button.listeners.click();
+  assert.equal(button.disabled, true);
+  await button.listeners.click();
+  assert.equal(downloads.length, 1);
+  assert.equal(downloads[0].url, '/api/attendance-alerts/export');
+  assert.deepEqual(JSON.parse(JSON.stringify(downloads[0].params)), { period: 'month', endDate: '2026-10-14' });
+  finish();
+  await pending;
+  assert.equal(button.disabled, false);
+});
+
 test('the badge shows only its class subject, and handled warnings stop blinking', async () => {
   const app = setup();
   await app.context.refreshRosterAttendanceAlerts();

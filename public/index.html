@@ -235,6 +235,7 @@
                 <p id="rosterMeta">Chọn lớp ở cây bên trái để thao tác nhanh.</p>
               </div>
               <div class="section-actions">
+                <button class="btn secondary roster-tool-btn" id="exportRepeatedAbsencesBtn" type="button" title="Xuất toàn bộ học sinh vắng không phép từ 2 buổi theo từng môn trong tháng hiện tại, tại cơ sở đang chọn"><i class="fa-solid fa-file-excel"></i> Xuất vắng ≥2 buổi (tháng này)</button>
                 <button class="btn primary roster-tool-btn" id="openClassNotificationBtn" type="button"><i class="fa-solid fa-bullhorn"></i> Gửi thông báo theo lớp</button>
                 <button class="btn primary roster-tool-btn roster-add-btn" id="addStudentBtn" type="button"><i class="fa-solid fa-user-plus"></i> Thêm học sinh</button>
                 <button class="btn primary btn-exam roster-tool-btn roster-exam-btn" id="openExamSelectBtn" type="button"><i class="fa-solid fa-star"></i> Nhập điểm thi</button>
@@ -780,6 +781,7 @@
 <li>Bấm nhãn để xem các buổi nghỉ, ngày, buổi và lớp. Trao đổi với học sinh hoặc phụ huynh, nhập ghi chú nếu cần, rồi bấm <strong>Đã xử lý</strong>.</li>
 <li>App lưu người xử lý và thời gian; nhãn chuyển sang <strong>Đã xử lý</strong>, ngừng nhấp nháy. Khi có thêm buổi vắng không phép được tính vào cảnh báo, học sinh sẽ cần xử lý lại.</li>
 <li>Vắng có phép và Đã bù không tính vào ngưỡng này. Gửi lại tin nhắn hay gọi nhiều lần không làm tăng số buổi vắng.</li>
+<li>Bấm <strong>Xuất vắng ≥2 buổi (tháng này)</strong> ở Danh sách học sinh để tải Excel học sinh vắng không phép từ 2 buổi trở lên, theo từng môn, từ đầu tháng đến hôm nay. File lấy toàn bộ cơ sở đang chọn, gồm cả cảnh báo đã xử lý; không giới hạn ở lớp đang mở. Mỗi dòng ghi tên, lớp, số điện thoại, số buổi và chi tiết ngày/buổi vắng.</li>
 </ul>
 <h4>Gửi thông báo theo lớp</h4>
 <ol>
@@ -1141,7 +1143,7 @@
   <script src="/tuition-reminders.js?v=20261014-2"></script>
   <script src="/class-notifications.js?v=20261015-1"></script>
   <script src="/app.js?v=20261014-28"></script>
-  <script src="/attendance-alerts.js?v=20261014-2"></script>
+  <script src="/attendance-alerts.js?v=20261017-1"></script>
   <script src="/exams.js?v=20261009-2"></script>
   <nav class="bottom-nav">
     <button class="bottom-tab active" data-tab="absenceTab" type="button"><i class="fa-solid fa-clipboard-user"></i><span>Điểm danh</span></button>
