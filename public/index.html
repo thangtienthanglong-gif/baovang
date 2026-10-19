@@ -399,12 +399,12 @@
           <div class="field span-4">
             <label for="messageTemplate">Mẫu báo vắng/trễ</label>
             <textarea id="messageTemplate" rows="3"></textarea>
-            <span class="muted">Biến: {schoolName}, {date}, {studentCode}, {studentName}, {className}, {session}, {absenceStatus}, {reason}, {parentName}, {phone}, {makeupNotice}. Báo vắng từ thứ 2 đến thứ 7 tự thêm lịch bù từ ngày gửi đến Chủ nhật cùng tuần (giờ Việt Nam); gửi vào Chủ nhật thì bỏ phần đi bù. Dùng {makeupNotice} để chọn vị trí chèn, hoặc để hệ thống tự thêm cuối tin.</span>
+            <span class="muted">Biến: {schoolName}, {date}, {studentCode}, {studentName}, {className}, {session}, {absenceStatus}, {reason}, {parentName}, {phone}, {makeupNotice}. Nghỉ sáng: bù từ chiều; nghỉ chiều: bù từ tối; nghỉ tối: bù từ ngày hôm sau, đến Chủ nhật cùng tuần nghỉ. Chủ nhật không gợi ý bù. Dùng {makeupNotice} để chọn vị trí chèn, hoặc để hệ thống tự thêm cuối tin.</span>
           </div>
           <div class="field span-4">
             <label for="makeupNoticeTemplate">Mẫu lịch đi bù</label>
             <textarea id="makeupNoticeTemplate" rows="3"></textarea>
-            <span class="muted">Sửa câu chữ tại đây và giữ các biến để thứ, ngày tự cập nhật: {makeupStartDay} = thứ bắt đầu, {makeupStartDate} = ngày gửi, {makeupEndDay} = Chủ nhật, {makeupEndDate} = ngày cuối tuần. Chỉ thêm vào tin báo vắng từ thứ 2 đến thứ 7; Chủ nhật tự bỏ. Để trống sẽ dùng mẫu mặc định.</span>
+            <span class="muted">Sửa câu chữ tại đây và giữ các biến để lịch tự cập nhật: {makeupStartDay} = buổi/thứ bắt đầu (ví dụ chiều thứ 2), {makeupStartDate} = ngày bắt đầu bù, {makeupEndDay} = Chủ nhật, {makeupEndDate} = ngày cuối tuần nghỉ. Giữ {makeupStartDay} để hiện rõ buổi có thể bắt đầu bù. Chủ nhật tự bỏ; tuần nghỉ đã hết thì không gợi ý bù. Để trống sẽ dùng mẫu mặc định.</span>
           </div>
           <div class="field span-4">
             <label for="earlyLeaveTemplate">Mẫu báo về sớm</label>
@@ -439,7 +439,7 @@
           </div>
           <div class="field span-4">
             <label>Xem trước tin nhắn (Live Preview)</label>
-            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <div style="display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
               <select id="previewTypeSelect" style="max-width: 200px;">
                 <option value="absence">Mẫu báo vắng/trễ</option>
                 <option value="early-leave">Mẫu báo về sớm</option>
@@ -452,8 +452,13 @@
                 <option value="Vắng không phép">Vắng không phép</option>
                 <option value="Vắng có phép">Vắng có phép</option>
               </select>
+              <select id="previewSessionSelect" aria-label="Buổi nghỉ xem trước" style="max-width: 200px;">
+                <option value="Sáng">Nghỉ buổi sáng</option>
+                <option value="Chiều">Nghỉ buổi chiều</option>
+                <option value="Tối">Nghỉ buổi tối</option>
+              </select>
             </div>
-            <span class="muted">Bản xem trước dùng học sinh mẫu; tin gửi thật lấy trạng thái của từng học sinh. Lịch bù tính theo ngày gửi hiện tại, không theo ngày điểm danh đang chọn.</span>
+            <span class="muted">Bản xem trước dùng học sinh mẫu, ngày điểm danh đang chọn và buổi nghỉ ở trên. Tin gửi thật tính theo ngày, buổi nghỉ của từng học sinh; lịch bù không vượt quá Chủ nhật của tuần nghỉ và không gợi ý ngày đã qua.</span>
             <div id="messagePreview" class="preview-box"></div>
           </div>
           <div class="actions span-4">
@@ -922,7 +927,7 @@
 <li>Mở <strong>Zalo</strong>, nhập <strong>Tên trường</strong>, chọn <strong>Zalo cá nhân</strong> hoặc <strong>Zalo OA</strong>.</li>
 <li>Cài đặt thời gian chờ và các thông số của chế độ đang dùng. Với Zalo cá nhân, có thể đặt số học sinh mỗi chu kì và số phút nghỉ giữa chu kì.</li>
 <li>Sửa <strong>Mẫu báo vắng/trễ</strong>, <strong>Mẫu báo về sớm</strong>, <strong>Mẫu nhắc học phí</strong>, <strong>Mẫu thông báo kiểm tra định kì</strong>, <strong>Mẫu thông báo đăng ký mới</strong> hoặc <strong>Mẫu thông báo chung</strong>. Giữ đúng các biến trong dấu ngoặc nhọn, ví dụ <strong>{studentName}</strong>, <strong>{className}</strong>, <strong>{absenceStatus}</strong>.</li>
-<li>Tin báo vắng tự thêm khoảng có thể đi bù từ ngày gửi đến Chủ nhật cùng tuần theo giờ Việt Nam. Gửi vào Chủ nhật thì không thêm lịch bù. Dùng <strong>{makeupNotice}</strong> để chọn vị trí chèn câu này trong mẫu; nếu không có biến, hệ thống tự thêm cuối tin. Tin đi trễ và về sớm không kèm lịch bù.</li>
+<li>Tin báo vắng tự tính lịch bù theo ngày và buổi nghỉ: nghỉ sáng bù từ chiều cùng ngày, nghỉ chiều bù từ tối cùng ngày, nghỉ tối hoặc cả ngày bù từ ngày hôm sau. Ví dụ nghỉ tối thứ 2 thì bù từ thứ 3 đến Chủ nhật cùng tuần. Chủ nhật hoặc tuần nghỉ đã hết thì không gợi ý bù; gửi lại tin không gợi ý ngày đã qua. Dùng <strong>{makeupNotice}</strong> để chọn vị trí chèn câu này trong mẫu; nếu không có biến, hệ thống tự thêm cuối tin. Tin đi trễ và về sớm không kèm lịch bù.</li>
 <li>Muốn đổi câu chữ của phần đi bù, sửa ô <strong>Mẫu lịch đi bù</strong> và bấm <strong>Lưu cấu hình</strong>. Giữ các biến <strong>{makeupStartDay}</strong>, <strong>{makeupStartDate}</strong>, <strong>{makeupEndDay}</strong>, <strong>{makeupEndDate}</strong> để lịch vẫn tự tính. Xem kết quả trong bản xem trước của Mẫu báo vắng/trễ.</li>
 <li>Kiểm tra <strong>Xem trước tin nhắn</strong>; đây là dữ liệu mẫu, tin gửi thật lấy thông tin của từng học sinh. Với báo vắng, chọn thử cả Vắng có phép và Vắng không phép.</li>
 <li>Bấm <strong>Lưu cấu hình</strong> trước khi gửi.</li>
@@ -1179,8 +1184,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="/tuition-reminders.js?v=20261014-2"></script>
   <script src="/class-notifications.js?v=20261015-1"></script>
-  <script src="/attendance-message.js?v=20261019-2"></script>
-  <script src="/app.js?v=20261019-2"></script>
+  <script src="/attendance-message.js?v=20261019-3"></script>
+  <script src="/app.js?v=20261019-3"></script>
   <script src="/attendance-alerts.js?v=20261017-2"></script>
   <script src="/exams.js?v=20261009-2"></script>
   <nav class="bottom-nav">

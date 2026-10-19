@@ -819,6 +819,7 @@ function buildMessage(settings, absence, student, now = new Date()) {
   const dict = {
     schoolName: settings.schoolName || 'Trường học',
     date: displayDate,
+    attendanceDate: dateStr,
     studentCode: student.code || '',
     studentName: student.fullName || '',
     className: absence.attendanceClass || student.className || '',

@@ -628,6 +628,8 @@ function renderMessagePreview() {
   const previewType = $('#previewTypeSelect')?.value || 'absence';
   const previewStatusSelect = $('#previewAbsenceStatusSelect');
   if (previewStatusSelect) previewStatusSelect.hidden = previewType !== 'absence';
+  const previewSessionSelect = $('#previewSessionSelect');
+  if (previewSessionSelect) previewSessionSelect.hidden = previewType !== 'absence';
   let templateId = 'messageTemplate';
   if (previewType === 'early-leave') templateId = 'earlyLeaveTemplate';
   if (previewType === 'tuition') templateId = 'tuitionTemplate';
@@ -652,10 +654,11 @@ function renderMessagePreview() {
   const dummyData = {
     schoolName: $('#schoolName')?.value || 'Trường Thăng Long',
     date: displayDate,
+    attendanceDate: selectedDate(),
     studentCode: 'HS001',
     studentName: 'Vũ Phương Hướng Nam',
     className: dummyClass,
-    session: dummySession !== 'Khác' ? dummySession : 'Sáng',
+    session: previewType === 'absence' && previewSessionSelect ? previewSessionSelect.value : dummySession !== 'Khác' ? dummySession : 'Sáng',
     absenceStatus: previewType === 'early-leave' ? 'Về sớm' : previewType === 'exam-notice' ? 'Kiểm tra định kì' : previewType === 'enrollment-notice' ? 'Đăng ký mới' : previewType === 'absence' ? previewStatusSelect?.value || 'Vắng không phép' : '',
     reason: previewType === 'early-leave' ? 'Về sớm lúc 17:00' : 'Không có lý do',
     parentName: 'Phụ huynh HS',
@@ -3522,6 +3525,7 @@ function initEvents() {
   $('#enrollmentNoticeTemplate')?.addEventListener('input', renderMessagePreview);
   $('#previewTypeSelect')?.addEventListener('change', renderMessagePreview);
   $('#previewAbsenceStatusSelect')?.addEventListener('change', renderMessagePreview);
+  $('#previewSessionSelect')?.addEventListener('change', renderMessagePreview);
   $('#schoolName')?.addEventListener('input', renderMessagePreview);
 
   $('#sessionDropdown')?.addEventListener('change', () => {
