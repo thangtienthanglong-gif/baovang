@@ -40,6 +40,7 @@ function setup() {
     normalizeInitialReason: value => value, absenceStatusForMessage: value => value,
     studentByIdMap: students => Object.fromEntries(students.map(row => [row.id, row])),
     resolveAbsenceMessageTemplate: value => value || 'Thông báo vắng',
+    AttendanceMessage: require('../public/attendance-message'),
     defaultSettings: () => db.settings,
     getZaloRuntimeConfig: () => ({ mode: 'personal-real' }),
     isWithdrawnAbsence: (row, student) => student.status === 'Nghỉ học' || student.removedFromClass,

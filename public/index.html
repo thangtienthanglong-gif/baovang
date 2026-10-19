@@ -399,7 +399,12 @@
           <div class="field span-4">
             <label for="messageTemplate">Mẫu báo vắng/trễ</label>
             <textarea id="messageTemplate" rows="3"></textarea>
-            <span class="muted">Biến: {schoolName}, {date}, {studentCode}, {studentName}, {className}, {session}, {absenceStatus}, {reason}, {parentName}, {phone}</span>
+            <span class="muted">Biến: {schoolName}, {date}, {studentCode}, {studentName}, {className}, {session}, {absenceStatus}, {reason}, {parentName}, {phone}, {makeupNotice}. Báo vắng từ thứ 2 đến thứ 7 tự thêm lịch bù từ ngày gửi đến Chủ nhật cùng tuần (giờ Việt Nam); gửi vào Chủ nhật thì bỏ phần đi bù. Dùng {makeupNotice} để chọn vị trí chèn, hoặc để hệ thống tự thêm cuối tin.</span>
+          </div>
+          <div class="field span-4">
+            <label for="earlyLeaveTemplate">Mẫu báo về sớm</label>
+            <textarea id="earlyLeaveTemplate" rows="3"></textarea>
+            <span class="muted">Dùng riêng cho trạng thái Về sớm, không kèm lịch bù. Biến: {schoolName}, {date}, {studentName}, {className}, {session}, {absenceStatus}, {reason}, {parentName}, {phone}. Biến {reason} chứa giờ về sớm đã nhập khi điểm danh.</span>
           </div>
           <div class="field span-4">
             <label for="tuitionTemplate">Mẫu nhắc học phí</label>
@@ -432,6 +437,7 @@
             <div style="display: flex; gap: 8px; margin-bottom: 8px;">
               <select id="previewTypeSelect" style="max-width: 200px;">
                 <option value="absence">Mẫu báo vắng/trễ</option>
+                <option value="early-leave">Mẫu báo về sớm</option>
                 <option value="tuition">Mẫu nhắc học phí</option>
                 <option value="periodic">Thông báo chung</option>
                 <option value="exam-notice">Kiểm tra định kì</option>
@@ -442,7 +448,7 @@
                 <option value="Vắng có phép">Vắng có phép</option>
               </select>
             </div>
-            <span class="muted">Bản xem trước dùng học sinh mẫu; tin gửi thật lấy trạng thái của từng học sinh.</span>
+            <span class="muted">Bản xem trước dùng học sinh mẫu; tin gửi thật lấy trạng thái của từng học sinh. Lịch bù tính theo ngày gửi hiện tại, không theo ngày điểm danh đang chọn.</span>
             <div id="messagePreview" class="preview-box"></div>
           </div>
           <div class="actions span-4">
@@ -770,7 +776,7 @@
 <tr><td>Đang học</td><td>Học sinh đang theo học và không có tình trạng đặc biệt cần ghi nhận.</td></tr>
 <tr><td>Vắng không phép</td><td>Học sinh nghỉ buổi học mà chưa xin phép. Được tính vào cảnh báo vắng không phép.</td></tr>
 <tr><td>Vắng có phép</td><td>Học sinh đã xin phép nghỉ buổi học. Không tính vào cảnh báo vắng không phép.</td></tr>
-<tr><td>Đi trễ / Về sớm</td><td>Ghi nhận học sinh đến muộn hoặc rời lớp sớm.</td></tr>
+<tr><td>Đi trễ / Về sớm</td><td>Ghi nhận học sinh đến muộn hoặc rời lớp sớm. Chọn Về sớm để nhập giờ về và gửi bằng mẫu riêng, không kèm lịch bù.</td></tr>
 <tr><td>Đã bù</td><td>Học sinh đã học bù trước buổi học chính; không tạo yêu cầu báo vắng cho buổi đó.</td></tr>
 <tr><td>Nghỉ học</td><td>Học sinh ngừng theo học. App yêu cầu nhập lý do và lưu vào lịch sử học sinh nghỉ học.</td></tr>
 <tr><td>Trễ học phí</td><td>Ghi nhận trường hợp cần nhắc học phí. Kiểm tra liên hệ ở Lịch sử học phí.</td></tr>
@@ -910,7 +916,8 @@
 <ol>
 <li>Mở <strong>Zalo</strong>, nhập <strong>Tên trường</strong>, chọn <strong>Zalo cá nhân</strong> hoặc <strong>Zalo OA</strong>.</li>
 <li>Cài đặt thời gian chờ và các thông số của chế độ đang dùng. Với Zalo cá nhân, có thể đặt số học sinh mỗi chu kì và số phút nghỉ giữa chu kì.</li>
-<li>Sửa <strong>Mẫu báo vắng/trễ</strong>, <strong>Mẫu nhắc học phí</strong>, <strong>Mẫu thông báo kiểm tra định kì</strong>, <strong>Mẫu thông báo đăng ký mới</strong> hoặc <strong>Mẫu thông báo chung</strong>. Giữ đúng các biến trong dấu ngoặc nhọn, ví dụ <strong>{studentName}</strong>, <strong>{className}</strong>, <strong>{absenceStatus}</strong>.</li>
+<li>Sửa <strong>Mẫu báo vắng/trễ</strong>, <strong>Mẫu báo về sớm</strong>, <strong>Mẫu nhắc học phí</strong>, <strong>Mẫu thông báo kiểm tra định kì</strong>, <strong>Mẫu thông báo đăng ký mới</strong> hoặc <strong>Mẫu thông báo chung</strong>. Giữ đúng các biến trong dấu ngoặc nhọn, ví dụ <strong>{studentName}</strong>, <strong>{className}</strong>, <strong>{absenceStatus}</strong>.</li>
+<li>Tin báo vắng tự thêm khoảng có thể đi bù từ ngày gửi đến Chủ nhật cùng tuần theo giờ Việt Nam. Gửi vào Chủ nhật thì không thêm lịch bù. Dùng <strong>{makeupNotice}</strong> để chọn vị trí chèn câu này trong mẫu; nếu không có biến, hệ thống tự thêm cuối tin. Tin đi trễ và về sớm không kèm lịch bù.</li>
 <li>Kiểm tra <strong>Xem trước tin nhắn</strong>; đây là dữ liệu mẫu, tin gửi thật lấy thông tin của từng học sinh. Với báo vắng, chọn thử cả Vắng có phép và Vắng không phép.</li>
 <li>Bấm <strong>Lưu cấu hình</strong> trước khi gửi.</li>
 </ol>
@@ -1150,10 +1157,24 @@
       </div>
     </form>
   </dialog>
+  <dialog id="earlyLeaveDialog" class="withdrawal-reason-dialog" aria-labelledby="earlyLeaveTitle">
+    <form id="earlyLeaveForm">
+      <h2 id="earlyLeaveTitle">Ghi nhận về sớm</h2>
+      <p id="earlyLeaveStudent" class="muted"></p>
+      <label for="earlyLeaveTime">Giờ về sớm</label>
+      <input id="earlyLeaveTime" type="time" required>
+      <p class="muted">Giờ về được đưa vào mẫu báo về sớm, không kèm lịch bù.</p>
+      <div class="withdrawal-reason-actions">
+        <button class="btn secondary" id="earlyLeaveCancel" type="button">Hủy</button>
+        <button class="btn primary" type="submit">Lưu</button>
+      </div>
+    </form>
+  </dialog>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="/tuition-reminders.js?v=20261014-2"></script>
   <script src="/class-notifications.js?v=20261015-1"></script>
-  <script src="/app.js?v=20261014-28"></script>
+  <script src="/attendance-message.js?v=20261019-1"></script>
+  <script src="/app.js?v=20261019-1"></script>
   <script src="/attendance-alerts.js?v=20261017-2"></script>
   <script src="/exams.js?v=20261009-2"></script>
   <nav class="bottom-nav">

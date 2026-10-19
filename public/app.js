@@ -599,6 +599,7 @@ function renderSettings() {
   if ($('#cozeUserId')) $('#cozeUserId').value = settings.cozeUserId || 'bao-vang-teacher';
   if ($('#cozeAccessToken')) $('#cozeAccessToken').placeholder = settings.hasCozeAccessToken ? 'Đã có token, nhập token mới nếu muốn thay' : 'Chưa có token';
   $('#messageTemplate').value = settings.messageTemplate || '';
+  if ($('#earlyLeaveTemplate')) $('#earlyLeaveTemplate').value = settings.earlyLeaveTemplate || '';
   if ($('#tuitionTemplate')) $('#tuitionTemplate').value = settings.tuitionTemplate || '';
   if ($('#periodicTemplate')) $('#periodicTemplate').value = settings.periodicTemplate || '';
   if ($('#examNoticeTemplate')) $('#examNoticeTemplate').value = settings.examNoticeTemplate || '';
@@ -627,6 +628,7 @@ function renderMessagePreview() {
   const previewStatusSelect = $('#previewAbsenceStatusSelect');
   if (previewStatusSelect) previewStatusSelect.hidden = previewType !== 'absence';
   let templateId = 'messageTemplate';
+  if (previewType === 'early-leave') templateId = 'earlyLeaveTemplate';
   if (previewType === 'tuition') templateId = 'tuitionTemplate';
   if (previewType === 'periodic') templateId = 'periodicTemplate';
   if (previewType === 'exam-notice') templateId = 'examNoticeTemplate';
@@ -653,20 +655,15 @@ function renderMessagePreview() {
     studentName: 'Vũ Phương Hướng Nam',
     className: dummyClass,
     session: dummySession !== 'Khác' ? dummySession : 'Sáng',
-    absenceStatus: previewType === 'exam-notice' ? 'Kiểm tra định kì' : previewType === 'enrollment-notice' ? 'Đăng ký mới' : previewStatusSelect?.value || 'Vắng không phép',
-    reason: 'Không có lý do',
+    absenceStatus: previewType === 'early-leave' ? 'Về sớm' : previewType === 'exam-notice' ? 'Kiểm tra định kì' : previewType === 'enrollment-notice' ? 'Đăng ký mới' : previewType === 'absence' ? previewStatusSelect?.value || 'Vắng không phép' : '',
+    reason: previewType === 'early-leave' ? 'Về sớm lúc 17:00' : 'Không có lý do',
     parentName: 'Phụ huynh HS',
     phone: '0901234567',
     tuitionDebt: '',
     birthday: '15/05/2012'
   };
 
-  let previewText = template;
-  for (const [key, value] of Object.entries(dummyData)) {
-    previewText = previewText.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
-  }
-
-  previewBox.textContent = previewText;
+  previewBox.textContent = AttendanceMessage.renderTemplate(template, dummyData);
 }
 
 function renderZaloModeFields() {
@@ -2055,6 +2052,41 @@ function requestWithdrawalReason(student) {
   });
 }
 
+function requestEarlyLeaveTime(student) {
+  const dialog = $('#earlyLeaveDialog');
+  const form = $('#earlyLeaveForm');
+  const input = $('#earlyLeaveTime');
+  const cancelButton = $('#earlyLeaveCancel');
+  if (!dialog || !form || !input || !cancelButton) {
+    throw new Error('Không mở được hộp thoại giờ về sớm. Vui lòng tải lại trang.');
+  }
+  if (dialog.open) return Promise.resolve(null);
+  $('#earlyLeaveStudent').textContent = [student.fullName, student.className].filter(Boolean).join(' · ');
+  input.value = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+  }).format(new Date());
+  return new Promise(resolve => {
+    const finish = value => {
+      form.removeEventListener('submit', onSubmit);
+      dialog.removeEventListener('close', onClose);
+      cancelButton.removeEventListener('click', onCancel);
+      dialog.close();
+      resolve(value);
+    };
+    const onSubmit = event => {
+      event.preventDefault();
+      if (form.reportValidity()) finish(input.value);
+    };
+    const onClose = () => finish(null);
+    const onCancel = () => finish(null);
+    form.addEventListener('submit', onSubmit);
+    dialog.addEventListener('close', onClose);
+    cancelButton.addEventListener('click', onCancel);
+    dialog.showModal();
+    input.focus();
+  });
+}
+
 async function updateRosterStatus(select) {
   const studentId = select.dataset.studentId;
   const attendanceClass = select.dataset.attendanceClass;
@@ -2130,6 +2162,21 @@ async function updateRosterStatus(select) {
   let withdrawalReason;
   let withdrawalDate;
   let withdrawalDay;
+  let initialReason = status;
+  if (status === 'Về sớm') {
+    const student = state.students.find(row => row.id === studentId);
+    if (!student) throw new Error('Không tìm thấy học sinh. Vui lòng tải lại danh sách.');
+    const current = absenceForStudent(studentId, attendanceClass);
+    select.value = current ? normalizeAbsenceStatus(current.absenceStatus) : 'Đang học';
+    const branchId = getActiveBranch();
+    const date = selectedDate();
+    const time = await requestEarlyLeaveTime(student);
+    if (time === null) return;
+    if (getActiveBranch() !== branchId || selectedDate() !== date) {
+      throw new Error('Chi nhánh hoặc ngày điểm danh đã thay đổi. Vui lòng chọn lại học sinh.');
+    }
+    initialReason = `Về sớm lúc ${time}`;
+  }
   if (status === 'Nghỉ học') {
     const student = state.students.find(row => row.id === studentId);
     if (!student) throw new Error('Không tìm thấy học sinh. Vui lòng tải lại danh sách.');
@@ -2157,7 +2204,7 @@ async function updateRosterStatus(select) {
       method: 'PUT',
       body: JSON.stringify({
         absenceStatus: status,
-        initialReason: status,
+        initialReason,
         ...(status === 'Nghỉ học' ? { note: withdrawalReason } : {}),
         sendZalo: status !== 'Nghỉ học' && status !== 'Đã bù'
       })
@@ -2181,7 +2228,7 @@ async function updateRosterStatus(select) {
       attendanceClass: className,
       session: sessionInfo.sessionName,
       absenceStatus: status,
-      initialReason: status,
+      initialReason,
       ...(status === 'Nghỉ học' ? { note: withdrawalReason } : {}),
       sendZalo: status !== 'Nghỉ học' && status !== 'Đã bù'
     })
@@ -3003,6 +3050,7 @@ function buildSettingsPayload() {
     cozeAccessToken: $('#cozeAccessToken') ? normalizeAccessTokenInput($('#cozeAccessToken').value) : '',
     cozeUserId: $('#cozeUserId') ? $('#cozeUserId').value : '',
     messageTemplate: $('#messageTemplate').value,
+    earlyLeaveTemplate: $('#earlyLeaveTemplate')?.value || '',
     tuitionTemplate: $('#tuitionTemplate')?.value || '',
     periodicTemplate: $('#periodicTemplate')?.value || '',
     examNoticeTemplate: $('#examNoticeTemplate')?.value || '',
@@ -3464,6 +3512,7 @@ function initEvents() {
   });
 
   $('#messageTemplate')?.addEventListener('input', renderMessagePreview);
+  $('#earlyLeaveTemplate')?.addEventListener('input', renderMessagePreview);
   $('#tuitionTemplate')?.addEventListener('input', renderMessagePreview);
   $('#periodicTemplate')?.addEventListener('input', renderMessagePreview);
   $('#examNoticeTemplate')?.addEventListener('input', renderMessagePreview);

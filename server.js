@@ -16,6 +16,7 @@ const { buildAttendanceAlerts, subjectForClass, registerAttendanceAlertRoutes } 
 const { historyDateRange, matchesHistoryDate, historyExportSuffix } = require('./lib/history-date-range');
 const { groupQuitStudents } = require('./lib/quit-history');
 const { registerStudentNotificationRoutes } = require('./lib/student-notifications');
+const AttendanceMessage = require('./public/attendance-message');
 const { DEFAULT_TUITION_TEMPLATE, resolveTuitionTemplate, buildTuitionReminders,
   selectTuitionContacts, registerTuitionReminderRoutes } = require('./lib/tuition-reminders');
 
@@ -100,6 +101,7 @@ const ABSENCE_STATUSES = ['Vắng', 'Có phép', 'Đã bù', 'Đi trễ', 'Về 
 const MAKEUP_ATTENDANCE_STATUSES = new Set(['Vắng', 'Có phép', 'Đi trễ', 'Về sớm']);
 const DEFAULT_ABSENCE_MESSAGE_TEMPLATE = 'Kính gửi Quý phụ huynh, {schoolName} thông báo học sinh {studentName}, lớp {className}.\nHọc sinh: {absenceStatus} - {session} ngày {date}.\nPhụ huynh vui lòng phản hồi với nhà trường nếu cần bổ sung thông tin.';
 const OLD_ABSENCE_MESSAGE_TEMPLATE = 'Kính gửi Quý phụ huynh, {schoolName} thông báo học sinh {studentName}, lớp {className}.\nVắng học {session} ngày {date}.\nHọc sinh: {absenceStatus}.\nPhụ huynh vui lòng phản hồi với nhà trường nếu cần bổ sung thông tin.';
+const DEFAULT_EARLY_LEAVE_TEMPLATE = 'Kính gửi Quý phụ huynh, {schoolName} thông báo học sinh {studentName}, lớp {className}.\nHọc sinh: {reason} - {session} ngày {date}.\nPhụ huynh vui lòng xác nhận thông tin với nhà trường.';
 const pendingAiActions = new Map();
 
 app.use(express.json({ limit: '5mb' }));
@@ -358,6 +360,7 @@ function defaultSettings() {
     cozeAccessToken: '',
     cozeUserId: 'bao-vang-teacher',
     messageTemplate: DEFAULT_ABSENCE_MESSAGE_TEMPLATE,
+    earlyLeaveTemplate: DEFAULT_EARLY_LEAVE_TEMPLATE,
     tuitionTemplate: DEFAULT_TUITION_TEMPLATE,
     periodicTemplate: 'Kính gửi Quý phụ huynh, {schoolName} gửi thông báo định kì/khóa mới cho em {studentName}, lớp {className}.',
     examNoticeTemplate: 'Kính gửi Quý phụ huynh, {schoolName} thông báo kiểm tra định kì cho em {studentName}, lớp {className}.\nLịch kiểm tra: [Nhập ngày, giờ].\nNội dung ôn tập: [Nhập nội dung].\nTrân trọng!',
@@ -400,6 +403,7 @@ function publicSettings(settings) {
     cozeUserId: cozeConfig.userId,
     hasCozeAccessToken: Boolean(cozeConfig.accessToken),
     messageTemplate: resolveAbsenceMessageTemplate(settings.messageTemplate),
+    earlyLeaveTemplate: settings.earlyLeaveTemplate || DEFAULT_EARLY_LEAVE_TEMPLATE,
     tuitionTemplate: resolveTuitionTemplate(settings.tuitionTemplate),
     periodicTemplate: settings.periodicTemplate || defaultSettings().periodicTemplate,
     examNoticeTemplate: settings.examNoticeTemplate || defaultSettings().examNoticeTemplate,
@@ -805,7 +809,7 @@ function sendWorkbook(res, filename, sheets) {
   res.send(buffer);
 }
 
-function buildMessage(settings, absence, student) {
+function buildMessage(settings, absence, student, now = new Date()) {
   const dateStr = absence.date || '';
   const dateParts = dateStr.split('-');
   const displayDate = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : dateStr;
@@ -827,7 +831,9 @@ function buildMessage(settings, absence, student) {
   
   const status = normalizeAbsenceStatus(absence.absenceStatus);
   let template = resolveAbsenceMessageTemplate(settings.messageTemplate);
-  if (status === 'Học phí' || status === 'Trễ học phí') {
+  if (status === 'Về sớm') {
+    template = settings.earlyLeaveTemplate || DEFAULT_EARLY_LEAVE_TEMPLATE;
+  } else if (status === 'Học phí' || status === 'Trễ học phí') {
     template = resolveTuitionTemplate(settings.tuitionTemplate);
   } else if (status === 'Kiểm tra định kì') {
     template = settings.examNoticeTemplate || defaultSettings().examNoticeTemplate;
@@ -837,7 +843,7 @@ function buildMessage(settings, absence, student) {
     template = settings.periodicTemplate || 'Kính gửi Quý phụ huynh, {schoolName} gửi thông báo định kỳ/khóa mới cho em {studentName}, lớp {className}.';
   }
   
-  let msg = template.replace(/\{(\w+)\}/g, (_, key) => dict[key] ?? '');
+  let msg = AttendanceMessage.renderTemplate(template, dict, now);
   
   if (status === 'Đi trễ') {
     msg = msg.replace(/vắng học/gi, 'đi trễ');
@@ -2944,6 +2950,7 @@ app.put('/api/settings', async (req, res, next) => {
       cozeBotId: cleanText(req.body.cozeBotId),
       cozeUserId: cleanText(req.body.cozeUserId) || 'bao-vang-teacher',
       messageTemplate: cleanMultilineText(req.body.messageTemplate) || defaultSettings().messageTemplate,
+      earlyLeaveTemplate: req.body.earlyLeaveTemplate === undefined ? (db.settings?.earlyLeaveTemplate || DEFAULT_EARLY_LEAVE_TEMPLATE) : cleanMultilineText(req.body.earlyLeaveTemplate) || DEFAULT_EARLY_LEAVE_TEMPLATE,
       tuitionTemplate: cleanMultilineText(req.body.tuitionTemplate) || defaultSettings().tuitionTemplate,
       periodicTemplate: cleanMultilineText(req.body.periodicTemplate) || defaultSettings().periodicTemplate,
       examNoticeTemplate: req.body.examNoticeTemplate === undefined ? (db.settings?.examNoticeTemplate || defaultSettings().examNoticeTemplate) : cleanMultilineText(req.body.examNoticeTemplate) || defaultSettings().examNoticeTemplate,
