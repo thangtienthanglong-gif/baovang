@@ -39,6 +39,19 @@ test('Vietnam midnight changes the send date, even on a UTC server', () => {
   assert.match(AttendanceMessage.makeupNotice('Vắng', new Date('2026-12-31T08:00:00Z')), /31\/12\/2026.*03\/01\/2027/);
 });
 
+test('editable makeup wording retains automatic dates and still disappears on Sunday', () => {
+  const template = 'Em được học bù trong tuần: {makeupStartDay} ({makeupStartDate}) – {makeupEndDay} ({makeupEndDate}).';
+  assert.equal(AttendanceMessage.makeupNotice('Vắng', new Date('2026-10-19T08:00:00Z'), template),
+    'Em được học bù trong tuần: thứ 2 (19/10/2026) – Chủ nhật (25/10/2026).');
+  for (const status of ['Vắng', 'Có phép', 'Về sớm', 'Đi trễ', 'Học phí']) {
+    assert.equal(AttendanceMessage.makeupNotice(status, new Date('2026-10-25T08:00:00Z'), template), '');
+  }
+  for (const template of ['', '   ', undefined]) {
+    assert.equal(AttendanceMessage.makeupNotice('Vắng', new Date('2026-10-19T08:00:00Z'), template),
+      'Học sinh có thể đi bù từ thứ 2 ngày 19/10/2026 đến Chủ nhật ngày 25/10/2026.');
+  }
+});
+
 test('all absence aliases get makeup; unrelated notifications and early departure never do', () => {
   const now = new Date('2026-10-19T08:00:00Z');
   for (const status of ['Vắng', 'Có phép', 'Vắng có phép', 'Vắng không phép', 'Không phép', 'Cả ngày']) {
@@ -68,6 +81,9 @@ test('server uses send date rather than attendance date, with an independent ear
   const settings = { messageTemplate: '{studentName}: {absenceStatus}, {date}.', earlyLeaveTemplate: 'TIN VỀ SỚM: {studentName}, {reason}, {date}.' };
   assert.match(context.buildMessage(settings, record, student, new Date('2026-10-19T08:00:00Z')), /01\/09\/2026.*\n.*19\/10\/2026.*25\/10\/2026/);
   assert.doesNotMatch(context.buildMessage(settings, record, student, new Date('2026-10-25T08:00:00Z')), /đi bù/);
+  const customized = { ...settings, makeupNoticeTemplate: 'Lịch bù: {makeupStartDate} đến {makeupEndDate}.' };
+  assert.match(context.buildMessage(customized, record, student, new Date('2026-10-19T08:00:00Z')), /\nLịch bù: 19\/10\/2026 đến 25\/10\/2026\.$/);
+  assert.doesNotMatch(context.buildMessage(customized, record, student, new Date('2026-10-25T08:00:00Z')), /Lịch bù/);
   const early = { ...record, absenceStatus: 'Về sớm', initialReason: 'Về sớm lúc 17:15' };
   const message = context.buildMessage(settings, early, student, new Date('2026-10-19T08:00:00Z'));
   assert.equal(message, 'TIN VỀ SỚM: Nguyễn An, Về sớm lúc 17:15, 01/09/2026.');
@@ -77,7 +93,7 @@ test('server uses send date rather than attendance date, with an independent ear
 
 test('settings preview matches the server and never adds makeup to non-absence templates', () => {
   const now = new Date('2026-10-19T08:00:00Z');
-  const shared = { renderTemplate: (template, data) => AttendanceMessage.renderTemplate(template, data, now) };
+  const shared = { renderTemplate: (template, data, _now, makeupTemplate) => AttendanceMessage.renderTemplate(template, data, now, makeupTemplate) };
   const fields = Object.fromEntries(Object.entries({ previewTypeSelect: 'absence', previewAbsenceStatusSelect: 'Vắng có phép',
     messageTemplate: '{studentName}: {absenceStatus}, {date}.', earlyLeaveTemplate: '{studentName}: {reason}, {date}.',
     tuitionTemplate: 'Nhắc học phí: {studentName}', periodicTemplate: 'Thông báo: {studentName}', schoolName: 'Trường học'
@@ -88,6 +104,9 @@ test('settings preview matches the server and never adds makeup to non-absence t
   vm.runInNewContext(slice(frontend, 'function renderMessagePreview(', 'function renderZaloModeFields('), context);
   context.renderMessagePreview();
   assert.match(fields.messagePreview.textContent, /Vắng có phép, 01\/09\/2026.*\n.*19\/10\/2026.*25\/10\/2026/);
+  fields.makeupNoticeTemplate = { value: 'Lịch bù: {makeupStartDate} đến {makeupEndDate}.' };
+  context.renderMessagePreview();
+  assert.match(fields.messagePreview.textContent, /\nLịch bù: 19\/10\/2026 đến 25\/10\/2026\.$/);
   fields.previewTypeSelect.value = 'early-leave';
   context.renderMessagePreview();
   assert.match(fields.messagePreview.textContent, /Về sớm lúc 17:00/);

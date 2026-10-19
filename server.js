@@ -361,6 +361,7 @@ function defaultSettings() {
     cozeUserId: 'bao-vang-teacher',
     messageTemplate: DEFAULT_ABSENCE_MESSAGE_TEMPLATE,
     earlyLeaveTemplate: DEFAULT_EARLY_LEAVE_TEMPLATE,
+    makeupNoticeTemplate: AttendanceMessage.DEFAULT_MAKEUP_NOTICE_TEMPLATE,
     tuitionTemplate: DEFAULT_TUITION_TEMPLATE,
     periodicTemplate: 'Kính gửi Quý phụ huynh, {schoolName} gửi thông báo định kì/khóa mới cho em {studentName}, lớp {className}.',
     examNoticeTemplate: 'Kính gửi Quý phụ huynh, {schoolName} thông báo kiểm tra định kì cho em {studentName}, lớp {className}.\nLịch kiểm tra: [Nhập ngày, giờ].\nNội dung ôn tập: [Nhập nội dung].\nTrân trọng!',
@@ -404,6 +405,7 @@ function publicSettings(settings) {
     hasCozeAccessToken: Boolean(cozeConfig.accessToken),
     messageTemplate: resolveAbsenceMessageTemplate(settings.messageTemplate),
     earlyLeaveTemplate: settings.earlyLeaveTemplate || DEFAULT_EARLY_LEAVE_TEMPLATE,
+    makeupNoticeTemplate: settings.makeupNoticeTemplate || AttendanceMessage.DEFAULT_MAKEUP_NOTICE_TEMPLATE,
     tuitionTemplate: resolveTuitionTemplate(settings.tuitionTemplate),
     periodicTemplate: settings.periodicTemplate || defaultSettings().periodicTemplate,
     examNoticeTemplate: settings.examNoticeTemplate || defaultSettings().examNoticeTemplate,
@@ -843,7 +845,7 @@ function buildMessage(settings, absence, student, now = new Date()) {
     template = settings.periodicTemplate || 'Kính gửi Quý phụ huynh, {schoolName} gửi thông báo định kỳ/khóa mới cho em {studentName}, lớp {className}.';
   }
   
-  let msg = AttendanceMessage.renderTemplate(template, dict, now);
+  let msg = AttendanceMessage.renderTemplate(template, dict, now, settings.makeupNoticeTemplate);
   
   if (status === 'Đi trễ') {
     msg = msg.replace(/vắng học/gi, 'đi trễ');
@@ -2951,6 +2953,7 @@ app.put('/api/settings', async (req, res, next) => {
       cozeUserId: cleanText(req.body.cozeUserId) || 'bao-vang-teacher',
       messageTemplate: cleanMultilineText(req.body.messageTemplate) || defaultSettings().messageTemplate,
       earlyLeaveTemplate: req.body.earlyLeaveTemplate === undefined ? (db.settings?.earlyLeaveTemplate || DEFAULT_EARLY_LEAVE_TEMPLATE) : cleanMultilineText(req.body.earlyLeaveTemplate) || DEFAULT_EARLY_LEAVE_TEMPLATE,
+      makeupNoticeTemplate: req.body.makeupNoticeTemplate === undefined ? (db.settings?.makeupNoticeTemplate || AttendanceMessage.DEFAULT_MAKEUP_NOTICE_TEMPLATE) : cleanMultilineText(req.body.makeupNoticeTemplate) || AttendanceMessage.DEFAULT_MAKEUP_NOTICE_TEMPLATE,
       tuitionTemplate: cleanMultilineText(req.body.tuitionTemplate) || defaultSettings().tuitionTemplate,
       periodicTemplate: cleanMultilineText(req.body.periodicTemplate) || defaultSettings().periodicTemplate,
       examNoticeTemplate: req.body.examNoticeTemplate === undefined ? (db.settings?.examNoticeTemplate || defaultSettings().examNoticeTemplate) : cleanMultilineText(req.body.examNoticeTemplate) || defaultSettings().examNoticeTemplate,

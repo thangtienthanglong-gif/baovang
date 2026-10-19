@@ -4,8 +4,9 @@
   else root.AttendanceMessage = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   const ABSENT_STATUSES = new Set(['Vắng', 'Có phép', 'Vắng không phép', 'Vắng có phép', 'Không phép', 'Cả ngày']);
+  const DEFAULT_MAKEUP_NOTICE_TEMPLATE = 'Học sinh có thể đi bù từ {makeupStartDay} ngày {makeupStartDate} đến {makeupEndDay} ngày {makeupEndDate}.';
 
-  function makeupNotice(status, now = new Date()) {
+  function makeupNotice(status, now = new Date(), template = DEFAULT_MAKEUP_NOTICE_TEMPLATE) {
     if (!ABSENT_STATUSES.has(status)) return '';
     // Send date follows Vietnam time even when the server runs in UTC.
     const parts = new Intl.DateTimeFormat('en-GB', {
@@ -18,15 +19,20 @@
     const end = new Date(start);
     end.setUTCDate(end.getUTCDate() + 7 - weekday);
     const display = date => `${String(date.getUTCDate()).padStart(2, '0')}/${String(date.getUTCMonth() + 1).padStart(2, '0')}/${date.getUTCFullYear()}`;
-    return `Học sinh có thể đi bù từ thứ ${weekday + 1} ngày ${display(start)} đến Chủ nhật ngày ${display(end)}.`;
+    const values = {
+      makeupStartDay: `thứ ${weekday + 1}`, makeupStartDate: display(start),
+      makeupEndDay: 'Chủ nhật', makeupEndDate: display(end)
+    };
+    const text = String(template || '').trim() || DEFAULT_MAKEUP_NOTICE_TEMPLATE;
+    return text.replace(/\{(makeupStartDay|makeupStartDate|makeupEndDay|makeupEndDate)\}/g, (_, key) => values[key]);
   }
 
-  function renderTemplate(template, data, now = new Date()) {
-    const notice = makeupNotice(data.absenceStatus, now);
+  function renderTemplate(template, data, now = new Date(), makeupTemplate) {
+    const notice = makeupNotice(data.absenceStatus, now, makeupTemplate);
     const values = { ...data, makeupNotice: notice };
     const message = template.replace(/\{(\w+)\}/g, (_, key) => values[key] ?? '').trim();
     return notice && !template.includes('{makeupNotice}') ? `${message}\n${notice}` : message;
   }
 
-  return { makeupNotice, renderTemplate };
+  return { makeupNotice, renderTemplate, DEFAULT_MAKEUP_NOTICE_TEMPLATE };
 });

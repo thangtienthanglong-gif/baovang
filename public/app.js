@@ -600,6 +600,7 @@ function renderSettings() {
   if ($('#cozeAccessToken')) $('#cozeAccessToken').placeholder = settings.hasCozeAccessToken ? 'Đã có token, nhập token mới nếu muốn thay' : 'Chưa có token';
   $('#messageTemplate').value = settings.messageTemplate || '';
   if ($('#earlyLeaveTemplate')) $('#earlyLeaveTemplate').value = settings.earlyLeaveTemplate || '';
+  if ($('#makeupNoticeTemplate')) $('#makeupNoticeTemplate').value = settings.makeupNoticeTemplate || AttendanceMessage.DEFAULT_MAKEUP_NOTICE_TEMPLATE;
   if ($('#tuitionTemplate')) $('#tuitionTemplate').value = settings.tuitionTemplate || '';
   if ($('#periodicTemplate')) $('#periodicTemplate').value = settings.periodicTemplate || '';
   if ($('#examNoticeTemplate')) $('#examNoticeTemplate').value = settings.examNoticeTemplate || '';
@@ -663,7 +664,7 @@ function renderMessagePreview() {
     birthday: '15/05/2012'
   };
 
-  previewBox.textContent = AttendanceMessage.renderTemplate(template, dummyData);
+  previewBox.textContent = AttendanceMessage.renderTemplate(template, dummyData, new Date(), $('#makeupNoticeTemplate')?.value);
 }
 
 function renderZaloModeFields() {
@@ -3051,6 +3052,7 @@ function buildSettingsPayload() {
     cozeUserId: $('#cozeUserId') ? $('#cozeUserId').value : '',
     messageTemplate: $('#messageTemplate').value,
     earlyLeaveTemplate: $('#earlyLeaveTemplate')?.value || '',
+    makeupNoticeTemplate: $('#makeupNoticeTemplate')?.value || '',
     tuitionTemplate: $('#tuitionTemplate')?.value || '',
     periodicTemplate: $('#periodicTemplate')?.value || '',
     examNoticeTemplate: $('#examNoticeTemplate')?.value || '',
@@ -3513,6 +3515,7 @@ function initEvents() {
 
   $('#messageTemplate')?.addEventListener('input', renderMessagePreview);
   $('#earlyLeaveTemplate')?.addEventListener('input', renderMessagePreview);
+  $('#makeupNoticeTemplate')?.addEventListener('input', renderMessagePreview);
   $('#tuitionTemplate')?.addEventListener('input', renderMessagePreview);
   $('#periodicTemplate')?.addEventListener('input', renderMessagePreview);
   $('#examNoticeTemplate')?.addEventListener('input', renderMessagePreview);

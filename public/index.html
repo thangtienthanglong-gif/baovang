@@ -402,6 +402,11 @@
             <span class="muted">Biến: {schoolName}, {date}, {studentCode}, {studentName}, {className}, {session}, {absenceStatus}, {reason}, {parentName}, {phone}, {makeupNotice}. Báo vắng từ thứ 2 đến thứ 7 tự thêm lịch bù từ ngày gửi đến Chủ nhật cùng tuần (giờ Việt Nam); gửi vào Chủ nhật thì bỏ phần đi bù. Dùng {makeupNotice} để chọn vị trí chèn, hoặc để hệ thống tự thêm cuối tin.</span>
           </div>
           <div class="field span-4">
+            <label for="makeupNoticeTemplate">Mẫu lịch đi bù</label>
+            <textarea id="makeupNoticeTemplate" rows="3"></textarea>
+            <span class="muted">Sửa câu chữ tại đây và giữ các biến để thứ, ngày tự cập nhật: {makeupStartDay} = thứ bắt đầu, {makeupStartDate} = ngày gửi, {makeupEndDay} = Chủ nhật, {makeupEndDate} = ngày cuối tuần. Chỉ thêm vào tin báo vắng từ thứ 2 đến thứ 7; Chủ nhật tự bỏ. Để trống sẽ dùng mẫu mặc định.</span>
+          </div>
+          <div class="field span-4">
             <label for="earlyLeaveTemplate">Mẫu báo về sớm</label>
             <textarea id="earlyLeaveTemplate" rows="3"></textarea>
             <span class="muted">Dùng riêng cho trạng thái Về sớm, không kèm lịch bù. Biến: {schoolName}, {date}, {studentName}, {className}, {session}, {absenceStatus}, {reason}, {parentName}, {phone}. Biến {reason} chứa giờ về sớm đã nhập khi điểm danh.</span>
@@ -918,6 +923,7 @@
 <li>Cài đặt thời gian chờ và các thông số của chế độ đang dùng. Với Zalo cá nhân, có thể đặt số học sinh mỗi chu kì và số phút nghỉ giữa chu kì.</li>
 <li>Sửa <strong>Mẫu báo vắng/trễ</strong>, <strong>Mẫu báo về sớm</strong>, <strong>Mẫu nhắc học phí</strong>, <strong>Mẫu thông báo kiểm tra định kì</strong>, <strong>Mẫu thông báo đăng ký mới</strong> hoặc <strong>Mẫu thông báo chung</strong>. Giữ đúng các biến trong dấu ngoặc nhọn, ví dụ <strong>{studentName}</strong>, <strong>{className}</strong>, <strong>{absenceStatus}</strong>.</li>
 <li>Tin báo vắng tự thêm khoảng có thể đi bù từ ngày gửi đến Chủ nhật cùng tuần theo giờ Việt Nam. Gửi vào Chủ nhật thì không thêm lịch bù. Dùng <strong>{makeupNotice}</strong> để chọn vị trí chèn câu này trong mẫu; nếu không có biến, hệ thống tự thêm cuối tin. Tin đi trễ và về sớm không kèm lịch bù.</li>
+<li>Muốn đổi câu chữ của phần đi bù, sửa ô <strong>Mẫu lịch đi bù</strong> và bấm <strong>Lưu cấu hình</strong>. Giữ các biến <strong>{makeupStartDay}</strong>, <strong>{makeupStartDate}</strong>, <strong>{makeupEndDay}</strong>, <strong>{makeupEndDate}</strong> để lịch vẫn tự tính. Xem kết quả trong bản xem trước của Mẫu báo vắng/trễ.</li>
 <li>Kiểm tra <strong>Xem trước tin nhắn</strong>; đây là dữ liệu mẫu, tin gửi thật lấy thông tin của từng học sinh. Với báo vắng, chọn thử cả Vắng có phép và Vắng không phép.</li>
 <li>Bấm <strong>Lưu cấu hình</strong> trước khi gửi.</li>
 </ol>
@@ -1173,8 +1179,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="/tuition-reminders.js?v=20261014-2"></script>
   <script src="/class-notifications.js?v=20261015-1"></script>
-  <script src="/attendance-message.js?v=20261019-1"></script>
-  <script src="/app.js?v=20261019-1"></script>
+  <script src="/attendance-message.js?v=20261019-2"></script>
+  <script src="/app.js?v=20261019-2"></script>
   <script src="/attendance-alerts.js?v=20261017-2"></script>
   <script src="/exams.js?v=20261009-2"></script>
   <nav class="bottom-nav">
