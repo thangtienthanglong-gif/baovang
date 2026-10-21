@@ -2100,8 +2100,33 @@ async function updateRosterStatus(select) {
   const attendanceClass = select.dataset.attendanceClass;
   const absenceId = select.dataset.absenceId;
   const status = normalizeAbsenceStatus(select.value);
-  const refreshAttendance = () => ['Nghỉ học', 'Đã bù'].includes(status)
-    ? loadBootstrap() : loadAttendanceAbsences();
+  const attendanceBranch = getActiveBranch();
+  const attendanceDate = selectedDate();
+  const refreshAttendance = async (result, removedId = '') => {
+    if (status === 'Nghỉ học') return loadBootstrap();
+    if (getActiveBranch() !== attendanceBranch || selectedDate() !== attendanceDate) return;
+    const absence = result?.absence;
+    if ((!absence && !removedId) || !Array.isArray(state.absences)) return loadAttendanceAbsences();
+    const currentClass = getAttendanceFilters().className;
+    if (currentClass && currentClass !== 'ALL' && currentClass !== (absence?.className || attendanceClass)) return;
+    state.absences = state.absences.filter(row => row.id !== (removedId || absence.id));
+    if (absence) state.absences.push(absence);
+    const actionable = state.absences.filter(row => !row.notificationOnly
+      && normalizeAbsenceStatus(row.absenceStatus) !== 'Đã bù'
+      && row.studentStatus !== 'Nghỉ học' && !row.studentRemovedFromClass);
+    const count = field => value => actionable.filter(row => row[field] === value).length;
+    const call = count('callStatus'), notice = count('noticeStatus');
+    state.summary = {
+      total: actionable.length, pending: call('Chưa gọi'), called: call('Đã gọi'),
+      noAnswer: call('Không nghe máy'), callBack: call('Hẹn gọi lại'), wrongNumber: call('Sai số'),
+      noticeWaiting: notice('Chờ gửi'), noticeSent: notice('Đã gửi'), noticeFailed: notice('Lỗi gửi'),
+      noticeSkipped: notice('Không gửi') + notice('Chạy thử') + notice('Chưa gửi')
+    };
+    renderSummary();
+    renderAbsences();
+    renderClassDropdown();
+    renderRoster();
+  };
 
   if (['Kiểm tra định kì', 'Đăng ký mới'].includes(status)) {
     const student = state.students.find(row => row.id === studentId);
@@ -2204,7 +2229,7 @@ async function updateRosterStatus(select) {
     if (absenceId) {
       await api(`/api/absences/${absenceId}`, { method: 'DELETE' });
       toast('Đã chuyển học sinh về trạng thái đang học.');
-      await refreshAttendance();
+      await refreshAttendance(null, absenceId);
     }
     return;
   }
@@ -2221,7 +2246,7 @@ async function updateRosterStatus(select) {
     });
     toast(status === 'Đã bù' ? 'Đã ghi nhận học sinh học bù trước buổi này; không gửi báo vắng.'
       : status === 'Nghỉ học' ? 'Đã chuyển học sinh vào Lịch sử nghỉ học; không gửi Zalo.' : 'Đã cập nhật trạng thái.' + queuedMessage(result));
-    await refreshAttendance();
+    await refreshAttendance(result);
     if (status === 'Nghỉ học') await loadQuitStudents();
     return;
   }
@@ -2245,7 +2270,7 @@ async function updateRosterStatus(select) {
   });
   toast(status === 'Đã bù' ? 'Đã ghi nhận học sinh học bù trước buổi này; không gửi báo vắng.'
     : status === 'Nghỉ học' ? 'Đã chuyển học sinh vào Lịch sử nghỉ học; không gửi Zalo.' : 'Đã cập nhật trạng thái.' + queuedMessage(result));
-  await refreshAttendance();
+  await refreshAttendance(result);
   if (status === 'Nghỉ học') await loadQuitStudents();
 }
 

@@ -22,10 +22,11 @@ function setup() {
     getClassScheduleInfo: () => ({ sessionName: 'Tối' }),
     api: async (url, options) => {
       requests.push({ url, options });
-      return options ? {} : { absences: [{ id: 'saved', studentId: 's1', absenceStatus: 'Vắng' }], summary: { total: 1 } };
+      return options ? { absence: { id: 'saved', date, className: '8A', studentId: 's1', absenceStatus: 'Vắng', noticeStatus: 'Chờ gửi', callStatus: 'Chưa gọi' } }
+        : { absences: [{ id: 'saved', studentId: 's1', absenceStatus: 'Vắng' }], summary: { total: 1 } };
     },
     loadBootstrap: async () => { throw Error('Full bootstrap must not run after ordinary attendance'); },
-    toast() {}, queuedMessage: () => '', renderSummary() {}, renderClassDropdown() {}, renderRoster() {}, renderFilters() {}
+    toast() {}, queuedMessage: () => '', renderSummary() {}, renderAbsences() {}, renderClassDropdown() {}, renderRoster() {}, renderFilters() {}
   };
   vm.createContext(context);
   vm.runInContext(slice(frontend, 'async function loadAttendanceAbsences()', 'async function loadStudents('), context);
@@ -34,20 +35,21 @@ function setup() {
 }
 
 for (const absenceId of ['', 'a1']) {
-  test(`ordinary attendance uses one filtered refresh and no full reload (${absenceId || 'new'})`, async () => {
+  test(`ordinary attendance updates the queue from its saved response without a second API (${absenceId || 'new'})`, async () => {
     const app = setup();
     await app.context.updateRosterStatus({ value: 'Vắng', dataset: { studentId: 's1', attendanceClass: '8A', absenceId } });
-    assert.equal(app.requests.length, 2);
+    assert.equal(app.requests.length, 1);
     assert.equal(app.requests[0].options.method, absenceId ? 'PUT' : 'POST');
-    assert.equal(app.requests[1].url, '/api/absences?date=2026-10-21&className=8A');
     assert.equal(app.context.state.absences[0].id, 'saved');
+    assert.equal(app.context.state.summary.total, 1);
+    assert.equal(app.context.state.summary.noticeWaiting, 1);
   });
 }
 
-test('returning to studying refreshes attendance once after deleting the absence', async () => {
+test('returning to studying updates the queue without another read', async () => {
   const app = setup();
   await app.context.updateRosterStatus({ value: 'Đang học', dataset: { studentId: 's1', attendanceClass: '8A', absenceId: 'a1' } });
-  assert.equal(app.requests.length, 2);
+  assert.equal(app.requests.length, 1);
   assert.equal(app.requests[0].options.method, 'DELETE');
 });
 

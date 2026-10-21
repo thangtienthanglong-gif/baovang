@@ -50,9 +50,10 @@ for (const absenceId of ['', 'existing']) {
       renderTuitionReminderBadge: () => '', tuitionQueueChecked: () => true,
     state: { students: [student] }, normalizeAbsenceStatus: value => value,
       selectedDate: () => '2026-10-10', selectedDay: () => 'ALL',
+      getActiveBranch: () => 'main',
       getClassScheduleInfo: () => ({ sessionName: 'Tối' }),
       api: async (url, options) => { requests.push({ url, options }); return {}; },
-      toast() {}, loadBootstrap: async () => {}
+      toast() {}, loadBootstrap: async () => {}, loadAttendanceAbsences: async () => {}
     };
     vm.createContext(context);
     vm.runInContext(slice('async function updateRosterStatus(', 'function bulkZaloMessage('), context);

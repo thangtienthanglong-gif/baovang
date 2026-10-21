@@ -105,6 +105,16 @@ const DEFAULT_EARLY_LEAVE_TEMPLATE = 'Kính gửi Quý phụ huynh, {schoolName}
 const pendingAiActions = new Map();
 
 app.use(express.json({ limit: '5mb' }));
+app.use('/api', (req, res, next) => {
+  const started = Date.now();
+  req.dbTiming = { read: 0, write: 0 };
+  const json = res.json;
+  res.json = function (data) {
+    res.setHeader('Server-Timing', `app;dur=${Date.now() - started}, db-read;dur=${req.dbTiming.read}, db-write;dur=${req.dbTiming.write}`);
+    return json.call(this, data);
+  };
+  next();
+});
 app.use('/api', (req, res, next) => authenticateToken(req, res, next));
 app.use((req, res, next) => {
   if (
@@ -203,6 +213,83 @@ function personalTestLimitFromSettings(settings) {
 
 const dbSnapshots = new WeakMap();
 const branchSnapshots = new WeakMap();
+const branchRecordCollections = ['students', 'absences', 'callLogs', 'notificationLogs', 'contactRequests',
+  'scheduleExceptions', 'exams', 'teaching_sessions', 'evaluations', 'warnings'];
+
+function branchStorageKeys(branch) {
+  const keys = {};
+  for (const collection of [...branchRecordCollections, 'classes']) {
+    keys[collection] = new Map(Object.entries(branch[collection] || {}).filter(([, row]) => row != null)
+      .map(([key, row]) => [collection === 'classes' ? row : row.id, key]));
+  }
+  return keys;
+}
+
+function normalizeBranchCollections(branch) {
+  for (const collection of [...branchRecordCollections, 'classes']) {
+    if (branch[collection]) branch[collection] = Object.values(branch[collection]).filter(row => row != null);
+  }
+  for (const collection of ['students', 'absences', 'callLogs', 'notificationLogs', 'teaching_sessions', 'evaluations', 'warnings']) {
+    if (!branch[collection]) branch[collection] = [];
+  }
+}
+
+function branchPresencePath(branch, keys) {
+  if (branch.settings?.zaloMode != null) return 'settings/zaloMode';
+  for (const collection of branchRecordCollections) {
+    const first = [...keys[collection]].find(([id]) => typeof id === 'string');
+    if (first) return `${collection}/${first[1]}/id`;
+  }
+  if (branch.settings && Object.keys(branch.settings).length) return `settings/${Object.keys(branch.settings)[0]}`;
+  if (keys.classes.size) return `classes/${keys.classes.values().next().value}`;
+  return '';
+}
+
+function branchChanges(snapshot, desired) {
+  const changes = {}, guards = new Map();
+  const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const addFields = (before, after, path) => {
+    if (equal(before, after)) return;
+    if (before && after && typeof before === 'object' && typeof after === 'object'
+        && !Array.isArray(before) && !Array.isArray(after)) {
+      for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+        addFields(before[key], after[key], `${path}/${key}`);
+      }
+    } else changes[path] = after ?? null;
+  };
+  const original = snapshot.original;
+  for (const collection of new Set([...Object.keys(original), ...Object.keys(desired)])) {
+    if (collection === 'attendanceAlertActions' || equal(original[collection], desired[collection])) continue;
+    const before = original[collection] || [], after = desired[collection] || [];
+    const identity = row => collection === 'classes' ? row : row?.id;
+    const valid = rows => Array.isArray(rows) && rows.every(row => typeof identity(row) === 'string')
+      && new Set(rows.map(identity)).size === rows.length;
+    if (snapshot.keys[collection] && valid(before) && valid(after)) {
+      const oldById = new Map(before.map(row => [identity(row), row]));
+      const nextById = new Map(after.map(row => [identity(row), row]));
+      for (const [id, row] of oldById) {
+        const path = `${collection}/${snapshot.keys[collection].get(id)}`;
+        if (!nextById.has(id)) changes[path] = null;
+        else if (!equal(row, nextById.get(id))) {
+          addFields(row, nextById.get(id), path);
+          if (collection !== 'classes') guards.set(`${path}/id`, id);
+        }
+      }
+      for (const [id, row] of nextById) {
+        if (!oldById.has(id)) {
+          // Push keys preserve chronological log order after legacy numeric keys.
+          // Allocate locally without writing; the rows still commit in one update.
+          const key = snapshot.keys[collection].get(id) || (collection === 'classes'
+            ? `r_${encodeURIComponent(id).replace(/\./g, '%2E')}`
+            : getDatabase().ref(`/branches/${snapshot.branchId}/${collection}`).push().key);
+          snapshot.keys[collection].set(id, key);
+          changes[`${collection}/${key}`] = row;
+        }
+      }
+    } else addFields(original[collection], desired[collection], collection);
+  }
+  return { changes, guards };
+}
 
 async function readDb() {
   if (!getApps().length) {
@@ -213,6 +300,7 @@ async function readDb() {
   try {
     const snapshot = await getDatabase().ref('/').once('value');
     const db = snapshot.val() || {};
+    const storedBranchIds = new Set(Object.keys(db.branches || {}));
 
     // Keep legacy root data readable until it is migrated explicitly. A read must not overwrite a branch.
     if ((db.students || db.absences || db.settings) && !db.branches?.main) {
@@ -230,16 +318,16 @@ async function readDb() {
 
     // Normalize arrays for all branches to prevent undefined errors
     for (const branchId in db.branches) {
-      if (!db.branches[branchId].students) db.branches[branchId].students = [];
-      if (!db.branches[branchId].absences) db.branches[branchId].absences = [];
-      if (!db.branches[branchId].callLogs) db.branches[branchId].callLogs = [];
-      if (!db.branches[branchId].notificationLogs) db.branches[branchId].notificationLogs = [];
-      if (!db.branches[branchId].teaching_sessions) db.branches[branchId].teaching_sessions = [];
-      if (!db.branches[branchId].evaluations) db.branches[branchId].evaluations = [];
-      if (!db.branches[branchId].warnings) db.branches[branchId].warnings = [];
+      const branch = db.branches[branchId];
+      const keys = branchStorageKeys(branch);
+      const presencePath = branchPresencePath(branch, keys);
+      normalizeBranchCollections(branch);
+      branchSnapshots.set(branch, { branchId, keys, presencePath, existed: storedBranchIds.has(branchId) });
     }
 
-    dbSnapshots.set(db, JSON.parse(JSON.stringify(db)));
+    const original = JSON.parse(JSON.stringify(db));
+    dbSnapshots.set(db, original);
+    for (const [branchId, branch] of Object.entries(db.branches)) branchSnapshots.get(branch).original = original.branches[branchId];
     return db;
   } catch (err) {
     console.error('Lỗi khi đọc dữ liệu từ Firebase:', err);
@@ -260,7 +348,9 @@ async function writeDb(db) {
   const newBranches = db.branches || {};
   for (const branchId of new Set([...Object.keys(oldBranches), ...Object.keys(newBranches)])) {
     if (JSON.stringify(oldBranches[branchId]) !== JSON.stringify(newBranches[branchId])) {
-      changes[`branches/${branchId}`] = newBranches[branchId] ?? null;
+      if (oldBranches[branchId] && newBranches[branchId] && branchSnapshots.has(newBranches[branchId])) {
+        await saveBranchDb({ headers: { 'x-branch-id': branchId } }, newBranches[branchId]);
+      } else changes[`branches/${branchId}`] = newBranches[branchId] ?? null;
     }
   }
   for (const key of new Set([...Object.keys(original), ...Object.keys(db)])) {
@@ -269,8 +359,7 @@ async function writeDb(db) {
       changes[key] = db[key] ?? null;
     }
   }
-  if (!Object.keys(changes).length) return;
-  await getDatabase().ref('/').update(changes);
+  if (Object.keys(changes).length) await getDatabase().ref('/').update(changes);
   dbSnapshots.set(db, JSON.parse(JSON.stringify(db)));
 }
 
@@ -294,15 +383,26 @@ function resolveValidBranchId(req, rootDb) {
   throw error;
 }
 
-async function getBranchDb(req) {
+async function getBranchDb(req, fields = null) {
+  const started = Date.now();
   if (!getApps().length) {
     const error = new Error('Chưa kết nối được cơ sở dữ liệu.');
     error.status = 503;
     throw error;
   }
   const branchId = getBranchId(req);
-  const snapshot = await getDatabase().ref(`/branches/${branchId}`).once('value');
-  let targetBranch = snapshot.val();
+  let targetBranch;
+  if (fields) {
+    const values = await Promise.all(fields.map(async field => {
+      const snapshot = await getDatabase().ref(`/branches/${branchId}/${field}`).once('value');
+      return [field, snapshot.val()];
+    }));
+    targetBranch = Object.fromEntries(values.filter(([, value]) => value != null));
+    if (!Object.keys(targetBranch).length) targetBranch = null;
+  } else {
+    const snapshot = await getDatabase().ref(`/branches/${branchId}`).once('value');
+    targetBranch = snapshot.val();
+  }
   const existed = Boolean(targetBranch);
   if (!targetBranch) {
     if (branchId !== 'main') {
@@ -314,10 +414,10 @@ async function getBranchDb(req) {
     const rootDb = await readDb();
     targetBranch = rootDb.branches.main || { settings: defaultSettings() };
   }
-  for (const key of ['students', 'absences', 'callLogs', 'notificationLogs', 'teaching_sessions', 'evaluations', 'warnings']) {
-    if (!targetBranch[key]) targetBranch[key] = [];
-  }
-  branchSnapshots.set(targetBranch, { branchId, original: JSON.parse(JSON.stringify(targetBranch)), existed });
+  const keys = req.method === 'GET' ? null : branchStorageKeys(targetBranch);
+  const presencePath = keys ? branchPresencePath(targetBranch, keys) : null;
+  normalizeBranchCollections(targetBranch);
+  if (keys) branchSnapshots.set(targetBranch, { branchId, original: JSON.parse(JSON.stringify(targetBranch)), keys, presencePath, existed });
   
   // Auto-fix existing absences stuck in "Chờ gửi thủ công" but have a call log
   if (targetBranch.callLogs && targetBranch.absences) {
@@ -332,70 +432,43 @@ async function getBranchDb(req) {
     });
   }
 
+  if (req.dbTiming) req.dbTiming.read += Date.now() - started;
   return targetBranch;
 }
 
 async function saveBranchDb(req, branchDb) {
+  const started = Date.now();
   const snapshot = branchSnapshots.get(branchDb);
   const branchId = getBranchId(req);
   if (!snapshot || snapshot.branchId !== branchId) {
     throw new Error('Không thể lưu dữ liệu chưa được đọc từ cơ sở đang chọn.');
   }
   const desired = JSON.parse(JSON.stringify(branchDb));
-  // Resolutions have a separate transaction and are never owned by attendance saves.
-  delete desired.attendanceAlertActions;
-  const original = { ...snapshot.original };
-  delete original.attendanceAlertActions;
-  if (JSON.stringify(original) === JSON.stringify(desired)) return;
-  const result = await getDatabase().ref(`/branches/${branchId}`).transaction(current => {
-    // Firebase may first invoke the callback with an empty local cache.
-    if (current === null && snapshot.existed) return null;
-    return mergeBranchChanges(original, desired, current || snapshot.original);
-  }, undefined, false);
-  if (!result.committed || !result.snapshot.val()) {
-    const error = new Error('Cơ sở đã thay đổi hoặc bị xóa. Vui lòng tải lại trước khi lưu.');
-    error.status = 409;
-    throw error;
+  const ref = getDatabase().ref(`/branches/${branchId}`);
+  const { changes, guards } = branchChanges(snapshot, desired);
+  if (!Object.keys(changes).length) return;
+  if (snapshot.existed) {
+    // Validate only small identity leaves, never download the branch again.
+    const checks = [[snapshot.presencePath, null], ...guards];
+    await Promise.all(checks.map(async ([path, expected]) => {
+      const current = await getDatabase().ref(`/branches/${branchId}/${path}`).once('value');
+      if (current.val() == null || (expected !== null && current.val() !== expected)) {
+        const error = new Error('Dữ liệu đã thay đổi hoặc bị xóa. Vui lòng tải lại trước khi lưu.');
+        error.status = 409;
+        throw error;
+      }
+    }));
+    // All related row/field changes commit together in one small atomic update.
+    await ref.update(changes);
+  } else {
+    // First explicit save of legacy main data. Normal saves never take this path.
+    await ref.update(desired);
+    snapshot.keys = branchStorageKeys(desired);
+    snapshot.presencePath = branchPresencePath(desired, snapshot.keys);
   }
   snapshot.original = JSON.parse(JSON.stringify(branchDb));
   snapshot.existed = true;
-}
-
-function mergeBranchChanges(original, desired, current) {
-  const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-  if (equal(original, desired)) return current;
-  if (Array.isArray(desired) && (original === undefined || Array.isArray(original))) {
-    const before = original || [];
-    const records = rows => Array.isArray(rows) && rows.every(row => row && typeof row === 'object' && typeof row.id === 'string')
-      && new Set(rows.map(row => row.id)).size === rows.length;
-    if (records(before) && records(desired) && records(current || [])) {
-      const oldById = new Map(before.map(row => [row.id, row]));
-      const nextById = new Map(desired.map(row => [row.id, row]));
-      const liveIds = new Set((current || []).map(row => row.id));
-      const merged = (current || []).filter(row => !oldById.has(row.id) || nextById.has(row.id)).map(row =>
-        nextById.has(row.id) ? mergeBranchChanges(oldById.get(row.id), nextById.get(row.id), row) : row);
-      for (const row of desired) {
-        if (!oldById.has(row.id) && !liveIds.has(row.id)) merged.push(row);
-      }
-      return merged;
-    }
-    if (!equal(current ?? [], before) && !equal(current, desired)) {
-      const error = new Error('Danh sách đã được cập nhật ở phiên khác. Vui lòng tải lại trước khi lưu.');
-      error.status = 409;
-      throw error;
-    }
-    return desired;
-  }
-  if (desired && typeof desired === 'object' && !Array.isArray(desired)) {
-    const merged = { ...(current || {}) };
-    for (const key of new Set([...Object.keys(original || {}), ...Object.keys(desired)])) {
-      if (equal(original?.[key], desired[key])) continue;
-      if (!Object.hasOwn(desired, key)) delete merged[key];
-      else merged[key] = mergeBranchChanges(original?.[key], desired[key], current?.[key]);
-    }
-    return merged;
-  }
-  return desired;
+  if (req.dbTiming) req.dbTiming.write += Date.now() - started;
 }
 
 function defaultSettings() {
@@ -3515,7 +3588,7 @@ app.post('/api/students/:id/transfer', (req, res, next) => authenticateToken(req
       err.status = 503;
       throw err;
     }
-    await getDatabase().ref(`/branches/${branchId}`).set(db);
+    await writeDb(rootDb);
     res.json(db.students[index]);
   } catch (error) {
     next(error);
@@ -3983,7 +4056,8 @@ app.post('/api/absences', async (req, res, next) => {
       error.status = 400;
       throw error;
     }
-    const db = await getBranchDb(req);
+    const db = await getBranchDb(req, ['students', 'absences', 'settings', 'callLogs', 'scheduleExceptions',
+      ...(['Học phí', 'Trễ học phí', 'Nghỉ học', 'Đã bù'].includes(normalizeAbsenceStatus(req.body.absenceStatus)) ? ['notificationLogs', 'contactRequests'] : [])]);
     const student = db.students.find(row => row.id === req.body.studentId);
     if (!student) {
       const err = new Error('Không tìm thấy học sinh.');
@@ -4032,7 +4106,7 @@ app.post('/api/absences', async (req, res, next) => {
       if (absenceStatus === 'Nghỉ học') markStudentWithdrawn(db, student.id, db.absences[duplicateIndex]);
       if (absenceStatus === 'Đã bù') markAbsenceMadeUp(db, db.absences[duplicateIndex]);
       await saveBranchDb(req, db);
-      return res.json(db.absences[duplicateIndex]);
+      return res.json({ absence: enrichAbsence(db.absences[duplicateIndex], studentByIdMap(db.students)), noticeLog: null });
     }
 
     const absenceStatus = normalizeAbsenceStatus(req.body.absenceStatus);
@@ -4088,7 +4162,8 @@ app.put('/api/absences/:id/status', async (req, res, next) => {
       error.status = 400;
       throw error;
     }
-    const db = await getBranchDb(req);
+    const db = await getBranchDb(req, ['students', 'absences', 'settings', 'callLogs', 'scheduleExceptions',
+      ...(['Học phí', 'Trễ học phí', 'Nghỉ học', 'Đã bù'].includes(normalizeAbsenceStatus(req.body.absenceStatus)) ? ['notificationLogs', 'contactRequests'] : [])]);
     const index = db.absences.findIndex(absence => absence.id === req.params.id);
     if (index === -1) {
       const err = new Error('Không tìm thấy bản ghi vắng học.');
@@ -4466,7 +4541,7 @@ app.put('/api/absences/:id/call', async (req, res, next) => {
 
 app.delete('/api/absences/:id', async (req, res, next) => {
   try {
-    const db = await getBranchDb(req);
+    const db = await getBranchDb(req, ['absences', 'settings']);
     const before = db.absences.length;
     db.absences = db.absences.filter(absence => absence.id !== req.params.id);
     if (db.absences.length === before) {

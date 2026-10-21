@@ -144,7 +144,7 @@ function setupFrontend(confirmed, api) {
     renderTuitionReminderBadge: () => '', tuitionQueueChecked: () => true,
     state: { students: [student], classes: ['7C26M'], absences: [{ id: 'a1', studentId: 's1' }] },
     normalizeAbsenceStatus: value => value, absenceForStudent: () => ({ absenceStatus: 'Vắng' }),
-    confirm: () => confirmed, getActiveBranch: () => 'main', api,
+    confirm: () => confirmed, getActiveBranch: () => 'main', selectedDate: () => '2026-10-21', api,
     rebuildQuickSearchIndex() {}, renderClassDropdown() {}, renderRoster() {}, renderStudentSelect() {}, renderAbsences() {},
     loadBootstrap: async () => {}, toast() {}
   };

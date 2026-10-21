@@ -52,7 +52,7 @@ test('an empty class persists across bootstrap reads in its selected branch', as
   const result = await app.call('post', '/api/classes', { body: { className: ' 9vt6 ' } });
   assert.equal(result.status, 201);
   assert.equal(result.data.className, '9VT6');
-  assert.deepEqual(app.stored().branches.main.classes, ['9VT6']);
+  assert.deepEqual(Object.values(app.stored().branches.main.classes), ['9VT6']);
   assert.equal(app.stored().branches.main.students.length, 1);
   assert.deepEqual(app.stored().branches.other.classes, ['9VT6']);
   const bootstrap = await app.call('get', '/api/bootstrap');
@@ -67,7 +67,7 @@ test('legacy student classes remain available and duplicate codes are rejected',
   await assert.rejects(app.call('post', '/api/classes', { body: { className: '9vt3' } }), error => error.status === 409);
   await app.call('post', '/api/classes', { body: { className: '9VT6' } });
   await assert.rejects(app.call('post', '/api/classes', { body: { className: ' 9vt6 ' } }), error => error.status === 409);
-  assert.deepEqual(app.stored().branches.main.classes, ['9VT6']);
+  assert.deepEqual(Object.values(app.stored().branches.main.classes), ['9VT6']);
 });
 
 test('invalid codes and unknown branches cannot create a class', async () => {
