@@ -679,7 +679,6 @@ async function sendOne(item) {
       showZaloStatus(`BaoVang: ${warning}`, true);
       return { ok: true, formattingWarning: warning };
     }
-    await wait(900);
     showZaloStatus('BaoVang: đã gửi tin nhắn qua Zalo Web.');
     return { ok: true };
   };

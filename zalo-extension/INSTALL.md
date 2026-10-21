@@ -40,3 +40,5 @@ Khi extension đang chạy, trạng thái sẽ hiện ở góc trên bên phải
 - Không gửi mật khẩu, QR hoặc OTP cho extension hay cho người khác.
 - Nên thử một học sinh trước khi chạy hàng loạt.
 - Chỉ bật một phiên Auto trên một trình duyệt tại một thời điểm.
+
+Bản **1.3.3** dùng lại tab Zalo đang mở khi bắt đầu gửi, thay mã tiện ích ngay trong trang để tránh chờ tải lại Zalo Web. Kết quả gửi được báo ngay khi tìm thấy tin mới và kiểm tra nội dung; vẫn giữ khoảng nghỉ giữa các tin. Cập nhật cả webapp online để Hàng xử lý hiển thị từng kết quả ngay sau khi máy chủ lưu thành công.

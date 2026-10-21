@@ -91,7 +91,7 @@ test('an exact error report updates an orphaned legacy log without recreating at
 function extensionBridge() {
   const requests = [], timers = new Map(); let listener;
   const window = { addEventListener: (type, fn) => { listener = fn; }, removeEventListener() {}, postMessage() {} };
-  const context = { window, console, toast() {},
+  const context = { window, console, toast() {}, getActiveBranch: () => 'main',
     api: async (url, options) => { requests.push({ url, body: JSON.parse(options.body) }); },
     setTimeout: (fn, ms) => { timers.set(ms, fn); return ms; }, clearTimeout: timer => timers.delete(timer)
   };
@@ -136,4 +136,60 @@ test('duplicate and contradictory extension result events persist a completed it
   assert.equal(app.requests.length, 1);
   assert.equal(app.requests[0].body.logId, 'log-success');
   assert.match(app.requests[0].url, /manual-sent$/);
+});
+
+test('a confirmed send appears in the queue before the rest of the batch completes', async () => {
+  const app = extensionBridge();
+  let renders = 0;
+  app.context.state = { absences: [{ id: 'a1', noticeStatus: 'Chờ gửi thủ công' }] };
+  app.context.renderAbsences = () => { renders++; };
+  app.context.renderRoster = () => {};
+  let confirm;
+  app.context.api = () => new Promise(resolve => { confirm = resolve; });
+  const completed = app.context.startZaloExtensionAuto([{ id: 'log-success', absenceId: 'a1' }]);
+  app.event({ type: 'BAOVANG_EXTENSION_RESULT', itemId: 'log-success', ok: true });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.context.state.absences[0].noticeStatus, 'Chờ gửi thủ công');
+  confirm({ absence: { id: 'a1', noticeStatus: 'Đã gửi' } });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.context.state.absences[0].noticeStatus, 'Đã gửi');
+  assert.equal(renders, 1);
+  app.event({ type: 'BAOVANG_EXTENSION_STATUS', status: 'completed' });
+  assert.equal(await completed, true);
+});
+
+test('switching branches keeps reports on the sending branch and does not redraw another branch', async () => {
+  const app = extensionBridge();
+  let branch = 'main', renders = 0;
+  const headers = [];
+  app.context.getActiveBranch = () => branch;
+  app.context.state = { absences: [{ id: 'a1', noticeStatus: 'Chờ gửi thủ công' }] };
+  app.context.renderAbsences = () => { renders++; };
+  app.context.renderRoster = () => {};
+  app.context.api = async (_url, options) => {
+    headers.push(options.headers['X-Branch-Id']);
+    return { absence: { id: 'a1', noticeStatus: 'Đã gửi' } };
+  };
+  const completed = app.context.startZaloExtensionAuto([{ id: 'log-success', absenceId: 'a1' }]);
+  branch = 'other';
+  app.event({ type: 'BAOVANG_EXTENSION_RESULT', itemId: 'log-success', ok: true });
+  app.event({ type: 'BAOVANG_EXTENSION_STATUS', status: 'completed' });
+  await completed;
+  assert.deepEqual(headers, ['main']);
+  assert.equal(renders, 0);
+  assert.equal(app.context.state.absences[0].noticeStatus, 'Chờ gửi thủ công');
+});
+
+test('a failed save of a successful send warns the user and does not announce completion', async () => {
+  const app = extensionBridge();
+  const notices = [];
+  app.context.console = { error() {} };
+  app.context.toast = (message, type) => notices.push({ message, type });
+  app.context.api = async () => { throw Error('Offline'); };
+  const completed = app.context.startZaloExtensionAuto([{ id: 'log-success', absenceId: 'a1' }]);
+  app.event({ type: 'BAOVANG_EXTENSION_RESULT', itemId: 'log-success', ok: true });
+  app.event({ type: 'BAOVANG_EXTENSION_STATUS', status: 'completed' });
+  assert.equal(await completed, false);
+  assert.ok(notices.some(notice => notice.type === 'error' && /Chưa lưu được/.test(notice.message)));
+  assert.ok(notices.every(notice => !/hoàn tất/.test(notice.message)));
 });

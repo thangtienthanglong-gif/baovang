@@ -178,7 +178,7 @@ test('early-leave attendance saves the chosen time; cancel or changed context se
       requestEarlyLeaveTime: async () => { changed = true; return variant === 'cancel' ? null : '17:15'; },
       getClassScheduleInfo: () => ({ sessionName: 'Tối' }),
       api: async (url, options) => { calls.push({ url, body: JSON.parse(options.body) }); return {}; },
-      toast() {}, queuedMessage: () => '', loadBootstrap: async () => {}
+      toast() {}, queuedMessage: () => '', loadBootstrap: async () => {}, loadAttendanceAbsences: async () => {}
     };
     vm.runInNewContext(slice(frontend, 'async function updateRosterStatus(', 'function bulkZaloMessage('), context);
     const select = { value: 'Về sớm', dataset: { studentId: student.id, attendanceClass: student.className,

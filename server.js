@@ -202,6 +202,7 @@ function personalTestLimitFromSettings(settings) {
 
 
 const dbSnapshots = new WeakMap();
+const branchSnapshots = new WeakMap();
 
 async function readDb() {
   if (!getApps().length) {
@@ -294,25 +295,36 @@ function resolveValidBranchId(req, rootDb) {
 }
 
 async function getBranchDb(req) {
-  const rootDb = await readDb();
-  let branchId = resolveValidBranchId(req, rootDb);
-  
-  if (!rootDb.branches[branchId]) {
-    rootDb.branches['main'] = { students: [], absences: [], callLogs: [], notificationLogs: [], settings: defaultSettings() };
-    branchId = 'main';
+  if (!getApps().length) {
+    const error = new Error('Chưa kết nối được cơ sở dữ liệu.');
+    error.status = 503;
+    throw error;
   }
-  
-  const targetBranch = rootDb.branches[branchId];
-  if (!targetBranch.students) targetBranch.students = [];
-  if (!targetBranch.absences) targetBranch.absences = [];
-  if (!targetBranch.callLogs) targetBranch.callLogs = [];
-  if (!targetBranch.notificationLogs) targetBranch.notificationLogs = [];
+  const branchId = getBranchId(req);
+  const snapshot = await getDatabase().ref(`/branches/${branchId}`).once('value');
+  let targetBranch = snapshot.val();
+  const existed = Boolean(targetBranch);
+  if (!targetBranch) {
+    if (branchId !== 'main') {
+      const error = new Error('Không tìm thấy cơ sở đang chọn. Vui lòng tải lại danh sách cơ sở.');
+      error.status = 404;
+      throw error;
+    }
+    // Only old installations without branches.main need the root migration path.
+    const rootDb = await readDb();
+    targetBranch = rootDb.branches.main || { settings: defaultSettings() };
+  }
+  for (const key of ['students', 'absences', 'callLogs', 'notificationLogs', 'teaching_sessions', 'evaluations', 'warnings']) {
+    if (!targetBranch[key]) targetBranch[key] = [];
+  }
+  branchSnapshots.set(targetBranch, { branchId, original: JSON.parse(JSON.stringify(targetBranch)), existed });
   
   // Auto-fix existing absences stuck in "Chờ gửi thủ công" but have a call log
   if (targetBranch.callLogs && targetBranch.absences) {
+    const byId = new Map(targetBranch.absences.map(absence => [absence.id, absence]));
     targetBranch.callLogs.forEach(log => {
       if (log.absenceId) {
-        const absence = targetBranch.absences.find(a => a.id === log.absenceId);
+        const absence = byId.get(log.absenceId);
         if (absence && absence.noticeStatus === 'Chờ gửi thủ công') {
           absence.noticeStatus = 'Chưa kết bạn - Cần gọi';
         }
@@ -324,16 +336,66 @@ async function getBranchDb(req) {
 }
 
 async function saveBranchDb(req, branchDb) {
-  const rootDb = await readDb();
-  const branchId = resolveValidBranchId(req, rootDb);
-  if (!rootDb.branches) rootDb.branches = {};
-  // Alert resolutions use their own transaction; an older attendance read
-  // must not replace a teacher's newer resolution when saving the branch.
-  if (rootDb.branches[branchId]?.attendanceAlertActions !== undefined) {
-    branchDb.attendanceAlertActions = rootDb.branches[branchId].attendanceAlertActions;
+  const snapshot = branchSnapshots.get(branchDb);
+  const branchId = getBranchId(req);
+  if (!snapshot || snapshot.branchId !== branchId) {
+    throw new Error('Không thể lưu dữ liệu chưa được đọc từ cơ sở đang chọn.');
   }
-  rootDb.branches[branchId] = branchDb;
-  await writeDb(rootDb);
+  const desired = JSON.parse(JSON.stringify(branchDb));
+  // Resolutions have a separate transaction and are never owned by attendance saves.
+  delete desired.attendanceAlertActions;
+  const original = { ...snapshot.original };
+  delete original.attendanceAlertActions;
+  if (JSON.stringify(original) === JSON.stringify(desired)) return;
+  const result = await getDatabase().ref(`/branches/${branchId}`).transaction(current => {
+    // Firebase may first invoke the callback with an empty local cache.
+    if (current === null && snapshot.existed) return null;
+    return mergeBranchChanges(original, desired, current || snapshot.original);
+  }, undefined, false);
+  if (!result.committed || !result.snapshot.val()) {
+    const error = new Error('Cơ sở đã thay đổi hoặc bị xóa. Vui lòng tải lại trước khi lưu.');
+    error.status = 409;
+    throw error;
+  }
+  snapshot.original = JSON.parse(JSON.stringify(branchDb));
+  snapshot.existed = true;
+}
+
+function mergeBranchChanges(original, desired, current) {
+  const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  if (equal(original, desired)) return current;
+  if (Array.isArray(desired) && (original === undefined || Array.isArray(original))) {
+    const before = original || [];
+    const records = rows => Array.isArray(rows) && rows.every(row => row && typeof row === 'object' && typeof row.id === 'string')
+      && new Set(rows.map(row => row.id)).size === rows.length;
+    if (records(before) && records(desired) && records(current || [])) {
+      const oldById = new Map(before.map(row => [row.id, row]));
+      const nextById = new Map(desired.map(row => [row.id, row]));
+      const liveIds = new Set((current || []).map(row => row.id));
+      const merged = (current || []).filter(row => !oldById.has(row.id) || nextById.has(row.id)).map(row =>
+        nextById.has(row.id) ? mergeBranchChanges(oldById.get(row.id), nextById.get(row.id), row) : row);
+      for (const row of desired) {
+        if (!oldById.has(row.id) && !liveIds.has(row.id)) merged.push(row);
+      }
+      return merged;
+    }
+    if (!equal(current ?? [], before) && !equal(current, desired)) {
+      const error = new Error('Danh sách đã được cập nhật ở phiên khác. Vui lòng tải lại trước khi lưu.');
+      error.status = 409;
+      throw error;
+    }
+    return desired;
+  }
+  if (desired && typeof desired === 'object' && !Array.isArray(desired)) {
+    const merged = { ...(current || {}) };
+    for (const key of new Set([...Object.keys(original || {}), ...Object.keys(desired)])) {
+      if (equal(original?.[key], desired[key])) continue;
+      if (!Object.hasOwn(desired, key)) delete merged[key];
+      else merged[key] = mergeBranchChanges(original?.[key], desired[key], current?.[key]);
+    }
+    return merged;
+  }
+  return desired;
 }
 
 function defaultSettings() {
@@ -2234,6 +2296,7 @@ async function sendZaloNotice(db, absenceId, reason = 'auto') {
   try {
     const response = await fetch(config.endpoint, {
       method: 'POST',
+      signal: AbortSignal.timeout(15000),
       headers: {
         'Content-Type': 'application/json',
         access_token: config.accessToken
@@ -2248,7 +2311,9 @@ async function sendZaloNotice(db, absenceId, reason = 'auto') {
 
     return finish('Đã gửi', 'Đã gửi thông báo qua Zalo OA.', data);
   } catch (error) {
-    return finish('Lỗi gửi', error.message, null);
+    return finish('Lỗi gửi', ['TimeoutError', 'AbortError'].includes(error.name)
+      ? 'Zalo OA chưa phản hồi sau 15 giây. Chưa xác nhận được kết quả; kiểm tra Zalo trước khi gửi lại.'
+      : error.message, null);
   }
 }
 

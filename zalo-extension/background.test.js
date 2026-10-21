@@ -8,6 +8,7 @@ test('a multiline manual handoff stops the queue without marking the item failed
   const listeners = [];
   const appEvents = [];
   const sentItems = [];
+  const injectedTabs = [];
   let finish;
   const stopped = new Promise(resolve => { finish = resolve; });
   const chrome = {
@@ -16,10 +17,14 @@ test('a multiline manual handoff stops the queue without marking the item failed
       if (index !== -1) listeners.splice(index, 1);
     } } },
     windows: { async update() {} },
+    scripting: { async executeScript({ target, files }) {
+      assert.deepEqual(Array.from(files), ['content.js']);
+      injectedTabs.push(target.tabId);
+    } },
     tabs: {
       async query() { return [{ id: 7, windowId: 1 }]; },
       async update() {},
-      async reload() {},
+      async reload() { throw new Error('Starting a queue must reuse the open Zalo page'); },
       async get() { return { status: 'complete' }; },
       async sendMessage(tabId, message) {
         if (tabId === 3) {
@@ -41,11 +46,12 @@ test('a multiline manual handoff stops the queue without marking the item failed
     }
   };
   const source = fs.readFileSync(path.join(__dirname, 'background.js'), 'utf8');
-  vm.runInNewContext(source, { chrome, setTimeout, clearTimeout, Promise });
+  vm.runInNewContext(source, { chrome, setTimeout, clearTimeout, Promise, URL });
   listeners[0]({ type: 'BAOVANG_START_AUTO', items: [{ id: 'first' }, { id: 'second' }] }, { tab: { id: 3 } }, () => {});
   await stopped;
 
   assert.deepEqual(sentItems, ['first']);
+  assert.deepEqual(injectedTabs, [7]);
   assert.equal(appEvents.find(event => event.type === 'BAOVANG_EXTENSION_RESULT').manual, true);
   const finalStatus = appEvents.find(event => event.type === 'BAOVANG_EXTENSION_STATUS' && event.status === 'stopped');
   assert.equal(finalStatus.manual, 1);
@@ -63,7 +69,7 @@ function updateWorker(tabs, reload) {
     }, reload }
   };
   const source = fs.readFileSync(path.join(__dirname, 'background.js'), 'utf8');
-  vm.runInNewContext(source, { chrome, setTimeout, clearTimeout, Promise, console: { warn(...args) { warnings.push(args); } } });
+  vm.runInNewContext(source, { chrome, setTimeout, clearTimeout, Promise, URL, console: { warn(...args) { warnings.push(args); } } });
   return { onInstalled, warnings };
 }
 

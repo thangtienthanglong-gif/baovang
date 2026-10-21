@@ -21,15 +21,7 @@ function setupServer(main = { students: [{ id: 's1', className: '9VT3' }], absen
   const context = {
     app: Object.fromEntries(['get', 'post', 'put', 'delete'].map(method => [method, (url, handler) => routes.set(`${method} ${url}`, handler)])),
     getApps: () => [{}],
-    getDatabase: () => ({ ref: () => ({
-      once: async () => ({ val: () => structuredClone(stored) }),
-      update: async changes => {
-        for (const [key, value] of Object.entries(changes)) {
-          if (key.startsWith('branches/')) stored.branches[key.slice(9)] = structuredClone(value);
-          else stored[key] = structuredClone(value);
-        }
-      }
-    }) }),
+    getDatabase: require('./helpers/firebase').firebaseFixture(stored).getDatabase,
     cleanText: value => String(value ?? '').replace(/\s+/g, ' ').trim(),
     isActiveStudent: student => student && student.status !== 'Nghỉ học',
     defaultSettings: () => ({}), publicSettings: value => value,

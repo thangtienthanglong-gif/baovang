@@ -29,12 +29,7 @@ function setupServer() {
   const routes = new Map();
   const context = {
     app: Object.fromEntries(['get', 'post'].map(method => [method, (url, handler) => routes.set(`${method} ${url}`, handler)])),
-    getApps: () => [{}], getDatabase: () => ({ ref: () => ({
-      once: async () => ({ val: () => structuredClone(stored) }),
-      update: async changes => {
-        for (const [key, value] of Object.entries(changes)) stored.branches[key.slice(9)] = structuredClone(value);
-      }
-    }) }),
+    getApps: () => [{}], getDatabase: require('./helpers/firebase').firebaseFixture(stored).getDatabase,
     cleanText: value => String(value ?? '').replace(/\s+/g, ' ').trim(),
     defaultSettings: () => ({}), normalizeAbsenceStatus: value => value,
     normalizeSearchText: value => String(value || '').toLowerCase(),

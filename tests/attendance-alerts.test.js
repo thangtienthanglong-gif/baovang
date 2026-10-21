@@ -233,13 +233,20 @@ test('an attendance save from an older read retains a teacher resolution saved i
   branch.attendanceAlertActions = [{ id: 'handled-1', alertId: 'alert', sessionKeys: ['a', 'b'] }];
   const rootDb = { branches: { main: branch } };
   olderRead.absences[0].note = 'Updated attendance';
-  const context = { readDb: async () => rootDb, resolveValidBranchId: () => 'main', writeDb: async () => {} };
+  const { getDatabase } = require('./helpers/firebase').firebaseFixture(rootDb);
+  const context = { getApps: () => [{}], getDatabase, defaultSettings: () => ({}), console };
   const vm = require('node:vm');
   vm.createContext(context);
-  const offset = source.indexOf('async function saveBranchDb(');
+  const offset = source.indexOf('const dbSnapshots = new WeakMap();');
   vm.runInContext(source.slice(offset, source.indexOf('function defaultSettings(', offset)), context);
-  await context.saveBranchDb({}, olderRead);
+  const req = { headers: {} };
+  const read = await context.getBranchDb(req);
+  read.absences[0].note = olderRead.absences[0].note;
+  // Another request handles the alert after the attendance request's read.
+  rootDb.branches.main.attendanceAlertActions.push({ id: 'handled-2', alertId: 'second', sessionKeys: ['c'] });
+  await context.saveBranchDb(req, read);
   assert.equal(rootDb.branches.main.absences[0].note, 'Updated attendance');
   assert.equal(rootDb.branches.main.attendanceAlertActions[0].id, 'handled-1');
+  assert.equal(rootDb.branches.main.attendanceAlertActions[1].id, 'handled-2');
 });
 

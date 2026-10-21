@@ -61,9 +61,9 @@ async function findOrOpenZaloTab() {
     state.zaloTabId = tabs[0].id;
     await chrome.tabs.update(state.zaloTabId, { active: true });
     if (tabs[0].windowId != null) await chrome.windows.update(tabs[0].windowId, { focused: true });
-    // Reload so an extension update cannot leave an old content script in the tab.
-    await chrome.tabs.reload(state.zaloTabId);
     await waitForTabComplete(state.zaloTabId);
+    // Replace the bridge in place; reloading Zalo forces its app and chats to load again.
+    await chrome.scripting.executeScript({ target: { tabId: state.zaloTabId }, files: ['content.js'] });
     return state.zaloTabId;
   }
   const tab = await chrome.tabs.create({ url: 'https://chat.zalo.me/', active: true });

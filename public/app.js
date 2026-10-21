@@ -422,7 +422,11 @@ async function loadAbsences() {
 
 async function loadAttendanceAbsences() {
   if (syncAutomaticDate()) renderFilters();
-  const data = await api('/api/absences?' + queryString(getAttendanceFilters()));
+  const branchId = getActiveBranch();
+  const filters = getAttendanceFilters();
+  const data = await api('/api/absences?' + queryString(filters));
+  const currentFilters = getAttendanceFilters();
+  if (branchId !== getActiveBranch() || filters.date !== currentFilters.date || filters.className !== currentFilters.className) return;
   state.absences = data.absences;
   state.summary = data.summary;
   renderSummary();
@@ -2096,6 +2100,8 @@ async function updateRosterStatus(select) {
   const attendanceClass = select.dataset.attendanceClass;
   const absenceId = select.dataset.absenceId;
   const status = normalizeAbsenceStatus(select.value);
+  const refreshAttendance = () => ['Nghỉ học', 'Đã bù'].includes(status)
+    ? loadBootstrap() : loadAttendanceAbsences();
 
   if (['Kiểm tra định kì', 'Đăng ký mới'].includes(status)) {
     const student = state.students.find(row => row.id === studentId);
@@ -2198,7 +2204,7 @@ async function updateRosterStatus(select) {
     if (absenceId) {
       await api(`/api/absences/${absenceId}`, { method: 'DELETE' });
       toast('Đã chuyển học sinh về trạng thái đang học.');
-      await loadBootstrap();
+      await refreshAttendance();
     }
     return;
   }
@@ -2215,7 +2221,7 @@ async function updateRosterStatus(select) {
     });
     toast(status === 'Đã bù' ? 'Đã ghi nhận học sinh học bù trước buổi này; không gửi báo vắng.'
       : status === 'Nghỉ học' ? 'Đã chuyển học sinh vào Lịch sử nghỉ học; không gửi Zalo.' : 'Đã cập nhật trạng thái.' + queuedMessage(result));
-    await loadBootstrap();
+    await refreshAttendance();
     if (status === 'Nghỉ học') await loadQuitStudents();
     return;
   }
@@ -2239,7 +2245,7 @@ async function updateRosterStatus(select) {
   });
   toast(status === 'Đã bù' ? 'Đã ghi nhận học sinh học bù trước buổi này; không gửi báo vắng.'
     : status === 'Nghỉ học' ? 'Đã chuyển học sinh vào Lịch sử nghỉ học; không gửi Zalo.' : 'Đã cập nhật trạng thái.' + queuedMessage(result));
-  await loadBootstrap();
+  await refreshAttendance();
   if (status === 'Nghỉ học') await loadQuitStudents();
 }
 
@@ -2539,17 +2545,34 @@ async function sendBulkZalo(button) {
 
 function startZaloExtensionAuto(items) {
   return new Promise(resolve => {
+    const reportBranch = getActiveBranch();
+    const reportHeaders = { 'X-Branch-Id': reportBranch };
     let updateChain = Promise.resolve();
     let timeout;
+    let reportFailed = false;
     const reportedItems = new Set();
+    function applyReport(result) {
+      if (!result?.absence || getActiveBranch() !== reportBranch) return;
+      const row = state.absences.find(row => row.id === result.absence.id);
+      if (!row) return;
+      Object.assign(row, result.absence);
+      renderAbsences();
+      renderRoster();
+    }
+    function reportError(error) {
+      reportFailed = true;
+      console.error('Không cập nhật được trạng thái extension:', error);
+      toast('Chưa lưu được kết quả gửi Zalo lên máy chủ. Hãy kiểm tra tin trong Zalo trước khi gửi lại.', 'error');
+    }
     function failUnreportedItems(reason) {
       for (const item of items) {
         if (!item.absenceId || reportedItems.has(item.id)) continue;
         reportedItems.add(item.id);
         updateChain = updateChain.then(() => api(`/api/absences/${item.absenceId}/zalo/manual-error`, {
           method: 'POST',
+          headers: reportHeaders,
           body: JSON.stringify({ logId: item.id, error: reason || 'Extension không xác nhận được kết quả gửi.' })
-        })).catch(error => console.error('Không cập nhật được trạng thái lỗi extension:', error));
+        })).then(applyReport).catch(reportError);
       }
       return updateChain;
     }
@@ -2559,7 +2582,7 @@ function startZaloExtensionAuto(items) {
         window.removeEventListener('message', onMessage);
         failUnreportedItems('Extension không phản hồi; không xác nhận được tin đã gửi.')
           .then(() => {
-            toast('Extension không phản hồi. Các tin chưa xác nhận đã chuyển sang Lỗi gửi; hãy kiểm tra tab Zalo Web.', 'error');
+            if (!reportFailed) toast('Extension không phản hồi. Các tin chưa xác nhận đã chuyển sang Lỗi gửi; hãy kiểm tra tab Zalo Web.', 'error');
             resolve(false);
           });
       }, ms);
@@ -2582,9 +2605,10 @@ function startZaloExtensionAuto(items) {
           updateChain = updateChain.then(() =>
             api(`/api/absences/${item.absenceId}/zalo/${data.ok ? 'manual-sent' : 'manual-error'}`, {
               method: 'POST',
+              headers: reportHeaders,
               body: JSON.stringify(data.ok ? { logId: item.id, formattingWarning: data.formattingWarning || '' } : { logId: item.id, error: data.error || '' })
             })
-          ).catch(error => console.error('Không cập nhật được trạng thái extension:', error));
+          ).then(applyReport).catch(reportError);
         }
         if (!data.ok && data.skipped) toast(`Đã bỏ qua ${item?.phone || 'học sinh'}: ${data.error || 'không tìm thấy trên Zalo.'}`, 'error');
         if (!data.ok && !data.skipped && !data.manual) toast(`Auto đã dừng: ${data.error || 'Zalo Web không gửi được tin.'}`, 'error');
@@ -2595,15 +2619,17 @@ function startZaloExtensionAuto(items) {
         clearTimeout(timeout);
         const unfinished = data.status === 'completed' ? '' : (data.error || 'Extension dừng trước khi gửi hoặc xác nhận tin này.');
         if (unfinished) failUnreportedItems(unfinished);
-        if (data.status === 'completed') {
-          const skipped = data.skipped ? `, bỏ qua ${data.skipped}` : '';
-          toast(`Auto Zalo hoàn tất: đã gửi ${data.sent || 0}/${data.total || items.length} tin${skipped}.`);
-        } else if (data.status === 'error') {
-          toast(`Auto Zalo lỗi: ${data.error || 'Không kết nối được Zalo Web.'}`, 'error');
-        } else {
-          toast(data.error || `Auto Zalo đã dừng: ${data.sent || 0}/${data.total || items.length} tin đã gửi.`, data.manual ? undefined : 'error');
-        }
-        updateChain.then(() => resolve(data.status === 'completed'));
+        updateChain.then(() => {
+          if (data.status === 'completed' && !reportFailed) {
+            const skipped = data.skipped ? `, bỏ qua ${data.skipped}` : '';
+            toast(`Auto Zalo hoàn tất: đã gửi ${data.sent || 0}/${data.total || items.length} tin${skipped}.`);
+          } else if (data.status === 'error') {
+            toast(`Auto Zalo lỗi: ${data.error || 'Không kết nối được Zalo Web.'}`, 'error');
+          } else if (data.status !== 'completed') {
+            toast(data.error || `Auto Zalo đã dừng: ${data.sent || 0}/${data.total || items.length} tin đã gửi.`, data.manual ? undefined : 'error');
+          }
+          resolve(data.status === 'completed' && !reportFailed);
+        });
       }
     }
     window.addEventListener('message', onMessage);
