@@ -4111,7 +4111,7 @@ app.post('/api/absences', async (req, res, next) => {
 
     const absenceStatus = normalizeAbsenceStatus(req.body.absenceStatus);
     const recentlyReminded = absenceStatus === 'Học phí' && buildTuitionReminders(db, { now: nowISO() }).reminders[student.id];
-    const shouldAutoSend = !recentlyReminded && req.body.sendZalo !== false && !isWithdrawnAbsence({ absenceStatus }, student) && absenceStatus !== 'Đã bù' && absenceStatus !== 'Đi trễ' && absenceStatus !== 'Có phép' && absenceStatus !== 'Vắng có phép';
+    const shouldAutoSend = !recentlyReminded && req.body.sendZalo !== false && !isWithdrawnAbsence({ absenceStatus }, student) && absenceStatus !== 'Đã bù' && absenceStatus !== 'Đi trễ';
     const noticeDelayMinutes = shouldAutoSend ? delayMinutesFromSettings(db.settings || defaultSettings()) : 0;
     const absence = {
       id: id('abs'),

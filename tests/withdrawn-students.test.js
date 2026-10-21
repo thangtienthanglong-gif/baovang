@@ -38,6 +38,8 @@ function setup(db) {
   context.groupQuitStudents = require('../lib/quit-history').groupQuitStudents;
   Object.assign(context, require('../lib/tuition-reminders'));
   vm.createContext(context);
+  vm.runInContext(source.match(/^const ABSENCE_STATUSES = .*;$/m)[0], context);
+  vm.runInContext(slice('function normalizeAbsenceStatus(', 'function normalizeInitialReason('), context);
   for (const [start, end] of [
     ['function sanitizeStudent(', 'function getSummary('],
     ['function getSummary(', 'function filterCallLogs('],
@@ -58,6 +60,80 @@ function setup(db) {
 }
 
 const withdrawal = { date: '2026-10-06', studentId: 's1', session: 'Tối', absenceStatus: 'Nghỉ học', sendZalo: true };
+
+for (const status of ['Có phép', 'Vắng có phép']) {
+  for (const delay of [0, 15]) {
+    for (const mode of ['new', 'update']) {
+      test(`excused absence remains eligible for Zalo (${status}, delay ${delay}, ${mode})`, async () => {
+        const db = fixture();
+        db.settings.delay = delay;
+        if (mode === 'update') db.absences.push({ id: 'excused', studentId: 's1', date: withdrawal.date,
+          session: withdrawal.session, absenceStatus: 'Có phép', noticeStatus: 'Không gửi', autoNotice: false, noticeDueAt: '' });
+        const app = setup(db);
+        const result = await app.call(mode === 'new' ? 'post' : 'put',
+          mode === 'new' ? '/api/absences' : '/api/absences/:id/status', {
+            id: 'excused', body: { ...withdrawal, absenceStatus: status }
+          });
+        assert.equal(result.data.absence.absenceStatus, 'Có phép');
+        assert.equal(result.data.absence.noticeStatus, delay ? 'Chờ gửi' : 'Chờ gửi thủ công');
+        assert.equal(result.data.absence.autoNotice, delay > 0);
+        assert.equal(db.notificationLogs.length, delay ? 0 : 1);
+        if (delay) {
+          assert.ok(result.data.absence.noticeDueAt);
+          assert.equal(result.data.noticeLog, null);
+        } else {
+          assert.equal(result.data.noticeLog.absenceStatus, 'Có phép');
+          assert.equal(result.data.noticeLog.channel, 'Zalo cá nhân');
+          assert.equal(result.data.absence.noticeSentAt, '');
+        }
+        assert.equal(app.saves(), 1);
+        assert.equal(app.networkCalls(), 0);
+      });
+    }
+  }
+}
+
+test('explicitly disabling Zalo still suppresses a new excused absence', async () => {
+  for (const delay of [0, 15]) {
+    const db = fixture(); db.settings.delay = delay;
+    const app = setup(db);
+    const result = await app.call('post', '/api/absences', {
+      body: { ...withdrawal, absenceStatus: 'Vắng có phép', sendZalo: false }
+    });
+    assert.equal(result.data.absence.noticeStatus, 'Không gửi');
+    assert.equal(result.data.absence.autoNotice, false);
+    assert.equal(result.data.absence.noticeDueAt, '');
+    assert.equal(result.data.noticeLog, null);
+    assert.equal(db.notificationLogs.length, 0);
+    assert.equal(app.networkCalls(), 0);
+  }
+});
+
+test('reposting the same excused attendance does not create another notice attempt', async () => {
+  const db = fixture(); const app = setup(db);
+  const request = { body: { ...withdrawal, absenceStatus: 'Có phép' } };
+  const created = await app.call('post', '/api/absences', request);
+  const repeated = await app.call('post', '/api/absences', request);
+  assert.equal(repeated.data.absence.id, created.data.absence.id);
+  assert.equal(repeated.data.absence.noticeStatus, 'Chờ gửi thủ công');
+  assert.equal(repeated.data.noticeLog, null);
+  assert.equal(db.absences.length, 1);
+  assert.equal(db.notificationLogs.length, 1);
+  assert.equal(app.networkCalls(), 0);
+});
+
+test('an older excused absence marked not sent remains available for an explicit bulk send', async () => {
+  const db = fixture();
+  db.absences.push({ id: 'old-excused', studentId: 's1', date: withdrawal.date,
+    session: withdrawal.session, absenceStatus: 'Có phép', noticeStatus: 'Không gửi' });
+  const app = setup(db);
+  vm.runInContext(slice('async function runBulkZaloAction(', "app.post('/api/absences/:id/zalo/manual-sent'"), app.context);
+  const result = await app.context.runBulkZaloAction(db, {}, 'bulk_send', ['old-excused']);
+  assert.equal(result.processed, 1);
+  assert.equal(result.logs[0].status, 'Chờ gửi thủ công');
+  assert.equal(db.absences[0].noticeStatus, 'Chờ gửi thủ công');
+  assert.equal(app.networkCalls(), 0);
+});
 
 for (const mode of ['new', 'update']) {
   test(`recent cross-class tuition contacts disable automatic sending and scheduling (${mode})`, async () => {
